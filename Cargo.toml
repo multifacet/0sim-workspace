@@ -5,3 +5,7 @@ authors = ["Mark Mansi <markm@cs.wisc.edu>"]
 edition = "2018"
 
 [dependencies]
+#spurs = { git = "https://github.com/mark-i-m/spurs.git" }
+spurs = { path = "/nobackup/spurs" }
+clap = { version = "2.32.0", features = [ "color" ] }
+failure = "0.1.2"
