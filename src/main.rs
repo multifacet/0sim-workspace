@@ -18,8 +18,8 @@ fn main() -> Result<(), failure::Error> {
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
-            (@arg DEVICE: +required +takes_value
-             "The device to format and use as a home directory (e.g. /dev/sda)")
+            (@arg DEVICE: +takes_value -d --device
+             "(Optional) the device to format and use as a home directory (e.g. -d /dev/sda)")
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -32,7 +32,7 @@ fn main() -> Result<(), failure::Error> {
         ("setupcloudlabforvagrant", Some(sub_m)) => {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
             let username = sub_m.value_of("USERNAME").unwrap();
-            let device = sub_m.value_of("DEVICE").unwrap();
+            let device = sub_m.value_of("DEVICE");
             setupcloudlabforvagrant(dry_run, cloudlab, username, device)
         }
         _ => {
@@ -48,7 +48,7 @@ fn setupcloudlabforvagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
     cloudlab: A,
     username: &str,
-    device: &str,
+    device: Option<&str>,
 ) -> Result<(), failure::Error> {
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(username, &cloudlab)?;
@@ -82,20 +82,21 @@ fn setupcloudlabforvagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         ushell.toggle_dry_run();
     }
 
-    // Set up home device/directory
-    // - format the device
-    // - mkfs on the partition
-    // - copy data to new partition and mount as home dir
-    ushell.run(spurs::util::reformat_drive(device))?;
-
-    spurs::util::format_partition_as_ext4(
-        // TODO: need to format drive
-        &ushell,
-        dry_run,
-        &format!("{}1", device),
-        &format!("/users/{}", username),
-        username,
-    )?;
+    if let Some(device) = device {
+        // Set up home device/directory
+        // - format the device and create a partition
+        // - mkfs on the partition
+        // - copy data to new partition and mount as home dir
+        ushell.run(spurs::util::write_gpt(device))?;
+        ushell.run(spurs::util::create_partition(device))?;
+        spurs::util::format_partition_as_ext4(
+            &ushell,
+            dry_run,
+            &format!("{}1", device), // assume it is the first device partition
+            &format!("/users/{}", username),
+            username,
+        )?;
+    }
 
     // Setup all other devices as swap devices
     let unpartitioned = spurs::util::get_unpartitioned_devs(&ushell, dry_run)?;
