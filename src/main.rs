@@ -105,9 +105,13 @@ fn setupcloudlabforvagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     }
 
     // clone linux-dev
-    ushell.run(cmd!("mkdir linux-dev"))?;
+    ushell.run(cmd!("mkdir -p linux-dev"))?;
     ushell.run(cmd!("git init").cwd(&format!("/users/{}/linux-dev", username)))?;
-    ushell.run(cmd!("git checkout -b side").cwd(&format!("/users/{}/linux-dev", username)))?;
+    ushell.run(
+        cmd!("git checkout -b side")
+            .cwd(&format!("/users/{}/linux-dev", username))
+            .allow_error(), // if already exists
+    )?;
 
     if !dry_run {
         let _ = Command::new("git")
@@ -136,6 +140,7 @@ fn setupcloudlabforvagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     let config = ushell
         .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
         .stdout;
+    let config = config.trim();
     ushell.run(cmd!(
         "cp {} /users/{}/linux-dev/kbuild/.config",
         config,
@@ -166,6 +171,7 @@ fn setupcloudlabforvagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     }
 
     let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
+    let nprocess = nprocess.trim();
     ushell.run(
         cmd!("make -j {} binrpm-pkg LOCALVERSION=-ztier", nprocess)
             .cwd(&format!("/users/{}/linux-dev/kbuild", username))
