@@ -20,6 +20,8 @@ fn main() -> Result<(), failure::Error> {
              "The username on the remote (e.g. markm)")
             (@arg DEVICE: +takes_value -d --device
              "(Optional) the device to format and use as a home directory (e.g. -d /dev/sda)")
+            (@arg GIT_BRANCH: +takes_value -g --git_branch
+             "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -33,7 +35,8 @@ fn main() -> Result<(), failure::Error> {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
             let username = sub_m.value_of("USERNAME").unwrap();
             let device = sub_m.value_of("DEVICE");
-            setupcloudlabforvagrant(dry_run, cloudlab, username, device)
+            let git_branch = sub_m.value_of("GIT_BRANCH");
+            setupcloudlabforvagrant(dry_run, cloudlab, username, device, git_branch)
         }
         _ => {
             unreachable!();
@@ -49,6 +52,7 @@ fn setupcloudlabforvagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     cloudlab: A,
     username: &str,
     device: Option<&str>,
+    git_branch: Option<&str>,
 ) -> Result<(), failure::Error> {
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(username, &cloudlab)?;
@@ -113,9 +117,15 @@ fn setupcloudlabforvagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
             .allow_error(), // if already exists
     )?;
 
+    let git_branch = if let Some(git_branch) = git_branch {
+        git_branch
+    } else {
+        "markm_ztier"
+    };
+
     if !dry_run {
         let _ = Command::new("git")
-            .args(&["checkout", "markm_ztier"])
+            .args(&["checkout", git_branch])
             .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
             .status()?;
 
