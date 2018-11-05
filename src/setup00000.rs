@@ -99,12 +99,13 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
                 "push",
                 "-u",
                 &format!("ssh://{}/users/{}/linux-dev", cloudlab, username),
-                "markm_ztier",
+                git_branch,
             ])
             .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
             .status()?;
     }
-    ushell.run(cmd!("git checkout markm_ztier").cwd(&format!("/users/{}/linux-dev", username)))?;
+    ushell
+        .run(cmd!("git checkout {}", git_branch).cwd(&format!("/users/{}/linux-dev", username)))?;
 
     // compile linux-dev
     ushell.run(cmd!("mkdir -p /users/{}/linux-dev/kbuild", username))?;
