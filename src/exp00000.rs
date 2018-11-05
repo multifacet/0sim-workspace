@@ -2,6 +2,8 @@
 //!
 //! Requires `setup00000`.
 
+use std::collections::HashMap;
+
 use spurs::{cmd, ssh::SshShell};
 
 /// The port that vagrant VMs forward from.
@@ -26,8 +28,22 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     ushell
         .run(cmd!("echo 50 | sudo tee /sys/module/zswap/parameters/max_pool_percent").use_bash())?;
 
+    // Warm up
+    const WARM_UP_SIZE: usize = 50; // GB
+    const WARM_UP_PATTERN: &str = "-z";
     vshell.run(
-        cmd!("./target/release/time_mmap_touch {} {} > /vagrant/vm_shared/results/time_mmap_touch_{}gb_zero_zswap_ssdswap_{}.out",
+        cmd!(
+            "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+            (WARM_UP_SIZE << 30) >> 12,
+            WARM_UP_PATTERN,
+        )
+        .cwd("/home/vagrant/paperexp")
+        .use_bash(),
+    )?;
+
+    // Then, run the actual experiment
+    vshell.run(
+        cmd!("sudo ./target/release/time_mmap_touch {} {} > /vagrant/vm_shared/results/time_mmap_touch_{}gb_zero_zswap_ssdswap_{}.out",
              (size << 30) >> 12,
              pattern,
              size,
@@ -38,6 +54,17 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     )?;
 
     spurs::util::reboot(&mut ushell, dry_run)?;
+
+    Ok(())
+}
+
+pub fn run_setup_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    dry_run: bool,
+    cloudlab: A,
+    username: &str,
+) -> Result<(), failure::Error> {
+    // Connect
+    let _ = connect_and_setup_host_and_vagrant(dry_run, &cloudlab, username)?;
 
     Ok(())
 }
@@ -154,24 +181,28 @@ fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     shell: &SshShell,
     cloudlab: A,
 ) -> Result<SshShell, failure::Error> {
+    shell.run(cmd!("sudo systemctl stop firewalld"))?;
+    shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
     shell.run(cmd!("sudo systemctl start nfs-idmap.service"))?;
 
     let (host, _) = spurs::util::get_host_ip(cloudlab);
 
-    // For some reason port-forwarding doesn't work sometimes, so we retry.
-    let vshell = {
-        let mut vshell;
+    shell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant/"))?;
+    shell.run(
+        cmd!("vagrant up")
+            .no_pty()
+            .cwd("/proj/superpages-PG0/markm_vagrant/"),
+    )?;
+    shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
+    let vshell = SshShell::with_default_key("root", (host, VAGRANT_PORT))?;
 
-        loop {
-            shell.run(cmd!("vagrant up").cwd("/proj/superpages-PG0/markm_vagrant/"))?;
-            vshell = SshShell::with_default_key("root", (host, VAGRANT_PORT));
-            if vshell.is_ok() {
-                break;
-            }
-        }
-
-        vshell.unwrap()
+    // Pin vcpus
+    let pin = {
+        let mut pin = HashMap::new();
+        pin.insert(0, 0);
+        pin
     };
+    virsh_vcpupin(shell, &pin)?;
 
     Ok(vshell)
 }
@@ -211,6 +242,19 @@ fn turn_on_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::Erro
     }
 
     shell.run(cmd!("lsblk"))?;
+
+    Ok(())
+}
+
+/// For `(v, p)` in `mapping`, pin vcpu `v` to host cpu `p`.
+fn virsh_vcpupin(shell: &SshShell, mapping: &HashMap<usize, usize>) -> Result<(), failure::Error> {
+    shell.run(cmd!("sudo virsh vcpuinfo markm_vagrant_test_vm"))?;
+
+    for (v, p) in mapping {
+        shell.run(cmd!("sudo virsh vcpupin markm_vagrant_test_vm {} {}", v, p))?;
+    }
+
+    shell.run(cmd!("sudo virsh vcpuinfo markm_vagrant_test_vm"))?;
 
     Ok(())
 }

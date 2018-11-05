@@ -32,12 +32,19 @@ fn main() -> Result<(), failure::Error> {
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
             (@arg SIZE: +required +takes_value {is_usize}
-             "The number of GBs of the workload (e.g. markm)")
+             "The number of GBs of the workload (e.g. 500)")
             (@group PATTERN =>
                 (@attributes +required)
                 (@arg zeros: -z "Fill pages with zeros")
                 (@arg counter: -c "Fill pages with counter values")
             )
+        )
+        (@subcommand exp00000setup =>
+            (about: "Only start the VM for exp00000. Requires `sudo`.")
+            (@arg CLOUDLAB: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -65,6 +72,12 @@ fn main() -> Result<(), failure::Error> {
             };
 
             exp00000::run(dry_run, cloudlab, username, gbs, pattern)
+        }
+        ("exp00000setup", Some(sub_m)) => {
+            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
+            let username = sub_m.value_of("USERNAME").unwrap();
+
+            exp00000::run_setup_only(dry_run, cloudlab, username)
         }
         _ => {
             unreachable!();
