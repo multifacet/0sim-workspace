@@ -6,6 +6,7 @@ mod setup00000;
 
 // Experiment routines
 mod exp00000;
+mod exp00001;
 
 use clap::clap_app;
 
@@ -37,14 +38,29 @@ fn main() -> Result<(), failure::Error> {
                 (@attributes +required)
                 (@arg zeros: -z "Fill pages with zeros")
                 (@arg counter: -c "Fill pages with counter values")
+                (@arg memcached: -m "Run a memcached workload")
             )
         )
-        (@subcommand exp00000setup =>
+        (@subcommand exp00000up =>
             (about: "Only start the VM for exp00000. Requires `sudo`.")
             (@arg CLOUDLAB: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
+        )
+        (@subcommand exp00001 =>
+            (about: "Run experiment 00001. Requires `sudo`.")
+            (@arg DESKTOP: +required +takes_value
+             "The domain name of the remote (e.g. seclab8:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
+            (@arg SIZE: +required +takes_value {is_usize}
+             "The number of GBs of the workload (e.g. 500)")
+            (@group PATTERN =>
+                (@attributes +required)
+                (@arg zeros: -z "Fill pages with zeros")
+                (@arg counter: -c "Fill pages with counter values")
+            )
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -65,19 +81,35 @@ fn main() -> Result<(), failure::Error> {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
             let username = sub_m.value_of("USERNAME").unwrap();
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
+            let pattern = if sub_m.is_present("memcached") {
+                None
+            } else {
+                Some(if sub_m.is_present("zeros") {
+                    "-z"
+                } else {
+                    "-c"
+                })
+            };
+
+            exp00000::run(dry_run, cloudlab, username, gbs, pattern)
+        }
+        ("exp00000up", Some(sub_m)) => {
+            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
+            let username = sub_m.value_of("USERNAME").unwrap();
+
+            exp00000::run_setup_only(dry_run, cloudlab, username)
+        }
+        ("exp00001", Some(sub_m)) => {
+            let desktop = sub_m.value_of("DESKTOP").unwrap();
+            let username = sub_m.value_of("USERNAME").unwrap();
+            let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
             let pattern = if sub_m.is_present("zeros") {
                 "-z"
             } else {
                 "-c"
             };
 
-            exp00000::run(dry_run, cloudlab, username, gbs, pattern)
-        }
-        ("exp00000setup", Some(sub_m)) => {
-            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
-
-            exp00000::run_setup_only(dry_run, cloudlab, username)
+            exp00001::run(dry_run, desktop, username, gbs, pattern)
         }
         _ => {
             unreachable!();

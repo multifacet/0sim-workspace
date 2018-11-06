@@ -1,4 +1,4 @@
-//! Run the time_mmap_touch workload on the remote cloudlab machine.
+//! Run the time_mmap_touch or memcached_gen_data workload on the remote cloudlab machine.
 //!
 //! Requires `setup00000`.
 
@@ -17,7 +17,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     cloudlab: A,
     username: &str,
     size: usize,
-    pattern: &str,
+    pattern: Option<&str>,
 ) -> Result<(), failure::Error> {
     // Reboot
     initial_reboot(dry_run, &cloudlab, username)?;
@@ -31,30 +31,59 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     ushell
         .run(cmd!("echo 50 | sudo tee /sys/module/zswap/parameters/max_pool_percent").use_bash())?;
 
-    // Warm up
-    //const WARM_UP_SIZE: usize = 50; // GB
-    //const WARM_UP_PATTERN: &str = "-z";
-    //vshell.run(
-    //    cmd!(
-    //        "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-    //        (WARM_UP_SIZE << 30) >> 12,
-    //        WARM_UP_PATTERN,
-    //    )
-    //    .cwd("/home/vagrant/paperexp")
-    //    .use_bash(),
-    //)?;
+    // Run memcached or time_touch_mmap
+    if let Some(pattern) = pattern {
+        // Warm up
+        //const WARM_UP_SIZE: usize = 50; // GB
+        const WARM_UP_PATTERN: &str = "-z";
+        vshell.run(
+            cmd!(
+                "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                //(WARM_UP_SIZE << 30) >> 12,
+                //WARM_UP_PATTERN,
+                (size << 30) >> 12,
+                WARM_UP_PATTERN,
+            )
+            .cwd("/home/vagrant/paperexp")
+            .use_bash(),
+        )?;
 
-    // Then, run the actual experiment
-    vshell.run(
-        cmd!("sudo ./target/release/time_mmap_touch {} {} > /vagrant/vm_shared/results/time_mmap_touch_{}gb_zero_zswap_ssdswap_{}.out",
-             (size << 30) >> 12,
-             pattern,
-             size,
-             chrono::offset::Local::now().format("%Y-%m-%d-%H-%M-%S").to_string()
-        )
-        .cwd("/home/vagrant/paperexp")
-        .use_bash()
-    )?;
+        // Then, run the actual experiment
+        vshell.run(
+            cmd!(
+                "sudo ./target/release/time_mmap_touch {} {} \
+                 > /vagrant/vm_shared/results/time_mmap_touch_{}gb_zero_zswap_ssdswap_{}.out",
+                (size << 30) >> 12,
+                pattern,
+                size,
+                chrono::offset::Local::now()
+                    .format("%Y-%m-%d-%H-%M-%S")
+                    .to_string()
+            )
+            .cwd("/home/vagrant/paperexp")
+            .use_bash(),
+        )?;
+    } else {
+        vshell.run(cmd!("memcached -M -m {} -d -u vagrant", (size * 1024)))?;
+
+        // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
+        // This gives much simpler performance behaviors. memcached uses a large amount of the memory
+        // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
+        vshell.run(
+            cmd!(
+                "nohup ./target/release/memcached_gen_data localhost:11211 {} \
+                 > /vagrant/vm_shared/results/memcached_{}gb_zswap_ssdswap_{}.out",
+                size,
+                size,
+                chrono::offset::Local::now()
+                    .format("%Y-%m-%d-%H-%M-%S")
+                    .to_string()
+            )
+            .cwd("/home/vagrant/paperexp")
+            .use_bash()
+            .allow_error(),
+        )?;
+    }
 
     spurs::util::reboot(&mut ushell, dry_run)?;
 
@@ -137,6 +166,15 @@ fn connect_and_setup_host_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
     // Set up swapping
     turn_off_swapdevs(&ushell, dry_run)?;
     turn_on_swapdevs(&ushell, dry_run)?;
+
+    // Make sure /proj/superpages-PG0 is mounted
+    let nfs_mounted = ushell.run(cmd!("mount | grep proj").use_bash()).is_ok();
+    if !nfs_mounted {
+        ushell.run(
+            cmd!("sudo mount -t nfs -o rw,relatime,vers=3,rsize=131072,wsize=131072,namlen=255,hard,nolock,proto=tcp,timeo=600,ys,mountaddr=128.104.222.8,mountvers=3,mountport=900,mountproto=tcp,local_lock=all,addr=128.104.222.8 \
+                  128.104.222.8:/proj/superpages-PG0 /proj/superpages-PG0/")
+        )?;
+    }
 
     println!("Assuming home dir already mounted... uncomment this line if it's not");
     //mount_home_dir(ushell)
