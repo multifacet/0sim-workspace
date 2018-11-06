@@ -7,7 +7,10 @@ use std::collections::HashMap;
 use spurs::{cmd, ssh::SshShell};
 
 /// The port that vagrant VMs forward from.
-const VAGRANT_PORT: u16 = 5555;
+pub const VAGRANT_PORT: u16 = 5555;
+
+/// The amount of memory of the VM.
+pub const VAGRANT_MEM: usize = 1024;
 
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
@@ -29,17 +32,17 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         .run(cmd!("echo 50 | sudo tee /sys/module/zswap/parameters/max_pool_percent").use_bash())?;
 
     // Warm up
-    const WARM_UP_SIZE: usize = 50; // GB
-    const WARM_UP_PATTERN: &str = "-z";
-    vshell.run(
-        cmd!(
-            "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-            (WARM_UP_SIZE << 30) >> 12,
-            WARM_UP_PATTERN,
-        )
-        .cwd("/home/vagrant/paperexp")
-        .use_bash(),
-    )?;
+    //const WARM_UP_SIZE: usize = 50; // GB
+    //const WARM_UP_PATTERN: &str = "-z";
+    //vshell.run(
+    //    cmd!(
+    //        "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+    //        (WARM_UP_SIZE << 30) >> 12,
+    //        WARM_UP_PATTERN,
+    //    )
+    //    .cwd("/home/vagrant/paperexp")
+    //    .use_bash(),
+    //)?;
 
     // Then, run the actual experiment
     vshell.run(
@@ -94,7 +97,7 @@ fn connect_and_setup_host_and_vagrant<A: std::net::ToSocketAddrs + std::fmt::Dis
     username: &str,
 ) -> Result<(SshShell, SshShell), failure::Error> {
     let ushell = connect_and_setup_host_only(dry_run, &cloudlab, username)?;
-    let vshell = start_vagrant(&ushell, &cloudlab)?;
+    let vshell = start_vagrant(&ushell, &cloudlab, VAGRANT_MEM)?;
 
     Ok((ushell, vshell))
 }
@@ -145,6 +148,8 @@ fn connect_and_setup_host_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
     )?;
     ushell.run(cmd!("sudo /users/markm/linux-dev/tools/power/cpupower/cpupower frequency-set -g performance").dry_run(dry_run))?;
 
+    ushell.run(cmd!("echo 4 | sudo tee /proc/sys/kernel/printk").use_bash())?;
+
     Ok(ushell)
 }
 
@@ -177,15 +182,23 @@ fn turn_on_zswap(shell: &mut SshShell, dry_run: bool) -> Result<(), failure::Err
     Ok(())
 }
 
-fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
+pub fn connect_to_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    cloudlab: A,
+) -> Result<SshShell, failure::Error> {
+    let (host, _) = spurs::util::get_host_ip(cloudlab);
+    SshShell::with_default_key("root", (host, VAGRANT_PORT))
+}
+
+pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     shell: &SshShell,
     cloudlab: A,
+    memgb: usize,
 ) -> Result<SshShell, failure::Error> {
     shell.run(cmd!("sudo systemctl stop firewalld"))?;
     shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
     shell.run(cmd!("sudo systemctl start nfs-idmap.service"))?;
 
-    let (host, _) = spurs::util::get_host_ip(cloudlab);
+    gen_vagrantfile_gb(shell, memgb)?;
 
     shell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant/"))?;
     shell.run(
@@ -194,7 +207,7 @@ fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
             .cwd("/proj/superpages-PG0/markm_vagrant/"),
     )?;
     shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
-    let vshell = SshShell::with_default_key("root", (host, VAGRANT_PORT))?;
+    let vshell = connect_to_vagrant(cloudlab)?;
 
     // Pin vcpus
     let pin = {
@@ -255,6 +268,20 @@ fn virsh_vcpupin(shell: &SshShell, mapping: &HashMap<usize, usize>) -> Result<()
     }
 
     shell.run(cmd!("sudo virsh vcpuinfo markm_vagrant_test_vm"))?;
+
+    Ok(())
+}
+
+/// Generate a Vagrantfile for a VM with the given amount of memory.
+pub fn gen_vagrantfile_gb(shell: &SshShell, memgb: usize) -> Result<(), failure::Error> {
+    shell.run(
+        cmd!(
+            "sed 's/memory = 1023/memory = {}/' Vagrantfile.bk > Vagrantfile",
+            memgb
+        )
+        .use_bash()
+        .cwd("/proj/superpages-PG0/markm_vagrant/"),
+    )?;
 
     Ok(())
 }

@@ -168,11 +168,82 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     // update grub to choose this entry (new kernel) by default
     ushell.run(cmd!("sudo grub2-set-default 0"))?;
 
-    ushell.run(cmd!("mkdir images"))?;
+    // change image location
+    ushell.run(cmd!("mkdir -p vm_shared"))?;
+    ushell.run(cmd!("mkdir -p images"))?;
+    ushell.run(cmd!(
+        "sudo ln -sf /var/lib/libvirt/images/ /users/{}/images",
+        username
+    ))?;
 
     spurs::util::reboot(&mut ushell, dry_run)?;
 
-    println!("\n\nSET UP LIBVIRT IMAGE LOCATION\n\n");
+    // Add ssh key to VM
+    super::exp00000::gen_vagrantfile_gb(&ushell, 20)?;
+    ushell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant"))?;
+    ushell.run(cmd!("vagrant up").cwd("/proj/superpages-PG0/markm_vagrant"))?;
+
+    let key = std::fs::read_to_string("/u/m/a/markm/.ssh/id_rsa.pub")?;
+    let key = key.trim();
+    ushell.run(
+        cmd!(
+            "vagrant ssh -- 'echo {} >> /home/vagrant/.ssh/authorized_keys'",
+            key
+        )
+        .cwd("/proj/superpages-PG0/markm_vagrant"),
+    )?;
+    ushell.run(
+        cmd!("vagrant ssh -- sudo cp -r /home/vagrant/.ssh /root/")
+            .cwd("/proj/superpages-PG0/markm_vagrant"),
+    )?;
+
+    // Start vagrant
+    let vshell = super::exp00000::start_vagrant(&ushell, &cloudlab, 20)?;
+
+    // Install stuff on the VM
+    vshell.run(spurs::centos::yum_install(&[
+        "vim",
+        "git",
+        "memcached",
+        "gcc",
+    ]))?;
+
+    vshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
+
+    // Install benchmarks
+    vshell.run(cmd!("mkdir -p paperexp").cwd("/home/vagrant"))?;
+    vshell.run(cmd!("git init").cwd("/home/vagrant/paperexp"))?;
+    vshell.run(
+        cmd!("git checkout -b side")
+            .cwd("/home/vagrant/paperexp")
+            .allow_error(), // if already exists
+    )?;
+
+    if !dry_run {
+        let (host, _) = spurs::util::get_host_ip(cloudlab);
+
+        let _ = Command::new("git")
+            .args(&["checkout", "master"])
+            .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
+            .status()?;
+
+        let _ = Command::new("git")
+            .args(&[
+                "push",
+                "-u",
+                &format!(
+                    "ssh://root@{}:{}/home/vagrant/paperexp",
+                    host,
+                    super::exp00000::VAGRANT_PORT
+                ),
+                "master",
+            ])
+            .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
+            .status()?;
+    }
+    vshell.run(cmd!("git checkout master").cwd("/home/vagrant/paperexp"))?;
+
+    vshell.run(cmd!("/root/.cargo/bin/cargo build --release").cwd("/home/vagrant/paperexp"))?;
 
     Ok(())
 }
