@@ -7,6 +7,7 @@ mod setup00000;
 // Experiment routines
 mod exp00000;
 mod exp00001;
+mod exp00002;
 
 use clap::clap_app;
 
@@ -40,6 +41,8 @@ fn main() -> Result<(), failure::Error> {
                 (@arg counter: -c "Fill pages with counter values")
                 (@arg memcached: -m "Run a memcached workload")
             )
+            (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
+             "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
         )
         (@subcommand exp00000up =>
             (about: "Only start the VM for exp00000. Requires `sudo`.")
@@ -47,6 +50,8 @@ fn main() -> Result<(), failure::Error> {
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
+            (@arg VMSIZE: +takes_value {is_usize}
+             "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
         )
         (@subcommand exp00001 =>
             (about: "Run experiment 00001. Requires `sudo`.")
@@ -61,6 +66,17 @@ fn main() -> Result<(), failure::Error> {
                 (@arg zeros: -z "Fill pages with zeros")
                 (@arg counter: -c "Fill pages with counter values")
             )
+        )
+        (@subcommand exp00002 =>
+            (about: "Run experiment 00002. Requires `sudo`.")
+            (@arg CLOUDLAB: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
+            (@arg N: +required +takes_value {is_usize}
+             "The number of iterations of the workload (e.g. 50000000)")
+            (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
+             "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -90,14 +106,20 @@ fn main() -> Result<(), failure::Error> {
                     "-c"
                 })
             };
+            let vm_size = sub_m
+                .value_of("VMSIZE")
+                .map(|value| value.parse::<usize>().unwrap());
 
-            exp00000::run(dry_run, cloudlab, username, gbs, pattern)
+            exp00000::run(dry_run, cloudlab, username, gbs, pattern, vm_size)
         }
         ("exp00000up", Some(sub_m)) => {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
             let username = sub_m.value_of("USERNAME").unwrap();
+            let vm_size = sub_m
+                .value_of("VMSIZE")
+                .map(|value| value.parse::<usize>().unwrap());
 
-            exp00000::run_setup_only(dry_run, cloudlab, username)
+            exp00000::run_setup_only(dry_run, cloudlab, username, vm_size)
         }
         ("exp00001", Some(sub_m)) => {
             let desktop = sub_m.value_of("DESKTOP").unwrap();
@@ -111,6 +133,17 @@ fn main() -> Result<(), failure::Error> {
 
             exp00001::run(dry_run, desktop, username, gbs, pattern)
         }
+        ("exp00002", Some(sub_m)) => {
+            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
+            let username = sub_m.value_of("USERNAME").unwrap();
+            let n = sub_m.value_of("N").unwrap().parse::<usize>().unwrap();
+            let vm_size = sub_m
+                .value_of("VMSIZE")
+                .map(|value| value.parse::<usize>().unwrap());
+
+            exp00002::run(dry_run, cloudlab, username, n, vm_size)
+        }
+
         _ => {
             unreachable!();
         }

@@ -169,7 +169,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     ushell.run(cmd!("sudo grub2-set-default 0"))?;
 
     // change image location
-    ushell.run(cmd!("mkdir -p vm_shared"))?;
+    ushell.run(cmd!("mkdir -p vm_shared/results/"))?;
     ushell.run(cmd!("mkdir -p images"))?;
     ushell.run(cmd!(
         "sudo ln -sf /var/lib/libvirt/images/ /users/{}/images",

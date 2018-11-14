@@ -1,4 +1,4 @@
-//! Run the time_mmap_touch or memcached_gen_data workload on the remote cloudlab machine.
+//! Run the time_loop workload on the remote cloudlab machine.
 //!
 //! Requires `setup00000`.
 
@@ -16,8 +16,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
     cloudlab: A,
     username: &str,
-    size: usize, // GB
-    pattern: Option<&str>,
+    n: usize,               // GB
     vm_size: Option<usize>, // GB
 ) -> Result<(), failure::Error> {
     // Reboot
@@ -39,31 +38,24 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     ushell
         .run(cmd!("echo 50 | sudo tee /sys/module/zswap/parameters/max_pool_percent").use_bash())?;
 
-    // Run memcached or time_touch_mmap
-    if let Some(pattern) = pattern {
-        // Warm up
-        //const WARM_UP_SIZE: usize = 50; // GB
-        const WARM_UP_PATTERN: &str = "-z";
-        vshell.run(
-            cmd!(
-                "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                //(WARM_UP_SIZE << 30) >> 12,
-                //WARM_UP_PATTERN,
-                (size << 30) >> 12,
-                WARM_UP_PATTERN,
-            )
-            .cwd("/home/vagrant/paperexp")
-            .use_bash(),
-        )?;
+    // Warm up
+    const WARM_UP_PATTERN: &str = "-z";
+    vshell.run(
+        cmd!(
+            "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+            ((vm_size << 30) >> 12) >> 1,
+            WARM_UP_PATTERN,
+        )
+        .cwd("/home/vagrant/paperexp")
+        .use_bash(),
+    )?;
 
-        // Then, run the actual experiment
-        vshell.run(
+    // Then, run the actual experiment
+    vshell.run(
             cmd!(
-                "sudo ./target/release/time_mmap_touch {} {} \
-                 > /vagrant/vm_shared/results/time_mmap_touch_{}gb_zero_zswap_ssdswap_{}.out",
-                (size << 30) >> 12,
-                pattern,
-                size,
+                "sudo ./target/release/time_loop {} > /vagrant/vm_shared/results/time_loop_{}_zswap_ssdswap_{}.out",
+                n,
+                n,
                 chrono::offset::Local::now()
                     .format("%Y-%m-%d-%H-%M-%S")
                     .to_string()
@@ -71,27 +63,6 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
             .cwd("/home/vagrant/paperexp")
             .use_bash(),
         )?;
-    } else {
-        vshell.run(cmd!("memcached -M -m {} -d -u vagrant", (size * 1024)))?;
-
-        // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
-        // This gives much simpler performance behaviors. memcached uses a large amount of the memory
-        // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
-        vshell.run(
-            cmd!(
-                "nohup ./target/release/memcached_gen_data localhost:11211 {} \
-                 > /vagrant/vm_shared/results/memcached_{}gb_zswap_ssdswap_{}.out",
-                size,
-                size,
-                chrono::offset::Local::now()
-                    .format("%Y-%m-%d-%H-%M-%S")
-                    .to_string()
-            )
-            .cwd("/home/vagrant/paperexp")
-            .use_bash()
-            .allow_error(),
-        )?;
-    }
 
     spurs::util::reboot(&mut ushell, dry_run)?;
 
