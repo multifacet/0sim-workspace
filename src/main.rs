@@ -26,6 +26,8 @@ fn main() -> Result<(), failure::Error> {
              "(Optional) the device to format and use as a home directory (e.g. -d /dev/sda)")
             (@arg GIT_BRANCH: +takes_value -g --git_branch
              "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
+            (@arg ONLY_VM: -v --only_vm
+             "(Optional) only setup the VM")
         )
         (@subcommand exp00000 =>
             (about: "Run experiment 00000. Requires `sudo`.")
@@ -91,7 +93,8 @@ fn main() -> Result<(), failure::Error> {
             let username = sub_m.value_of("USERNAME").unwrap();
             let device = sub_m.value_of("DEVICE");
             let git_branch = sub_m.value_of("GIT_BRANCH");
-            setup00000::run(dry_run, cloudlab, username, device, git_branch)
+            let only_vm = sub_m.is_present("ONLY_VM");
+            setup00000::run(dry_run, cloudlab, username, device, git_branch, only_vm)
         }
         ("exp00000", Some(sub_m)) => {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
