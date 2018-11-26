@@ -23,6 +23,15 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         ushell.toggle_dry_run();
     }
 
+    // Rename `poweroff` so we can't accidentally use it
+    ushell.run(
+        cmd!(
+            "type poweroff && sudo mv $(type poweroff | awk '{{print $3}}') \
+             /usr/sbin/poweroff-actually || echo already renamed"
+        )
+        .use_bash(),
+    )?;
+
     // Install a bunch of stuff
     ushell.run(spurs::centos::yum_install(&[
         "libvirt",
