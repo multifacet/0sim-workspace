@@ -186,7 +186,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     }
 
     // Add ssh key to VM
-    crate::common::exp00000::gen_vagrantfile_gb(&ushell, 20, 1)?;
+    crate::common::exp00000::gen_vagrantfile(&ushell, 20, 1)?;
     ushell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant"))?;
     ushell.run(cmd!("vagrant up").cwd("/proj/superpages-PG0/markm_vagrant"))?;
 

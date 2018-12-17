@@ -48,7 +48,7 @@ fn main() -> Result<(), failure::Error> {
             )
             (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
              "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
-            (@arg CORES: +takes_value {is_usize} -c --cores
+            (@arg CORES: +takes_value {is_usize} -C --cores
              "The number of cores of the VM (defaults to 1)")
             (@arg WARMUP: -w --warmup
              "Pass this flag to warmup the VM before running the main workload.")
@@ -86,7 +86,7 @@ fn main() -> Result<(), failure::Error> {
              "The number of iterations of the workload (e.g. 50000000)")
             (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
              "The number of GBs of the VM (defaults to 1024)")
-            (@arg CORES: +takes_value {is_usize} -c --cores
+            (@arg CORES: +takes_value {is_usize} -C --cores
              "The number of cores of the VM (defaults to 1)")
             (@arg WARMUP: -w --warmup
              "Pass this flag to warmup the VM before running the main workload.")

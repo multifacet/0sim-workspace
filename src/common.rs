@@ -177,7 +177,7 @@ pub mod exp00000 {
         shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
         shell.run(cmd!("sudo systemctl start nfs-idmap.service"))?;
 
-        gen_vagrantfile_gb(shell, memgb, cores)?;
+        gen_vagrantfile(shell, memgb, cores)?;
 
         shell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant/"))?;
         shell.run(
@@ -191,7 +191,9 @@ pub mod exp00000 {
         // Pin vcpus
         let pin = {
             let mut pin = HashMap::new();
-            pin.insert(0, 0);
+            for c in 0..cores {
+                pin.insert(c, c);
+            }
             pin
         };
         virsh_vcpupin(shell, &pin)?;
@@ -255,7 +257,7 @@ pub mod exp00000 {
     }
 
     /// Generate a Vagrantfile for a VM with the given amount of memory and number of cores.
-    pub fn gen_vagrantfile_gb(
+    pub fn gen_vagrantfile(
         shell: &SshShell,
         memgb: usize,
         cores: usize,
@@ -264,21 +266,230 @@ pub mod exp00000 {
             cmd!("cp Vagrantfile.bk Vagrantfile").cwd("/proj/superpages-PG0/markm_vagrant/"),
         )?;
         shell.run(
-            cmd!("sed 's/memory = 1023/memory = {}/'", memgb)
+            cmd!("sed -i 's/memory = 1023/memory = {}/' Vagrantfile", memgb)
                 .cwd("/proj/superpages-PG0/markm_vagrant/"),
         )?;
         shell.run(
-            cmd!("sed 's/cpus = 1/cpus = {}/'", cores).cwd("/proj/superpages-PG0/markm_vagrant/"),
+            cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores)
+                .cwd("/proj/superpages-PG0/markm_vagrant/"),
         )?;
         Ok(())
     }
 
 }
 
+pub mod exp00001 {
+    use std::collections::HashMap;
+
+    use spurs::{cmd, ssh::SshShell};
+
+    pub use super::exp00000::{connect_to_vagrant, VAGRANT_CORES, VAGRANT_PORT};
+
+    /// The default amount of memory of the VM.
+    pub const VAGRANT_MEM: usize = 1023;
+
+    /// Turn on Zswap with some default parameters.
+    pub fn turn_on_zswap(shell: &mut SshShell, dry_run: bool) -> Result<(), failure::Error> {
+        if dry_run {
+            shell.toggle_dry_run();
+        }
+
+        // apparently permissions can get weird
+        shell.run(cmd!("chmod +w /sys/module/zswap/parameters/*").use_bash())?;
+
+        // THP is buggy with frontswap until later kernels
+        shell.run(cmd!("echo never > /sys/kernel/mm/transparent_hugepage/enabled").use_bash())?;
+
+        shell.run(cmd!("echo ztier > /sys/module/zswap/parameters/zpool").use_bash())?;
+        shell.run(cmd!("echo y > /sys/module/zswap/parameters/enabled").use_bash())?;
+        shell.run(cmd!("tail /sys/module/zswap/parameters/*").use_bash())?;
+
+        if dry_run {
+            shell.toggle_dry_run();
+        }
+
+        Ok(())
+    }
+
+    /// For `(v, p)` in `mapping`, pin vcpu `v` to host cpu `p`.
+    pub fn virsh_vcpupin(
+        shell: &SshShell,
+        mapping: &HashMap<usize, usize>,
+    ) -> Result<(), failure::Error> {
+        shell.run(cmd!("virsh vcpuinfo vagrant_test_vm"))?;
+
+        for (v, p) in mapping {
+            shell.run(cmd!("virsh vcpupin vagrant_test_vm {} {}", v, p))?;
+        }
+
+        shell.run(cmd!("virsh vcpuinfo vagrant_test_vm"))?;
+
+        Ok(())
+    }
+
+    pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        shell: &SshShell,
+        desktop: A,
+        memgb: usize,
+    ) -> Result<SshShell, failure::Error> {
+        gen_vagrantfile_gb(shell, memgb)?;
+
+        shell.run(cmd!("vagrant halt").cwd("/home/markm/vagrant/"))?;
+        shell.run(cmd!("vagrant up").no_pty().cwd("/home/markm/vagrant/"))?;
+        shell.run(cmd!("lsof -i -P -n | grep LISTEN").use_bash())?;
+        let vshell = connect_to_vagrant(desktop)?;
+
+        // Pin vcpus
+        let pin = {
+            let mut pin = HashMap::new();
+            pin.insert(0, 0);
+            pin
+        };
+        virsh_vcpupin(shell, &pin)?;
+
+        Ok(vshell)
+    }
+
+    /// Generate a Vagrantfile for a VM with the given amount of memory.
+    pub fn gen_vagrantfile_gb(shell: &SshShell, memgb: usize) -> Result<(), failure::Error> {
+        shell.run(
+            cmd!(
+                "sed 's/memory = 1023/memory = {}/' Vagrantfile.bk > Vagrantfile",
+                memgb
+            )
+            .use_bash()
+            .cwd("/home/markm/vagrant/"),
+        )?;
+
+        Ok(())
+    }
+
+    pub fn reboot(shell: &mut SshShell, dry_run: bool) -> Result<(), failure::Error> {
+        let _ = shell.run(cmd!("reboot").dry_run(dry_run));
+
+        if !dry_run {
+            // If we try to reconnect immediately, the machine will not have gone down yet.
+            std::thread::sleep(std::time::Duration::from_secs(10));
+
+            // Attempt to reconnect.
+            shell.reconnect()?;
+        }
+
+        // Make sure it worked.
+        shell.run(cmd!("whoami").dry_run(dry_run))?;
+
+        Ok(())
+    }
+
+    /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
+    pub fn initial_reboot<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        dry_run: bool,
+        desktop: A,
+    ) -> Result<(), failure::Error> {
+        // Connect to the remote
+        let mut ushell = SshShell::with_default_key("root", &desktop)?;
+        if dry_run {
+            ushell.toggle_dry_run();
+        }
+
+        // Reboot the remote to make sure we have a clean slate
+        reboot(&mut ushell, dry_run)?;
+
+        Ok(())
+    }
+
+    /// Connects to the host and to vagrant. Returns shells for both.
+    pub fn connect_and_setup_host_and_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        dry_run: bool,
+        username: &str,
+        desktop: A,
+    ) -> Result<(SshShell, SshShell, SshShell), failure::Error> {
+        let (ushell, rshell) = connect_and_setup_host_only(dry_run, username, &desktop)?;
+        let vshell = start_vagrant(&ushell, &desktop, VAGRANT_MEM)?;
+
+        Ok((ushell, rshell, vshell))
+    }
+
+    /// Connects to the host, waiting for it to come up if necessary. Turn on only the swap devices we
+    /// want. Set the scaling governor. Returns the shell to the host.
+    pub fn connect_and_setup_host_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        dry_run: bool,
+        username: &str,
+        desktop: A,
+    ) -> Result<(SshShell, SshShell), failure::Error> {
+        // Keep trying to connect until we succeed
+        let rshell = {
+            let mut shell;
+            loop {
+                shell = match SshShell::with_default_key("root", &desktop) {
+                    Ok(shell) => shell,
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_secs(10));
+                        continue;
+                    }
+                };
+                match shell.run(cmd!("whoami")) {
+                    Ok(_) => break,
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_secs(10));
+                        continue;
+                    }
+                }
+            }
+
+            shell
+        };
+
+        let ushell = {
+            let mut shell;
+            loop {
+                shell = match SshShell::with_default_key(username, &desktop) {
+                    Ok(shell) => shell,
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_secs(10));
+                        continue;
+                    }
+                };
+                match shell.run(cmd!("whoami")) {
+                    Ok(_) => break,
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_secs(10));
+                        continue;
+                    }
+                }
+            }
+
+            shell
+        };
+
+        ushell.run(cmd!("uname -a").dry_run(dry_run))?;
+
+        // Set up swapping
+        rshell.run(cmd!("swapoff /dev/sda5"))?;
+        rshell.run(cmd!("swapon /dev/sdb"))?;
+
+        ushell.run(
+            cmd!("make")
+                .cwd("/home/markm/linux-dev/tools/power/cpupower/")
+                .dry_run(dry_run),
+        )?;
+        rshell.run(
+            cmd!(
+                "/home/markm/linux-dev/tools/power/cpupower/cpupower frequency-set -g performance"
+            )
+            .dry_run(dry_run),
+        )?;
+
+        rshell.run(cmd!("echo 4 > /proc/sys/kernel/printk").use_bash())?;
+
+        Ok((ushell, rshell))
+    }
+}
+
 pub mod exp00002 {
     pub use super::exp00000::{
         connect_and_setup_host_and_vagrant, connect_and_setup_host_only, connect_to_vagrant,
-        gen_vagrantfile_gb, initial_reboot, run_setup_only, start_vagrant, turn_off_swapdevs,
+        gen_vagrantfile, initial_reboot, run_setup_only, start_vagrant, turn_off_swapdevs,
         turn_on_swapdevs, turn_on_zswap, virsh_vcpupin, VAGRANT_CORES, VAGRANT_MEM, VAGRANT_PORT,
     };
 }
