@@ -1,6 +1,9 @@
 //! This program runs different routines remotely. Which routine is chosen by passing different
 //! command line arguments. certain routines require extra arguments.
 
+// Useful common routines
+mod common;
+
 // Setup routines
 mod setup00000;
 
@@ -45,6 +48,10 @@ fn main() -> Result<(), failure::Error> {
             )
             (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
              "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
+            (@arg CORES: +takes_value {is_usize} -c --cores
+             "The number of cores of the VM (defaults to 1)")
+            (@arg WARMUP: -w --warmup
+             "Pass this flag to warmup the VM before running the main workload.")
         )
         (@subcommand exp00000up =>
             (about: "Only start the VM for exp00000. Requires `sudo`.")
@@ -78,7 +85,11 @@ fn main() -> Result<(), failure::Error> {
             (@arg N: +required +takes_value {is_usize}
              "The number of iterations of the workload (e.g. 50000000)")
             (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
-             "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
+             "The number of GBs of the VM (defaults to 1024)")
+            (@arg CORES: +takes_value {is_usize} -c --cores
+             "The number of cores of the VM (defaults to 1)")
+            (@arg WARMUP: -w --warmup
+             "Pass this flag to warmup the VM before running the main workload.")
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -112,8 +123,14 @@ fn main() -> Result<(), failure::Error> {
             let vm_size = sub_m
                 .value_of("VMSIZE")
                 .map(|value| value.parse::<usize>().unwrap());
+            let cores = sub_m
+                .value_of("CORES")
+                .map(|value| value.parse::<usize>().unwrap());
+            let warmup = sub_m.is_present("WARMUP");
 
-            exp00000::run(dry_run, cloudlab, username, gbs, pattern, vm_size)
+            exp00000::run(
+                dry_run, cloudlab, username, gbs, pattern, vm_size, cores, warmup,
+            )
         }
         ("exp00000up", Some(sub_m)) => {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
@@ -121,8 +138,11 @@ fn main() -> Result<(), failure::Error> {
             let vm_size = sub_m
                 .value_of("VMSIZE")
                 .map(|value| value.parse::<usize>().unwrap());
+            let cores = sub_m
+                .value_of("CORES")
+                .map(|value| value.parse::<usize>().unwrap());
 
-            exp00000::run_setup_only(dry_run, cloudlab, username, vm_size)
+            common::exp00000::run_setup_only(dry_run, cloudlab, username, vm_size, cores)
         }
         ("exp00001", Some(sub_m)) => {
             let desktop = sub_m.value_of("DESKTOP").unwrap();
@@ -143,8 +163,12 @@ fn main() -> Result<(), failure::Error> {
             let vm_size = sub_m
                 .value_of("VMSIZE")
                 .map(|value| value.parse::<usize>().unwrap());
+            let cores = sub_m
+                .value_of("CORES")
+                .map(|value| value.parse::<usize>().unwrap());
+            let warmup = sub_m.is_present("WARMUP");
 
-            exp00002::run(dry_run, cloudlab, username, n, vm_size)
+            exp00002::run(dry_run, cloudlab, username, n, vm_size, cores, warmup)
         }
 
         _ => {

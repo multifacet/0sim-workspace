@@ -186,7 +186,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     }
 
     // Add ssh key to VM
-    super::exp00000::gen_vagrantfile_gb(&ushell, 20)?;
+    crate::common::exp00000::gen_vagrantfile_gb(&ushell, 20, 1)?;
     ushell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant"))?;
     ushell.run(cmd!("vagrant up").cwd("/proj/superpages-PG0/markm_vagrant"))?;
 
@@ -211,13 +211,13 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
             "-f",
             "/u/m/a/markm/.ssh/known_hosts",
             "-R",
-            &format!("[{}]:{}", host, super::exp00000::VAGRANT_PORT),
+            &format!("[{}]:{}", host, crate::common::exp00000::VAGRANT_PORT),
         ])
         .status()
         .unwrap();
 
     // Start vagrant
-    let vshell = super::exp00000::start_vagrant(&ushell, &cloudlab, 20)?;
+    let vshell = crate::common::exp00000::start_vagrant(&ushell, &cloudlab, 20, 1)?;
 
     // Install stuff on the VM
     vshell.run(spurs::centos::yum_install(&[
@@ -253,7 +253,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
                 &format!(
                     "ssh://root@{}:{}/home/vagrant/paperexp",
                     host,
-                    super::exp00000::VAGRANT_PORT
+                    crate::common::exp00000::VAGRANT_PORT
                 ),
                 "master",
             ])
