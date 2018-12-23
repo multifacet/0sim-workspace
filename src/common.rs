@@ -493,3 +493,7 @@ pub mod exp00002 {
         turn_on_swapdevs, turn_on_zswap, virsh_vcpupin, VAGRANT_CORES, VAGRANT_MEM, VAGRANT_PORT,
     };
 }
+
+pub mod exp00003 {
+    pub use super::exp00000::*;
+}

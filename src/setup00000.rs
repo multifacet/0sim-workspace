@@ -178,7 +178,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         ushell.run(cmd!("mkdir -p vm_shared/results/"))?;
         ushell.run(cmd!("mkdir -p images"))?;
         ushell.run(cmd!(
-            "sudo ln -sf /var/lib/libvirt/images/ /users/{}/images",
+            "sudo ln -sf /users/{}/images /var/lib/libvirt/images",
             username
         ))?;
 
@@ -225,6 +225,8 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         "git",
         "memcached",
         "gcc",
+        "libcgroup",
+        "libcgroup-tools",
     ]))?;
 
     vshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;

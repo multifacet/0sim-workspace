@@ -6,11 +6,13 @@ mod common;
 
 // Setup routines
 mod setup00000;
+mod setup00001;
 
 // Experiment routines
 mod exp00000;
 mod exp00001;
 mod exp00002;
+mod exp00003;
 
 use clap::clap_app;
 
@@ -31,6 +33,13 @@ fn main() -> Result<(), failure::Error> {
              "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
             (@arg ONLY_VM: -v --only_vm
              "(Optional) only setup the VM")
+        )
+        (@subcommand setup00001 =>
+            (about: "Sets up the given _centos_ cloudlab machine for use exp00003. Requires `sudo`.")
+            (@arg CLOUDLAB: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
         )
         (@subcommand exp00000 =>
             (about: "Run experiment 00000. Requires `sudo`.")
@@ -91,6 +100,19 @@ fn main() -> Result<(), failure::Error> {
             (@arg WARMUP: -w --warmup
              "Pass this flag to warmup the VM before running the main workload.")
         )
+        (@subcommand exp00003 =>
+            (about: "Run experiment 00003. Requires `sudo`.")
+            (@arg CLOUDLAB: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
+            (@arg SIZE: +required +takes_value {is_usize}
+             "The number of GBs of the workload (e.g. 500)")
+            (@arg VMSIZE: +required +takes_value {is_usize}
+             "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
+            (@arg CORES: +takes_value {is_usize} -C --cores
+             "The number of cores of the VM (defaults to 1)")
+        )
     }
     .setting(clap::AppSettings::SubcommandRequired)
     .setting(clap::AppSettings::DisableVersion)
@@ -107,6 +129,12 @@ fn main() -> Result<(), failure::Error> {
             let only_vm = sub_m.is_present("ONLY_VM");
             setup00000::run(dry_run, cloudlab, username, device, git_branch, only_vm)
         }
+        ("setup00001", Some(sub_m)) => {
+            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
+            let username = sub_m.value_of("USERNAME").unwrap();
+            setup00001::run(dry_run, cloudlab, username)
+        }
+
         ("exp00000", Some(sub_m)) => {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
             let username = sub_m.value_of("USERNAME").unwrap();
@@ -169,6 +197,17 @@ fn main() -> Result<(), failure::Error> {
             let warmup = sub_m.is_present("WARMUP");
 
             exp00002::run(dry_run, cloudlab, username, n, vm_size, cores, warmup)
+        }
+        ("exp00003", Some(sub_m)) => {
+            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
+            let username = sub_m.value_of("USERNAME").unwrap();
+            let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
+            let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
+            let cores = sub_m
+                .value_of("CORES")
+                .map(|value| value.parse::<usize>().unwrap());
+
+            exp00003::run(dry_run, cloudlab, username, gbs, vm_size, cores)
         }
 
         _ => {
