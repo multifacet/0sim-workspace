@@ -35,11 +35,13 @@ fn main() -> Result<(), failure::Error> {
              "(Optional) only setup the VM")
         )
         (@subcommand setup00001 =>
-            (about: "Sets up the given _centos_ cloudlab machine for use exp00003. Requires `sudo`.")
+            (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
             (@arg CLOUDLAB: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
+            (@arg GIT_BRANCH: +required +takes_value
+             "The git branch to compile the kernel from (e.g. markm_ztier)")
         )
         (@subcommand exp00000 =>
             (about: "Run experiment 00000. Requires `sudo`.")
@@ -132,7 +134,8 @@ fn main() -> Result<(), failure::Error> {
         ("setup00001", Some(sub_m)) => {
             let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
             let username = sub_m.value_of("USERNAME").unwrap();
-            setup00001::run(dry_run, cloudlab, username)
+            let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
+            setup00001::run(dry_run, cloudlab, username, git_branch)
         }
 
         ("exp00000", Some(sub_m)) => {

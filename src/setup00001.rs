@@ -1,5 +1,5 @@
-//! Setup the given cloudlab node and VM such that the guest VM is using the kernel instrumented to
-//! measure THP compaction operations.
+//! Setup the given cloudlab node and VM such that the guest VM is using the kernel compiled from
+//! the given kernel branch.
 //!
 //! Requires `setup00000`.
 
@@ -7,12 +7,11 @@ use std::process::Command;
 
 use spurs::cmd;
 
-const THP_BRANCH: &str = "markm_instrument_thp_compaction";
-
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
     cloudlab: A,
     username: &str,
+    git_branch: &str,
 ) -> Result<(), failure::Error> {
     // Connect to the remote.
     let (ushell, vshell) = crate::common::exp00000::connect_and_setup_host_and_vagrant(
@@ -27,7 +26,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
 
     if !dry_run {
         let _ = Command::new("git")
-            .args(&["checkout", THP_BRANCH])
+            .args(&["checkout", git_branch])
             .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
             .status()?;
 
@@ -36,13 +35,13 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
                 "push",
                 "-u",
                 &format!("ssh://{}/users/{}/linux-dev", cloudlab, username),
-                THP_BRANCH,
+                git_branch,
             ])
             .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
             .status()?;
     }
     ushell
-        .run(cmd!("git checkout {}", THP_BRANCH).cwd(&format!("/users/{}/linux-dev", username)))?;
+        .run(cmd!("git checkout {}", git_branch).cwd(&format!("/users/{}/linux-dev", username)))?;
 
     // compile linux-dev
     ushell.run(cmd!("cp .config config.bak").cwd(&format!("/users/{}/linux-dev", username)))?;
