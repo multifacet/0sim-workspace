@@ -44,8 +44,11 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         .run(cmd!("git checkout {}", git_branch).cwd(&format!("/users/{}/linux-dev", username)))?;
 
     // compile linux-dev
-    ushell.run(cmd!("cp .config config.bak").cwd(&format!("/users/{}/linux-dev", username)))?;
-    ushell.run(cmd!("yes '' | make oldconfig").cwd(&format!("/users/{}/linux-dev", username)))?;
+    ushell
+        .run(cmd!("cp .config config.bak").cwd(&format!("/users/{}/linux-dev/kbuild", username)))?;
+    ushell.run(
+        cmd!("yes '' | make oldconfig").cwd(&format!("/users/{}/linux-dev/kbuild", username)),
+    )?;
 
     let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
     let nprocess = nprocess.trim();
@@ -59,7 +62,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     // copy the RPM over.
     let kernel_rpm = ushell
         .run(
-            cmd!("ls -t1 | head -n2 | sort")
+            cmd!("ls -t1 | head -n2 | sort | tail -n1")
                 .use_bash()
                 .cwd(&format!("/users/{}/rpmbuild/RPMS/x86_64/", username)),
         )?

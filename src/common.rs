@@ -119,11 +119,6 @@ pub mod exp00000 {
         println!("Assuming home dir already mounted... uncomment this line if it's not");
         //mount_home_dir(ushell)
 
-        ushell.run(
-            cmd!("make")
-                .cwd("/users/markm/linux-dev/tools/power/cpupower/")
-                .dry_run(dry_run),
-        )?;
         ushell.run(cmd!("sudo /users/markm/linux-dev/tools/power/cpupower/cpupower frequency-set -g performance").dry_run(dry_run))?;
 
         ushell.run(cmd!("echo 4 | sudo tee /proc/sys/kernel/printk").use_bash())?;

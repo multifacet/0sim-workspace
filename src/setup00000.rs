@@ -163,6 +163,13 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
                     .cwd(&format!("/users/{}/linux-dev/kbuild", username)),
             )?;
 
+            // Build cpupower
+            ushell.run(
+                cmd!("make")
+                    .cwd("/users/markm/linux-dev/tools/power/cpupower/")
+                    .dry_run(dry_run),
+            )?;
+
             // install linux-dev
             ushell.run(
                 cmd!("sudo yum -y install `ls -t1 | head -n2 | sort`")
