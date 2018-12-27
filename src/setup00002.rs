@@ -83,11 +83,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
             .args(&[
                 "push",
                 "-u",
-                &format!(
-                    "ssh://root@{}:{}/home/vagrant/paperexp",
-                    host,
-                    crate::common::exp00000::VAGRANT_PORT
-                ),
+                &format!("ssh://{}/users/{}/paperexp", host, login.username.as_str()),
                 "master",
             ])
             .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
@@ -103,8 +99,11 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     )?;
 
     ushell.run(
-        cmd!("/root/.cargo/bin/cargo build --release")
-            .cwd(&format!("/users/{}/paperexp", login.username.as_str())),
+        cmd!(
+            "/users/{}/.cargo/bin/cargo build --release",
+            login.username.as_str()
+        )
+        .cwd(&format!("/users/{}/paperexp", login.username.as_str())),
     )?;
 
     Ok(())
