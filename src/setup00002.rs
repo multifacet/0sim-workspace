@@ -12,33 +12,43 @@ use crate::common::Login;
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
     login: &Login<A>,
-    git_branch: &str,
+    git_branch: Option<&str>,
 ) -> Result<(), failure::Error> {
     // Connect to the remote.
     let ushell = crate::common::exp00000::connect_and_setup_host_only(dry_run, &login)?;
 
-    // Build and install the required kernel from source.
-    crate::common::setup00000::build_kernel_rpm(dry_run, &ushell, login, git_branch, &[], "exp")?;
+    if let Some(git_branch) = git_branch {
+        // Build and install the required kernel from source.
+        crate::common::setup00000::build_kernel_rpm(
+            dry_run,
+            &ushell,
+            login,
+            git_branch,
+            &[],
+            "exp",
+        )?;
 
-    let kernel_rpm = ushell
-        .run(
-            cmd!("ls -t1 | head -n2 | sort | tail -n1")
-                .use_bash()
-                .cwd(&format!(
-                    "/users/{}/rpmbuild/RPMS/x86_64/",
-                    login.username.as_str()
-                )),
-        )?
-        .stdout;
-    let kernel_rpm = kernel_rpm.trim();
+        let kernel_rpm = ushell
+            .run(
+                cmd!("ls -t1 | head -n2 | sort | tail -n1")
+                    .use_bash()
+                    .cwd(&format!(
+                        "/users/{}/rpmbuild/RPMS/x86_64/",
+                        login.username.as_str()
+                    )),
+            )?
+            .stdout;
+        let kernel_rpm = kernel_rpm.trim();
 
-    ushell.run(cmd!(
-        "sudo rpm -ivh --force /vagrant/vm_shared/{}",
-        kernel_rpm
-    ))?;
+        ushell.run(cmd!(
+            "sudo rpm -ivh --force /users/{}/rpmbuild/RPMS/x86_64/{}",
+            login.username.as_str(),
+            kernel_rpm
+        ))?;
 
-    // update grub to choose this entry (new kernel) by default
-    ushell.run(cmd!("sudo grub2-set-default 0"))?;
+        // update grub to choose this entry (new kernel) by default
+        ushell.run(cmd!("sudo grub2-set-default 0"))?;
+    }
 
     // Install stuff
     ushell.run(spurs::centos::yum_install(&[

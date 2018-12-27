@@ -53,8 +53,8 @@ fn main() -> Result<(), failure::Error> {
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
-            (@arg GIT_BRANCH: +required +takes_value
-             "The git branch to compile the kernel from (e.g. markm_ztier)")
+            (@arg GIT_BRANCH: +takes_value -g --git_branch
+             "(Optional) The git branch to compile the kernel from (e.g. markm_ztier)")
         )
 
         (@subcommand exp00000 =>
@@ -169,7 +169,7 @@ fn main() -> Result<(), failure::Error> {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
-            let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
+            let git_branch = sub_m.value_of("GIT_BRANCH");
             setup00002::run(dry_run, &login, git_branch)
         }
 
