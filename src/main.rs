@@ -7,14 +7,18 @@ mod common;
 // Setup routines
 mod setup00000;
 mod setup00001;
+mod setup00002;
 
 // Experiment routines
 mod exp00000;
 mod exp00001;
 mod exp00002;
 mod exp00003;
+mod exp00004;
 
 use clap::clap_app;
+
+use crate::common::{Login, Username};
 
 fn main() -> Result<(), failure::Error> {
     let matches = clap_app! {runner =>
@@ -43,6 +47,16 @@ fn main() -> Result<(), failure::Error> {
             (@arg GIT_BRANCH: +required +takes_value
              "The git branch to compile the kernel from (e.g. markm_ztier)")
         )
+        (@subcommand setup00002 =>
+            (about: "Sets up the given _centos_ machine for use exp00004. Requires `sudo`.")
+            (@arg CLOUDLAB: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
+            (@arg GIT_BRANCH: +required +takes_value
+             "The git branch to compile the kernel from (e.g. markm_ztier)")
+        )
+
         (@subcommand exp00000 =>
             (about: "Run experiment 00000. Requires `sudo`.")
             (@arg CLOUDLAB: +required +takes_value
@@ -115,6 +129,15 @@ fn main() -> Result<(), failure::Error> {
             (@arg CORES: +takes_value {is_usize} -C --cores
              "The number of cores of the VM (defaults to 1)")
         )
+        (@subcommand exp00004 =>
+            (about: "Run experiment 00004. Requires `sudo`.")
+            (@arg CLOUDLAB: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
+            (@arg SIZE: +required +takes_value {is_usize}
+             "The number of GBs of the workload (e.g. 500)")
+        )
     }
     .setting(clap::AppSettings::SubcommandRequired)
     .setting(clap::AppSettings::DisableVersion)
@@ -124,23 +147,37 @@ fn main() -> Result<(), failure::Error> {
 
     match matches.subcommand() {
         ("setup00000", Some(sub_m)) => {
-            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
             let device = sub_m.value_of("DEVICE");
             let git_branch = sub_m.value_of("GIT_BRANCH");
             let only_vm = sub_m.is_present("ONLY_VM");
-            setup00000::run(dry_run, cloudlab, username, device, git_branch, only_vm)
+            setup00000::run(dry_run, &login, device, git_branch, only_vm)
         }
         ("setup00001", Some(sub_m)) => {
-            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
             let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
-            setup00001::run(dry_run, cloudlab, username, git_branch)
+            setup00001::run(dry_run, &login, git_branch)
+        }
+        ("setup00002", Some(sub_m)) => {
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
+            let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
+            setup00002::run(dry_run, &login, git_branch)
         }
 
         ("exp00000", Some(sub_m)) => {
-            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
             let pattern = if sub_m.is_present("memcached") {
                 None
@@ -159,13 +196,13 @@ fn main() -> Result<(), failure::Error> {
                 .map(|value| value.parse::<usize>().unwrap());
             let warmup = sub_m.is_present("WARMUP");
 
-            exp00000::run(
-                dry_run, cloudlab, username, gbs, pattern, vm_size, cores, warmup,
-            )
+            exp00000::run(dry_run, &login, gbs, pattern, vm_size, cores, warmup)
         }
         ("exp00000up", Some(sub_m)) => {
-            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
             let vm_size = sub_m
                 .value_of("VMSIZE")
                 .map(|value| value.parse::<usize>().unwrap());
@@ -173,11 +210,13 @@ fn main() -> Result<(), failure::Error> {
                 .value_of("CORES")
                 .map(|value| value.parse::<usize>().unwrap());
 
-            common::exp00000::run_setup_only(dry_run, cloudlab, username, vm_size, cores)
+            common::exp00000::run_setup_only(dry_run, &login, vm_size, cores)
         }
         ("exp00001", Some(sub_m)) => {
-            let desktop = sub_m.value_of("DESKTOP").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("DESKTOP").unwrap(),
+            };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
             let pattern = if sub_m.is_present("zeros") {
                 "-z"
@@ -185,11 +224,13 @@ fn main() -> Result<(), failure::Error> {
                 "-c"
             };
 
-            exp00001::run(dry_run, desktop, username, gbs, pattern)
+            exp00001::run(dry_run, &login, gbs, pattern)
         }
         ("exp00002", Some(sub_m)) => {
-            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
             let n = sub_m.value_of("N").unwrap().parse::<usize>().unwrap();
             let vm_size = sub_m
                 .value_of("VMSIZE")
@@ -199,18 +240,29 @@ fn main() -> Result<(), failure::Error> {
                 .map(|value| value.parse::<usize>().unwrap());
             let warmup = sub_m.is_present("WARMUP");
 
-            exp00002::run(dry_run, cloudlab, username, n, vm_size, cores, warmup)
+            exp00002::run(dry_run, &login, n, vm_size, cores, warmup)
         }
         ("exp00003", Some(sub_m)) => {
-            let cloudlab = sub_m.value_of("CLOUDLAB").unwrap();
-            let username = sub_m.value_of("USERNAME").unwrap();
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
             let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
             let cores = sub_m
                 .value_of("CORES")
                 .map(|value| value.parse::<usize>().unwrap());
 
-            exp00003::run(dry_run, cloudlab, username, gbs, vm_size, cores)
+            exp00003::run(dry_run, &login, gbs, vm_size, cores)
+        }
+        ("exp00004", Some(sub_m)) => {
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
+            let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
+
+            exp00004::run(dry_run, &login, gbs)
         }
 
         _ => {

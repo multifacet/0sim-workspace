@@ -8,8 +8,7 @@ use crate::common::exp00000::*;
 
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
-    cloudlab: A,
-    username: &str,
+    login: &Login<A>,
     size: usize, // GB
     pattern: Option<&str>,
     vm_size: Option<usize>, // GB
@@ -17,7 +16,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     warmup: bool,
 ) -> Result<(), failure::Error> {
     // Reboot
-    initial_reboot(dry_run, &cloudlab, username)?;
+    initial_reboot(dry_run, &login)?;
 
     let vm_size = if let Some(vm_size) = vm_size {
         vm_size
@@ -32,8 +31,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     };
 
     // Connect
-    let (mut ushell, vshell) =
-        connect_and_setup_host_and_vagrant(dry_run, &cloudlab, username, vm_size, cores)?;
+    let (mut ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?;
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;

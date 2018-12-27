@@ -12,14 +12,13 @@ const INTERVAL: usize = 60; // seconds
 
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
-    cloudlab: A,
-    username: &str,
+    login: &Login<A>,
     size: usize,    // GB
     vm_size: usize, // GB
     cores: Option<usize>,
 ) -> Result<(), failure::Error> {
     // Reboot
-    initial_reboot(dry_run, &cloudlab, username)?;
+    initial_reboot(dry_run, &login)?;
 
     let cores = if let Some(cores) = cores {
         cores
@@ -28,8 +27,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     };
 
     // Connect
-    let (mut ushell, vshell) =
-        connect_and_setup_host_and_vagrant(dry_run, &cloudlab, username, vm_size, cores)?;
+    let (mut ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?;
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;

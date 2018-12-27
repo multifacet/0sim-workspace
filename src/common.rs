@@ -1,9 +1,162 @@
 //! A library of routines commonly used in experiments.
 
+#[derive(Copy, Clone, Debug)]
+pub struct Username<'u>(pub &'u str);
+
+impl Username<'_> {
+    pub fn as_str(&self) -> &str {
+        self.0
+    }
+}
+
+pub struct Login<'u, A: std::net::ToSocketAddrs + std::fmt::Display> {
+    pub host: A,
+    pub username: Username<'u>,
+}
+
+pub mod setup00000 {
+    use std::process::Command;
+
+    use spurs::{cmd, ssh::SshShell};
+
+    pub use super::{Login, Username};
+
+    /// Build a Linux kernel RPM on the remote host using the given kernel branch and kernel build
+    /// config options.
+    ///
+    /// `config_options` is a list of config option names that should be set to `y` before
+    /// building. It is the caller's responsibility to make sure that all dependencies are on too.
+    ///
+    /// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM.
+    pub fn build_kernel_rpm<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        dry_run: bool,
+        ushell: &SshShell,
+        login: &Login<A>,
+        git_branch: &str,
+        config_options: &[&str],
+        kernel_local_version: &str,
+    ) -> Result<(), failure::Error> {
+        ushell.run(cmd!("mkdir -p linux-dev"))?;
+        ushell
+            .run(cmd!("git init").cwd(&format!("/users/{}/linux-dev", login.username.as_str())))?;
+        ushell.run(
+            cmd!("git checkout -b side")
+                .cwd(&format!("/users/{}/linux-dev", login.username.as_str()))
+                .allow_error(), // if already exists
+        )?;
+
+        if !dry_run {
+            let _ = Command::new("git")
+                .args(&["checkout", git_branch])
+                .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
+                .status()?;
+
+            let _ = Command::new("git")
+                .args(&[
+                    "push",
+                    "-u",
+                    &format!(
+                        "ssh://{}/users/{}/linux-dev",
+                        login.host,
+                        login.username.as_str()
+                    ),
+                    git_branch,
+                ])
+                .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
+                .status()?;
+            let _ = Command::new("git")
+                .args(&["checkout", "side"])
+                .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
+                .status()?;
+        }
+        ushell.run(
+            cmd!("git checkout {}", git_branch)
+                .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
+        )?;
+
+        // compile linux-dev
+        ushell.run(cmd!(
+            "mkdir -p /users/{}/linux-dev/kbuild",
+            login.username.as_str()
+        ))?;
+
+        // save old config if there is one
+        ushell.run(
+            cmd!("cp .config config.bak",)
+                .cwd(&format!(
+                    "/users/{}/linux-dev/kbuild",
+                    login.username.as_str()
+                ))
+                .allow_error(),
+        )?;
+
+        ushell.run(
+            cmd!(
+                "make O=/users/{}/linux-dev/kbuild defconfig",
+                login.username.as_str()
+            )
+            .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
+        )?;
+        let config = ushell
+            .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
+            .stdout;
+        let config = config.trim();
+        ushell.run(cmd!(
+            "cp {} /users/{}/linux-dev/kbuild/.config",
+            config,
+            login.username.as_str(),
+        ))?;
+        ushell.run(cmd!("yes '' | make oldconfig").use_bash().cwd(&format!(
+            "/users/{}/linux-dev/kbuild",
+            login.username.as_str()
+        )))?;
+
+        // make sure some configurations are set
+        for opt in config_options.iter() {
+            ushell.run(cmd!(
+                "sed -i 's/# {} is not set/{}=y/' /users/{}/linux-dev/kbuild/.config",
+                opt,
+                opt,
+                login.username.as_str()
+            ))?;
+        }
+
+        let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
+        let nprocess = nprocess.trim();
+        ushell.run(
+            cmd!(
+                "make -j {} binrpm-pkg LOCALVERSION=-{}",
+                nprocess,
+                kernel_local_version
+            )
+            .cwd(&format!(
+                "/users/{}/linux-dev/kbuild",
+                login.username.as_str()
+            ))
+            .allow_error(),
+        )?;
+        ushell.run(
+            cmd!(
+                "make -j {} binrpm-pkg LOCALVERSION=-{}",
+                nprocess,
+                kernel_local_version
+            )
+            .cwd(&format!(
+                "/users/{}/linux-dev/kbuild",
+                login.username.as_str()
+            )),
+        )?;
+
+        Ok(())
+    }
+}
+
 pub mod exp00000 {
     use std::collections::HashMap;
 
     use spurs::{cmd, ssh::SshShell};
+
+    pub use super::{Login, Username};
 
     /// The port that vagrant VMs forward from.
     pub const VAGRANT_PORT: u16 = 5555;
@@ -16,8 +169,7 @@ pub mod exp00000 {
 
     pub fn run_setup_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
         dry_run: bool,
-        cloudlab: A,
-        username: &str,
+        login: &Login<A>,
         vm_size: Option<usize>,
         cores: Option<usize>,
     ) -> Result<(), failure::Error> {
@@ -34,7 +186,7 @@ pub mod exp00000 {
         };
 
         // Connect
-        let _ = connect_and_setup_host_and_vagrant(dry_run, &cloudlab, username, vm_size, cores)?;
+        let _ = connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?;
 
         Ok(())
     }
@@ -42,11 +194,10 @@ pub mod exp00000 {
     /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
     pub fn initial_reboot<A: std::net::ToSocketAddrs + std::fmt::Display>(
         dry_run: bool,
-        cloudlab: A,
-        username: &str,
+        login: &Login<A>,
     ) -> Result<(), failure::Error> {
         // Connect to the remote
-        let mut ushell = SshShell::with_default_key(username, &cloudlab)?;
+        let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
         if dry_run {
             ushell.toggle_dry_run();
         }
@@ -60,13 +211,12 @@ pub mod exp00000 {
     /// Connects to the host and to vagrant. Returns shells for both.
     pub fn connect_and_setup_host_and_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         dry_run: bool,
-        cloudlab: A,
-        username: &str,
+        login: &Login<A>,
         vm_size: usize,
         cores: usize,
     ) -> Result<(SshShell, SshShell), failure::Error> {
-        let ushell = connect_and_setup_host_only(dry_run, &cloudlab, username)?;
-        let vshell = start_vagrant(&ushell, &cloudlab, vm_size, cores)?;
+        let ushell = connect_and_setup_host_only(dry_run, &login)?;
+        let vshell = start_vagrant(&ushell, &login.host, vm_size, cores)?;
 
         Ok((ushell, vshell))
     }
@@ -75,14 +225,13 @@ pub mod exp00000 {
     /// want. Set the scaling governor. Returns the shell to the host.
     pub fn connect_and_setup_host_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
         dry_run: bool,
-        cloudlab: A,
-        username: &str,
+        login: &Login<A>,
     ) -> Result<SshShell, failure::Error> {
         // Keep trying to connect until we succeed
         let ushell = {
             let mut shell;
             loop {
-                shell = match SshShell::with_default_key(username, &cloudlab) {
+                shell = match SshShell::with_default_key(login.username.as_str(), &login.host) {
                     Ok(shell) => shell,
                     Err(_) => {
                         std::thread::sleep(std::time::Duration::from_secs(10));
@@ -279,6 +428,7 @@ pub mod exp00001 {
     use spurs::{cmd, ssh::SshShell};
 
     pub use super::exp00000::{connect_to_vagrant, VAGRANT_CORES, VAGRANT_PORT};
+    pub use super::{Login, Username};
 
     /// The default amount of memory of the VM.
     pub const VAGRANT_MEM: usize = 1023;
@@ -396,11 +546,10 @@ pub mod exp00001 {
     /// Connects to the host and to vagrant. Returns shells for both.
     pub fn connect_and_setup_host_and_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         dry_run: bool,
-        username: &str,
-        desktop: A,
+        login: &Login<A>,
     ) -> Result<(SshShell, SshShell, SshShell), failure::Error> {
-        let (ushell, rshell) = connect_and_setup_host_only(dry_run, username, &desktop)?;
-        let vshell = start_vagrant(&ushell, &desktop, VAGRANT_MEM)?;
+        let (ushell, rshell) = connect_and_setup_host_only(dry_run, &login)?;
+        let vshell = start_vagrant(&ushell, &login.host, VAGRANT_MEM)?;
 
         Ok((ushell, rshell, vshell))
     }
@@ -409,14 +558,13 @@ pub mod exp00001 {
     /// want. Set the scaling governor. Returns the shell to the host.
     pub fn connect_and_setup_host_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
         dry_run: bool,
-        username: &str,
-        desktop: A,
+        login: &Login<A>,
     ) -> Result<(SshShell, SshShell), failure::Error> {
         // Keep trying to connect until we succeed
         let rshell = {
             let mut shell;
             loop {
-                shell = match SshShell::with_default_key("root", &desktop) {
+                shell = match SshShell::with_default_key("root", &login.host) {
                     Ok(shell) => shell,
                     Err(_) => {
                         std::thread::sleep(std::time::Duration::from_secs(10));
@@ -438,7 +586,7 @@ pub mod exp00001 {
         let ushell = {
             let mut shell;
             loop {
-                shell = match SshShell::with_default_key(username, &desktop) {
+                shell = match SshShell::with_default_key(login.username.as_str(), &login.host) {
                     Ok(shell) => shell,
                     Err(_) => {
                         std::thread::sleep(std::time::Duration::from_secs(10));
@@ -487,8 +635,13 @@ pub mod exp00002 {
         gen_vagrantfile, initial_reboot, run_setup_only, start_vagrant, turn_off_swapdevs,
         turn_on_swapdevs, turn_on_zswap, virsh_vcpupin, VAGRANT_CORES, VAGRANT_MEM, VAGRANT_PORT,
     };
+    pub use super::{Login, Username};
 }
 
 pub mod exp00003 {
     pub use super::exp00000::*;
+}
+
+pub mod exp00004 {
+    pub use super::exp00003::*;
 }

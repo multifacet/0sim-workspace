@@ -7,22 +7,24 @@ use std::process::Command;
 
 use spurs::cmd;
 
+use crate::common::Login;
+
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
-    cloudlab: A,
-    username: &str,
+    login: &Login<A>,
     git_branch: &str,
 ) -> Result<(), failure::Error> {
     // Connect to the remote.
-    let (ushell, vshell) = crate::common::exp00000::connect_and_setup_host_and_vagrant(
-        dry_run, &cloudlab, username, 20, 1,
-    )?;
+    let (ushell, vshell) =
+        crate::common::exp00000::connect_and_setup_host_and_vagrant(dry_run, &login, 20, 1)?;
 
     // Install the instrumented kernel on the guest.
     //
     // Building the kernel on the guest is painful, so we will build it on the host and copy it to
     // the guest via NFS.
-    ushell.run(cmd!("git checkout side").cwd(&format!("/users/{}/linux-dev", username)))?;
+    ushell.run(
+        cmd!("git checkout side").cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
+    )?;
 
     if !dry_run {
         let _ = Command::new("git")
@@ -34,27 +36,39 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
             .args(&[
                 "push",
                 "-u",
-                &format!("ssh://{}/users/{}/linux-dev", cloudlab, username),
+                &format!(
+                    "ssh://{}/users/{}/linux-dev",
+                    &login.host,
+                    login.username.as_str()
+                ),
                 git_branch,
             ])
             .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
             .status()?;
     }
-    ushell
-        .run(cmd!("git checkout {}", git_branch).cwd(&format!("/users/{}/linux-dev", username)))?;
+    ushell.run(
+        cmd!("git checkout {}", git_branch)
+            .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
+    )?;
 
     // compile linux-dev
-    ushell
-        .run(cmd!("cp .config config.bak").cwd(&format!("/users/{}/linux-dev/kbuild", username)))?;
-    ushell.run(
-        cmd!("yes '' | make oldconfig").cwd(&format!("/users/{}/linux-dev/kbuild", username)),
-    )?;
+    ushell.run(cmd!("cp .config config.bak").cwd(&format!(
+        "/users/{}/linux-dev/kbuild",
+        login.username.as_str()
+    )))?;
+    ushell.run(cmd!("yes '' | make oldconfig").cwd(&format!(
+        "/users/{}/linux-dev/kbuild",
+        login.username.as_str()
+    )))?;
 
     let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
     let nprocess = nprocess.trim();
     ushell.run(
         cmd!("make -j {} binrpm-pkg LOCALVERSION=-thpcmpt", nprocess)
-            .cwd(&format!("/users/{}/linux-dev/kbuild", username))
+            .cwd(&format!(
+                "/users/{}/linux-dev/kbuild",
+                login.username.as_str()
+            ))
             .allow_error(),
     )?;
 
@@ -64,15 +78,18 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         .run(
             cmd!("ls -t1 | head -n2 | sort | tail -n1")
                 .use_bash()
-                .cwd(&format!("/users/{}/rpmbuild/RPMS/x86_64/", username)),
+                .cwd(&format!(
+                    "/users/{}/rpmbuild/RPMS/x86_64/",
+                    login.username.as_str()
+                )),
         )?
         .stdout;
     let kernel_rpm = kernel_rpm.trim();
     ushell.run(cmd!(
         "cp /users/{}/rpmbuild/RPMS/x86_64/{} /users/{}/vm_shared/",
-        username,
+        login.username.as_str(),
         kernel_rpm,
-        username
+        login.username.as_str(),
     ))?;
 
     vshell.run(cmd!(

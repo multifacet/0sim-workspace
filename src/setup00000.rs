@@ -7,19 +7,20 @@ use std::process::Command;
 
 use spurs::{cmd, ssh::SshShell};
 
+use crate::common::Login;
+
 const VAGRANT_RPM_URL: &str =
     "https://releases.hashicorp.com/vagrant/2.1.5/vagrant_2.1.5_x86_64.rpm";
 
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
-    cloudlab: A,
-    username: &str,
+    login: &Login<A>,
     device: Option<&str>,
     git_branch: Option<&str>,
     only_vm: bool,
 ) -> Result<(), failure::Error> {
     // Connect to the remote
-    let mut ushell = SshShell::with_default_key(username, &cloudlab)?;
+    let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
     if dry_run {
         ushell.toggle_dry_run();
     }
@@ -55,7 +56,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         ushell.run(cmd!("vagrant plugin install vagrant-libvirt"))?;
 
         // Need a new shell so that we get the new user group
-        let mut ushell = SshShell::with_default_key(username, &cloudlab)?;
+        let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
         if dry_run {
             ushell.toggle_dry_run();
         }
@@ -71,8 +72,8 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
                 &ushell,
                 dry_run,
                 &format!("{}1", device), // assume it is the first device partition
-                &format!("/users/{}", username),
-                username,
+                &format!("/users/{}", login.username.as_str()),
+                login.username.as_str(),
             )?;
         }
 
@@ -84,56 +85,6 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
 
         // clone linux-dev
         if let Some(git_branch) = git_branch {
-            ushell.run(cmd!("mkdir -p linux-dev"))?;
-            ushell.run(cmd!("git init").cwd(&format!("/users/{}/linux-dev", username)))?;
-            ushell.run(
-                cmd!("git checkout -b side")
-                    .cwd(&format!("/users/{}/linux-dev", username))
-                    .allow_error(), // if already exists
-            )?;
-
-            if !dry_run {
-                let _ = Command::new("git")
-                    .args(&["checkout", git_branch])
-                    .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
-                    .status()?;
-
-                let _ = Command::new("git")
-                    .args(&[
-                        "push",
-                        "-u",
-                        &format!("ssh://{}/users/{}/linux-dev", cloudlab, username),
-                        git_branch,
-                    ])
-                    .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
-                    .status()?;
-            }
-            ushell.run(
-                cmd!("git checkout {}", git_branch).cwd(&format!("/users/{}/linux-dev", username)),
-            )?;
-
-            // compile linux-dev
-            ushell.run(cmd!("mkdir -p /users/{}/linux-dev/kbuild", username))?;
-            ushell.run(
-                cmd!("make O=/users/{}/linux-dev/kbuild defconfig", username)
-                    .cwd(&format!("/users/{}/linux-dev", username)),
-            )?;
-            let config = ushell
-                .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
-                .stdout;
-            let config = config.trim();
-            ushell.run(cmd!(
-                "cp {} /users/{}/linux-dev/kbuild/.config",
-                config,
-                username
-            ))?;
-            ushell.run(
-                cmd!("yes '' | make oldconfig")
-                    .use_bash()
-                    .cwd(&format!("/users/{}/linux-dev/kbuild", username)),
-            )?;
-
-            // make sure some configurations are set/not set
             const CONFIG_SET: &[&str] = &[
                 "CONFIG_ZSWAP",
                 "CONFIG_ZPOOL",
@@ -142,25 +93,9 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
                 "CONFIG_SBALLOC",
                 "CONFIG_ZSMALLOC",
             ];
-            for opt in CONFIG_SET.iter() {
-                ushell.run(cmd!(
-                    "sed -i 's/# {} is not set/{}=y/' /users/{}/linux-dev/kbuild/.config",
-                    opt,
-                    opt,
-                    username
-                ))?;
-            }
 
-            let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
-            let nprocess = nprocess.trim();
-            ushell.run(
-                cmd!("make -j {} binrpm-pkg LOCALVERSION=-ztier", nprocess)
-                    .cwd(&format!("/users/{}/linux-dev/kbuild", username))
-                    .allow_error(),
-            )?;
-            ushell.run(
-                cmd!("make -j {} binrpm-pkg LOCALVERSION=-ztier", nprocess)
-                    .cwd(&format!("/users/{}/linux-dev/kbuild", username)),
+            crate::common::setup00000::build_kernel_rpm(
+                dry_run, &ushell, login, git_branch, CONFIG_SET, "ztier",
             )?;
 
             // Build cpupower
@@ -174,7 +109,10 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
             ushell.run(
                 cmd!("sudo yum -y install `ls -t1 | head -n2 | sort`")
                     .use_bash()
-                    .cwd(&format!("/users/{}/rpmbuild/RPMS/x86_64/", username)),
+                    .cwd(&format!(
+                        "/users/{}/rpmbuild/RPMS/x86_64/",
+                        login.username.as_str()
+                    )),
             )?;
 
             // update grub to choose this entry (new kernel) by default
@@ -186,7 +124,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         ushell.run(cmd!("mkdir -p images"))?;
         ushell.run(cmd!(
             "sudo ln -sf /users/{}/images /var/lib/libvirt/images",
-            username
+            login.username.as_str()
         ))?;
 
         spurs::util::reboot(&mut ushell, dry_run)?;
@@ -212,7 +150,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     )?;
 
     // Old key will be cached for the VM, but it is likely to have changed
-    let (host, _) = spurs::util::get_host_ip(&cloudlab);
+    let (host, _) = spurs::util::get_host_ip(&login.host);
     let _ = Command::new("ssh-keygen")
         .args(&[
             "-f",
@@ -224,7 +162,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         .unwrap();
 
     // Start vagrant
-    let vshell = crate::common::exp00000::start_vagrant(&ushell, &cloudlab, 20, 1)?;
+    let vshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
 
     // Install stuff on the VM
     vshell.run(spurs::centos::yum_install(&[
@@ -248,7 +186,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     )?;
 
     if !dry_run {
-        let (host, _) = spurs::util::get_host_ip(cloudlab);
+        let (host, _) = spurs::util::get_host_ip(&login.host);
 
         let _ = Command::new("git")
             .args(&["checkout", "master"])

@@ -9,17 +9,15 @@ use crate::common::exp00001::*;
 
 pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     dry_run: bool,
-    desktop: A,
-    username: &str,
+    login: &Login<A>,
     size: usize,
     pattern: &str,
 ) -> Result<(), failure::Error> {
     // Reboot
-    initial_reboot(dry_run, &desktop)?;
+    initial_reboot(dry_run, &login.host)?;
 
     // Connect
-    let (_ushell, mut rshell, vshell) =
-        connect_and_setup_host_and_vagrant(dry_run, username, &desktop)?;
+    let (_ushell, mut rshell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login)?;
 
     // Environment
     turn_on_zswap(&mut rshell, dry_run)?;
