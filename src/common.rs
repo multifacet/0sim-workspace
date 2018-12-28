@@ -24,8 +24,9 @@ pub mod setup00000 {
     /// Build a Linux kernel RPM on the remote host using the given kernel branch and kernel build
     /// config options.
     ///
-    /// `config_options` is a list of config option names that should be set to `y` before
+    /// `config_options` is a list of config option names that should be set or unset before
     /// building. It is the caller's responsibility to make sure that all dependencies are on too.
+    /// If a config is `true` it is set to "y"; otherwise, it is unset.
     ///
     /// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM.
     pub fn build_kernel_rpm<A: std::net::ToSocketAddrs + std::fmt::Display>(
@@ -33,7 +34,7 @@ pub mod setup00000 {
         ushell: &SshShell,
         login: &Login<A>,
         git_branch: &str,
-        config_options: &[&str],
+        config_options: &[(&str, bool)],
         kernel_local_version: &str,
     ) -> Result<(), failure::Error> {
         ushell.run(cmd!("mkdir -p linux-dev"))?;
@@ -112,13 +113,22 @@ pub mod setup00000 {
         )))?;
 
         // make sure some configurations are set
-        for opt in config_options.iter() {
-            ushell.run(cmd!(
-                "sed -i 's/# {} is not set/{}=y/' /users/{}/linux-dev/kbuild/.config",
-                opt,
-                opt,
-                login.username.as_str()
-            ))?;
+        for (opt, set) in config_options.iter() {
+            if *set {
+                ushell.run(cmd!(
+                    "sed -i 's/# {} is not set/{}=y/' /users/{}/linux-dev/kbuild/.config",
+                    opt,
+                    opt,
+                    login.username.as_str()
+                ))?;
+            } else {
+                ushell.run(cmd!(
+                    "sed -i 's/{}=y/# {} is not set/' /users/{}/linux-dev/kbuild/.config",
+                    opt,
+                    opt,
+                    login.username.as_str()
+                ))?;
+            }
         }
 
         let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;

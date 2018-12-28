@@ -24,7 +24,10 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
             &ushell,
             login,
             git_branch,
-            &[],
+            &[
+                ("CONFIG_PAGE_TABLE_ISOLATION", false),
+                ("CONFIG_RETPOLINE", false),
+            ],
             "exp",
         )?;
 

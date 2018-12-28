@@ -45,7 +45,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     ushell.run(
         cmd!(
             "nohup ./target/release/memcached_and_capture_thp localhost:11211 {} {} \
-             > /vagrant/vm_shared/results/memcached_and_capture_thp_{}gb_bare_metal_{}.out",
+             > ../vm_shared/results/memcached_and_capture_thp_{}gb_bare_metal_{}.out",
             size,
             INTERVAL,
             size,
@@ -53,7 +53,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
                 .format("%Y-%m-%d-%H-%M-%S")
                 .to_string()
         )
-        .cwd("/home/vagrant/paperexp")
+        .cwd(&format!("/users/{}/paperexp", login.username.as_str()))
         .use_bash()
         .allow_error(),
     )?;

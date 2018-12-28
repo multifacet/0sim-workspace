@@ -85,13 +85,15 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
 
         // clone linux-dev
         if let Some(git_branch) = git_branch {
-            const CONFIG_SET: &[&str] = &[
-                "CONFIG_ZSWAP",
-                "CONFIG_ZPOOL",
-                "CONFIG_ZBUD",
-                "CONFIG_ZTIER",
-                "CONFIG_SBALLOC",
-                "CONFIG_ZSMALLOC",
+            const CONFIG_SET: &[(&str, bool)] = &[
+                ("CONFIG_ZSWAP", true),
+                ("CONFIG_ZPOOL", true),
+                ("CONFIG_ZBUD", true),
+                ("CONFIG_ZTIER", true),
+                ("CONFIG_SBALLOC", true),
+                ("CONFIG_ZSMALLOC", true),
+                ("CONFIG_PAGE_TABLE_ISOLATION", false),
+                ("CONFIG_RETPOLINE", false),
             ];
 
             crate::common::setup00000::build_kernel_rpm(
