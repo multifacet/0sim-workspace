@@ -39,7 +39,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
         cmd!("echo 1000 | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs").use_bash(),
     )?;
 
-    // Run memcached. We need to make it take slightly less memory than the VM, or it will OOM.
+    // Run memcached. We need to make it take slightly less memory than RAM + swap, or it will OOM.
     ushell.run(cmd!("memcached -m {} -d", size * 1024))?;
 
     ushell.run(
