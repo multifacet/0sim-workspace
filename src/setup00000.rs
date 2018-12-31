@@ -42,6 +42,7 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
             "qemu-kvm",
             "virt-manager",
             "pciutils-devel",
+            "bash-completion",
         ]))?;
         ushell.run(spurs::util::add_to_group("libvirt"))?;
 
