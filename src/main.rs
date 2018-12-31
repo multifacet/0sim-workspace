@@ -20,7 +20,7 @@ use clap::clap_app;
 
 use crate::common::{Login, Username};
 
-fn main() -> Result<(), failure::Error> {
+fn run() -> Result<(), failure::Error> {
     let matches = clap_app! {runner =>
         (about: "This program runs different routines remotely. Which routine is chosen by passing
          different command line arguments. certain routines require extra arguments.")
@@ -268,6 +268,14 @@ fn main() -> Result<(), failure::Error> {
         _ => {
             unreachable!();
         }
+    }
+}
+
+fn main() {
+    env_logger::init();
+
+    if let Err(e) = run() {
+        println!("RUNNER ERROR {:?}", e);
     }
 }
 
