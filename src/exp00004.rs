@@ -23,7 +23,7 @@ where
     initial_reboot(dry_run, &login)?;
 
     // Connect
-    let mut ushell = connect_and_setup_host_only(dry_run, &login)?;
+    let ushell = connect_and_setup_host_only(dry_run, &login)?;
 
     // Turn on compaction and force it too happen
     ushell.run(
