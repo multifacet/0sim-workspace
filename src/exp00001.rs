@@ -7,12 +7,15 @@ use spurs::cmd;
 
 use crate::common::exp00001::*;
 
-pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
+pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     size: usize,
     pattern: &str,
-) -> Result<(), failure::Error> {
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+{
     // Reboot
     initial_reboot(dry_run, &login.host)?;
 

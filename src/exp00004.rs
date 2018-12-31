@@ -11,11 +11,14 @@ use crate::common::exp00004::*;
 /// Interval at which to collect thp stats
 const INTERVAL: usize = 60; // seconds
 
-pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
+pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     size: usize, // GB
-) -> Result<(), failure::Error> {
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+{
     // Reboot
     initial_reboot(dry_run, &login)?;
 
@@ -60,7 +63,9 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
 
     ushell.run(cmd!("date"))?;
 
-    spurs::util::reboot(&mut ushell, dry_run)?;
+    ushell.run(cmd!("free -h"))?;
+
+    //spurs::util::reboot(&mut ushell, dry_run)?;
 
     Ok(())
 }

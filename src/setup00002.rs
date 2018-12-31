@@ -9,11 +9,14 @@ use spurs::cmd;
 
 use crate::common::Login;
 
-pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
+pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     git_branch: Option<&str>,
-) -> Result<(), failure::Error> {
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+{
     // Connect to the remote.
     let ushell = crate::common::exp00000::connect_and_setup_host_only(dry_run, &login)?;
 

@@ -9,11 +9,10 @@ use spurs::cmd;
 
 use crate::common::Login;
 
-pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
-    dry_run: bool,
-    login: &Login<A>,
-    git_branch: &str,
-) -> Result<(), failure::Error> {
+pub fn run<A>(dry_run: bool, login: &Login<A>, git_branch: &str) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+{
     // Connect to the remote.
     let (ushell, vshell) =
         crate::common::exp00000::connect_and_setup_host_and_vagrant(dry_run, &login, 20, 1)?;

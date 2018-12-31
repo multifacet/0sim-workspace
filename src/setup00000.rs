@@ -12,13 +12,16 @@ use crate::common::Login;
 const VAGRANT_RPM_URL: &str =
     "https://releases.hashicorp.com/vagrant/2.1.5/vagrant_2.1.5_x86_64.rpm";
 
-pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
+pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     device: Option<&str>,
     git_branch: Option<&str>,
     only_vm: bool,
-) -> Result<(), failure::Error> {
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+{
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
     if dry_run {

@@ -6,14 +6,17 @@ use spurs::cmd;
 
 use crate::common::exp00002::*;
 
-pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
+pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     n: usize,               // GB
     vm_size: Option<usize>, // GB
     cores: Option<usize>,
     warmup: bool,
-) -> Result<(), failure::Error> {
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+{
     // Reboot
     initial_reboot(dry_run, &login)?;
 
