@@ -177,12 +177,15 @@ pub mod exp00000 {
     /// The default number of cores of the VM.
     pub const VAGRANT_CORES: usize = 1;
 
-    pub fn run_setup_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    pub fn run_setup_only<A>(
         dry_run: bool,
         login: &Login<A>,
         vm_size: Option<usize>,
         cores: Option<usize>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), failure::Error>
+    where
+        A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display,
+    {
         let vm_size = if let Some(vm_size) = vm_size {
             vm_size
         } else {
@@ -202,10 +205,10 @@ pub mod exp00000 {
     }
 
     /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
-    pub fn initial_reboot<A: std::net::ToSocketAddrs + std::fmt::Display>(
-        dry_run: bool,
-        login: &Login<A>,
-    ) -> Result<(), failure::Error> {
+    pub fn initial_reboot<A>(dry_run: bool, login: &Login<A>) -> Result<(), failure::Error>
+    where
+        A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+    {
         // Connect to the remote
         let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
         if dry_run {
@@ -219,12 +222,15 @@ pub mod exp00000 {
     }
 
     /// Connects to the host and to vagrant. Returns shells for both.
-    pub fn connect_and_setup_host_and_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    pub fn connect_and_setup_host_and_vagrant<A>(
         dry_run: bool,
         login: &Login<A>,
         vm_size: usize,
         cores: usize,
-    ) -> Result<(SshShell, SshShell), failure::Error> {
+    ) -> Result<(SshShell, SshShell), failure::Error>
+    where
+        A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+    {
         let ushell = connect_and_setup_host_only(dry_run, &login)?;
         let vshell = start_vagrant(&ushell, &login.host, vm_size, cores)?;
 
@@ -233,10 +239,13 @@ pub mod exp00000 {
 
     /// Connects to the host, waiting for it to come up if necessary. Turn on only the swap devices we
     /// want. Set the scaling governor. Returns the shell to the host.
-    pub fn connect_and_setup_host_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    pub fn connect_and_setup_host_only<A>(
         dry_run: bool,
         login: &Login<A>,
-    ) -> Result<SshShell, failure::Error> {
+    ) -> Result<SshShell, failure::Error>
+    where
+        A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display,
+    {
         // Keep trying to connect until we succeed
         let ushell = {
             let mut shell;
@@ -537,10 +546,10 @@ pub mod exp00001 {
     }
 
     /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
-    pub fn initial_reboot<A: std::net::ToSocketAddrs + std::fmt::Display>(
-        dry_run: bool,
-        desktop: A,
-    ) -> Result<(), failure::Error> {
+    pub fn initial_reboot<A>(dry_run: bool, desktop: A) -> Result<(), failure::Error>
+    where
+        A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display,
+    {
         // Connect to the remote
         let mut ushell = SshShell::with_default_key("root", &desktop)?;
         if dry_run {
@@ -554,10 +563,13 @@ pub mod exp00001 {
     }
 
     /// Connects to the host and to vagrant. Returns shells for both.
-    pub fn connect_and_setup_host_and_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    pub fn connect_and_setup_host_and_vagrant<A>(
         dry_run: bool,
         login: &Login<A>,
-    ) -> Result<(SshShell, SshShell, SshShell), failure::Error> {
+    ) -> Result<(SshShell, SshShell, SshShell), failure::Error>
+    where
+        A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display,
+    {
         let (ushell, rshell) = connect_and_setup_host_only(dry_run, &login)?;
         let vshell = start_vagrant(&ushell, &login.host, VAGRANT_MEM)?;
 
@@ -566,10 +578,13 @@ pub mod exp00001 {
 
     /// Connects to the host, waiting for it to come up if necessary. Turn on only the swap devices we
     /// want. Set the scaling governor. Returns the shell to the host.
-    pub fn connect_and_setup_host_only<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    pub fn connect_and_setup_host_only<A>(
         dry_run: bool,
         login: &Login<A>,
-    ) -> Result<(SshShell, SshShell), failure::Error> {
+    ) -> Result<(SshShell, SshShell), failure::Error>
+    where
+        A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display,
+    {
         // Keep trying to connect until we succeed
         let rshell = {
             let mut shell;
