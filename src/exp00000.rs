@@ -89,7 +89,7 @@ where
         // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
         vshell.run(
             cmd!(
-                "nohup ./target/release/memcached_gen_data localhost:11211 {} \
+                "./target/release/memcached_gen_data localhost:11211 {} \
                  > /vagrant/vm_shared/results/memcached_{}gb_zswap_ssdswap_{}.out",
                 size,
                 size,

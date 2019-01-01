@@ -47,7 +47,7 @@ where
 
     ushell.run(
         cmd!(
-            "nohup ./target/release/memcached_and_capture_thp localhost:11211 {} {} \
+            "./target/release/memcached_and_capture_thp localhost:11211 {} {} \
              > ../vm_shared/results/memcached_and_capture_thp_{}gb_bare_metal_{}.out",
             size,
             INTERVAL,
