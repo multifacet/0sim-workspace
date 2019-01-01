@@ -5,7 +5,7 @@
 
 use std::process::Command;
 
-use spurs::cmd;
+use spurs::{cmd, ssh::SshShell};
 
 use crate::common::Login;
 
@@ -17,8 +17,11 @@ pub fn run<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
 {
-    // Connect to the remote.
-    let ushell = crate::common::exp00000::connect_and_setup_host_only(dry_run, &login)?;
+    // Connect to the remote
+    let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
+    if dry_run {
+        ushell.toggle_dry_run();
+    }
 
     if let Some(git_branch) = git_branch {
         // Build and install the required kernel from source.
