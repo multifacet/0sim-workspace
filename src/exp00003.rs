@@ -10,13 +10,16 @@ use crate::common::exp00003::*;
 /// Interval at which to collect thp stats
 const INTERVAL: usize = 60; // seconds
 
-pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
+pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     size: usize,    // GB
     vm_size: usize, // GB
     cores: Option<usize>,
-) -> Result<(), failure::Error> {
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+{
     // Reboot
     initial_reboot(dry_run, &login)?;
 
@@ -56,14 +59,11 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     )?;
 
     // Run memcached. We need to make it take slightly less memory than the VM, or it will OOM.
-    vshell.run(cmd!(
-        "memcached -m {} -d -u vagrant",
-        (vm_size * 1024 * 95 / 100) // 95% of VM
-    ))?;
+    vshell.run(cmd!("memcached -m {} -d -u vagrant", size * 1024))?;
 
     vshell.run(
         cmd!(
-            "nohup ./target/release/memcached_and_capture_thp localhost:11211 {} {} \
+            "./target/release/memcached_and_capture_thp localhost:11211 {} {} \
              > /vagrant/vm_shared/results/memcached_and_capture_thp_{}gb_zswap_ssdswap_vm{}gb_{}.out",
             size,
             INTERVAL,
@@ -79,8 +79,6 @@ pub fn run<A: std::net::ToSocketAddrs + std::fmt::Display>(
     )?;
 
     ushell.run(cmd!("date"))?;
-
-    spurs::util::reboot(&mut ushell, dry_run)?;
 
     Ok(())
 }

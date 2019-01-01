@@ -25,6 +25,8 @@ where
     // Connect
     let ushell = connect_and_setup_host_only(dry_run, &login)?;
 
+    ushell.run(cmd!("sudo swapon /dev/sda3"))?;
+
     // Turn on compaction and force it too happen
     ushell.run(
         cmd!("echo always | sudo tee /sys/kernel/mm/transparent_hugepage/enabled").use_bash(),
@@ -64,8 +66,6 @@ where
     ushell.run(cmd!("date"))?;
 
     ushell.run(cmd!("free -h"))?;
-
-    //spurs::util::reboot(&mut ushell, dry_run)?;
 
     Ok(())
 }
