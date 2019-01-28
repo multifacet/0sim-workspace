@@ -42,7 +42,8 @@ where
         .run(cmd!("echo 50 | sudo tee /sys/module/zswap/parameters/max_pool_percent").use_bash())?;
 
     // Calibrate
-    vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd("/home/vagrant/paperexp"))?;
+    vshell
+        .run(cmd!("sudo ./target/release/time_calibrate").cwd("/home/vagrant/0sim-experiments"))?;
 
     // Warm up
     if warmup {
@@ -53,7 +54,7 @@ where
                 ((vm_size << 30) >> 12) >> 1,
                 WARM_UP_PATTERN,
             )
-            .cwd("/home/vagrant/paperexp")
+            .cwd("/home/vagrant/0sim-experiments")
             .use_bash(),
         )?;
     }
@@ -70,7 +71,7 @@ where
                     .format("%Y-%m-%d-%H-%M-%S")
                     .to_string()
             )
-            .cwd("/home/vagrant/paperexp")
+            .cwd("/home/vagrant/0sim-experiments")
             .use_bash(),
         )?;
 

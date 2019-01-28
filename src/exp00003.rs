@@ -39,7 +39,7 @@ where
         .run(cmd!("echo 50 | sudo tee /sys/module/zswap/parameters/max_pool_percent").use_bash())?;
 
     // Calibrate
-    //vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd("/home/vagrant/paperexp"))?;
+    //vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd("/home/vagrant/0sim-experiments"))?;
 
     // Turn on compaction and force it too happen
     vshell.run(
@@ -73,7 +73,7 @@ where
                 .format("%Y-%m-%d-%H-%M-%S")
                 .to_string()
         )
-        .cwd("/home/vagrant/paperexp")
+        .cwd("/home/vagrant/0sim-experiments")
         .use_bash()
         .allow_error(),
     )?;

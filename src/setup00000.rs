@@ -186,39 +186,17 @@ where
     vshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
 
     // Install benchmarks
-    vshell.run(cmd!("mkdir -p paperexp").cwd("/home/vagrant"))?;
-    vshell.run(cmd!("git init").cwd("/home/vagrant/paperexp"))?;
     vshell.run(
-        cmd!("git checkout -b side")
-            .cwd("/home/vagrant/paperexp")
-            .allow_error(), // if already exists
+        cmd!(
+            "git clone {} 0sim-experiments",
+            crate::common::setup00000::ZEROSIM_EXPERIMENTS_SRC_REPO
+        )
+        .cwd("/home/vagrant/"),
     )?;
 
-    if !dry_run {
-        let (host, _) = spurs::util::get_host_ip(&login.host);
-
-        let _ = Command::new("git")
-            .args(&["checkout", "master"])
-            .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
-            .status()?;
-
-        let _ = Command::new("git")
-            .args(&[
-                "push",
-                "-u",
-                &format!(
-                    "ssh://root@{}:{}/home/vagrant/paperexp",
-                    host,
-                    crate::common::exp00000::VAGRANT_PORT
-                ),
-                "master",
-            ])
-            .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
-            .status()?;
-    }
-    vshell.run(cmd!("git checkout master").cwd("/home/vagrant/paperexp"))?;
-
-    vshell.run(cmd!("/root/.cargo/bin/cargo build --release").cwd("/home/vagrant/paperexp"))?;
+    vshell.run(
+        cmd!("/root/.cargo/bin/cargo build --release").cwd("/home/vagrant/0sim-experiments"),
+    )?;
 
     Ok(())
 }

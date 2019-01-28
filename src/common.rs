@@ -25,6 +25,7 @@ pub mod setup00000 {
     pub use super::{Login, Username};
 
     pub const LINUX_KERNEL_SRC_REPO: &str = "https://github.com/mark-i-m/0sim";
+    pub const ZEROSIM_EXPERIMENTS_SRC_REPO: &str = "https://github.com/mark-i-m/0sim-experiments";
 
     /// Push the repo at path `repo` and branch `git_branch` from the local machine to the given
     /// remote via SSH.

@@ -38,7 +38,7 @@ where
             (size << 30) >> 12,
             WARM_UP_PATTERN,
         )
-        .cwd("/home/vagrant/paperexp")
+        .cwd("/home/vagrant/0sim-experiments")
         .use_bash(),
     )?;
 
@@ -50,7 +50,7 @@ where
              size,
              chrono::offset::Local::now().format("%Y-%m-%d-%H-%M-%S").to_string()
         )
-        .cwd("/home/vagrant/paperexp")
+        .cwd("/home/vagrant/0sim-experiments")
         .use_bash()
     )?;
 

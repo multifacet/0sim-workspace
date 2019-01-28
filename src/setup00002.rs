@@ -3,8 +3,6 @@
 //!
 //! Requires `setup00000`.
 
-use std::process::Command;
-
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
@@ -75,39 +73,12 @@ where
     ushell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
 
     // Install benchmarks
-    ushell.run(cmd!("mkdir -p paperexp").cwd(&format!("/users/{}/", login.username.as_str())))?;
-    ushell.run(cmd!("git init").cwd(&format!("/users/{}/paperexp", login.username.as_str())))?;
     ushell.run(
-        cmd!("git checkout -b side")
-            .cwd(&format!("/users/{}/paperexp", login.username.as_str()))
-            .allow_error(), // if already exists
-    )?;
-
-    if !dry_run {
-        let (host, _) = spurs::util::get_host_ip(&login.host);
-
-        let _ = Command::new("git")
-            .args(&["checkout", "master"])
-            .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
-            .status()?;
-
-        let _ = Command::new("git")
-            .args(&[
-                "push",
-                "-u",
-                &format!("ssh://{}/users/{}/paperexp", host, login.username.as_str()),
-                "master",
-            ])
-            .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
-            .status()?;
-
-        let _ = Command::new("git")
-            .args(&["checkout", "side"])
-            .current_dir("/u/m/a/markm/private/large_mem/tools/paperexp/")
-            .status()?;
-    }
-    ushell.run(
-        cmd!("git checkout master").cwd(&format!("/users/{}/paperexp", login.username.as_str())),
+        cmd!(
+            "git clone {} 0sim-experiments",
+            crate::common::setup00000::ZEROSIM_EXPERIMENTS_SRC_REPO
+        )
+        .cwd("/home/vagrant/"),
     )?;
 
     ushell.run(

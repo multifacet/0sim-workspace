@@ -58,7 +58,10 @@ where
                 .format("%Y-%m-%d-%H-%M-%S")
                 .to_string()
         )
-        .cwd(&format!("/users/{}/paperexp", login.username.as_str()))
+        .cwd(&format!(
+            "/users/{}/0sim-experiments",
+            login.username.as_str()
+        ))
         .use_bash()
         .allow_error(),
     )?;
