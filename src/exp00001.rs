@@ -3,7 +3,7 @@
 //! Requires the desktop machine to already be set up, similarly to `setup00000`, with a minor
 //! exception: we run everything as root.
 
-use spurs::cmd;
+use spurs::{cmd, ssh::Execute};
 
 use crate::common::exp00001::*;
 

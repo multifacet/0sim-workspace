@@ -17,25 +17,24 @@ pub struct Login<'u, A: std::net::ToSocketAddrs + std::fmt::Display> {
 pub mod setup00000 {
     use std::process::Command;
 
-    use spurs::{cmd, ssh::SshShell};
+    use spurs::{
+        cmd,
+        ssh::{Execute, SshShell},
+    };
 
     pub use super::{Login, Username};
 
-    /// Build a Linux kernel RPM on the remote host using the given kernel branch and kernel build
-    /// config options.
-    ///
-    /// `config_options` is a list of config option names that should be set or unset before
-    /// building. It is the caller's responsibility to make sure that all dependencies are on too.
-    /// If a config is `true` it is set to "y"; otherwise, it is unset.
-    ///
-    /// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM.
-    pub fn build_kernel_rpm<A: std::net::ToSocketAddrs + std::fmt::Display>(
+    pub const LINUX_KERNEL_SRC_REPO: &str = "https://github.com/mark-i-m/0sim";
+
+    /// Push the repo at path `repo` and branch `git_branch` from the local machine to the given
+    /// remote via SSH.
+    #[allow(dead_code)]
+    pub fn push_repo_to_remote<A: std::net::ToSocketAddrs + std::fmt::Display>(
         dry_run: bool,
+        repo: &str,
+        git_branch: &str,
         ushell: &SshShell,
         login: &Login<A>,
-        git_branch: &str,
-        config_options: &[(&str, bool)],
-        kernel_local_version: &str,
     ) -> Result<(), failure::Error> {
         ushell.run(cmd!("mkdir -p linux-dev"))?;
         ushell
@@ -49,7 +48,7 @@ pub mod setup00000 {
         if !dry_run {
             let _ = Command::new("git")
                 .args(&["checkout", git_branch])
-                .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
+                .current_dir(repo)
                 .status()?;
 
             let _ = Command::new("git")
@@ -63,13 +62,34 @@ pub mod setup00000 {
                     ),
                     git_branch,
                 ])
-                .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
+                .current_dir(repo)
                 .status()?;
             let _ = Command::new("git")
                 .args(&["checkout", "side"])
-                .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
+                .current_dir(repo)
                 .status()?;
         }
+
+        Ok(())
+    }
+
+    /// Build a Linux kernel RPM on the remote host using the given kernel branch and kernel build
+    /// config options.
+    ///
+    /// `config_options` is a list of config option names that should be set or unset before
+    /// building. It is the caller's responsibility to make sure that all dependencies are on too.
+    /// If a config is `true` it is set to "y"; otherwise, it is unset.
+    ///
+    /// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM.
+    pub fn build_kernel_rpm<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        _dry_run: bool,
+        ushell: &SshShell,
+        login: &Login<A>,
+        git_branch: &str,
+        config_options: &[(&str, bool)],
+        kernel_local_version: &str,
+    ) -> Result<(), failure::Error> {
+        ushell.run(cmd!("git clone {} linux-dev", LINUX_KERNEL_SRC_REPO))?;
         ushell.run(
             cmd!("git checkout {}", git_branch)
                 .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
@@ -164,7 +184,10 @@ pub mod setup00000 {
 pub mod exp00000 {
     use std::collections::HashMap;
 
-    use spurs::{cmd, ssh::SshShell};
+    use spurs::{
+        cmd,
+        ssh::{Execute, SshShell},
+    };
 
     pub use super::{Login, Username};
 
@@ -382,7 +405,8 @@ pub mod exp00000 {
         let devs = spurs::util::get_unpartitioned_devs(shell, dry_run)?;
 
         // Get the size of each one
-        let sizes = spurs::util::get_dev_sizes(shell, &devs, dry_run)?;
+        let sizes =
+            spurs::util::get_dev_sizes(shell, devs.iter().map(String::as_str).collect(), dry_run)?;
 
         // Turn on the SSDs as swap devs
         for (dev, size) in devs.iter().zip(sizes.iter()) {
@@ -444,7 +468,10 @@ pub mod exp00000 {
 pub mod exp00001 {
     use std::collections::HashMap;
 
-    use spurs::{cmd, ssh::SshShell};
+    use spurs::{
+        cmd,
+        ssh::{Execute, SshShell},
+    };
 
     pub use super::exp00000::{connect_to_vagrant, VAGRANT_CORES, VAGRANT_PORT};
     pub use super::{Login, Username};

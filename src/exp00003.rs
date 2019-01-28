@@ -3,7 +3,7 @@
 //!
 //! Requires `setup00000` followed by `setup00001`.
 
-use spurs::cmd;
+use spurs::{cmd, ssh::Execute};
 
 use crate::common::exp00003::*;
 

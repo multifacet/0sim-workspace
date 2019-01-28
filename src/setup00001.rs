@@ -5,7 +5,7 @@
 
 use std::process::Command;
 
-use spurs::cmd;
+use spurs::{cmd, ssh::Execute};
 
 use crate::common::Login;
 
