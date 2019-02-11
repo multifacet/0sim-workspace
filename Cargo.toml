@@ -9,6 +9,7 @@ edition = "2018"
 #spurs = { path = "/nobackup/spurs" }
 spurs = "0.3.0"
 clap = { version = "2.32.0", features = [ "color" ] }
-failure = "0.1.4"
+failure = "0.1.5"
+failure_derive = "0.1.5"
 chrono = "0.4.6"
 env_logger = "0.6.0"

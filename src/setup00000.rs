@@ -5,15 +5,26 @@
 
 use std::process::Command;
 
+use failure::Fail;
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
 };
 
-use crate::common::Login;
+use crate::common::{
+    setup00000::{GITHUB_CLONE_USERNAME, LINUX_KERNEL_SRC_REPO, ZEROSIM_EXPERIMENTS_SRC_REPO},
+    GitHubRepo, Login,
+};
 
 const VAGRANT_RPM_URL: &str =
     "https://releases.hashicorp.com/vagrant/2.1.5/vagrant_2.1.5_x86_64.rpm";
+
+#[derive(Debug, Clone, Copy, Fail)]
+enum Setup00000Error {
+    #[fail(display = "Need a github token to clone repo.")]
+    NoToken,
+}
 
 pub fn run<A>(
     dry_run: bool,
@@ -21,10 +32,16 @@ pub fn run<A>(
     device: Option<&str>,
     git_branch: Option<&str>,
     only_vm: bool,
+    token: Option<&str>,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
 {
+    // Do some sanity checking
+    if git_branch.is_some() && !token.is_some() {
+        return Err(Setup00000Error::NoToken.into());
+    }
+
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
     if dry_run {
@@ -101,10 +118,22 @@ where
                 ("CONFIG_ZSMALLOC", true),
                 ("CONFIG_PAGE_TABLE_ISOLATION", false),
                 ("CONFIG_RETPOLINE", false),
+                ("CONFIG_FRAME_POINTER", true),
             ];
 
+            let zerosim_repo = GitHubRepo::Https {
+                repo: LINUX_KERNEL_SRC_REPO.into(),
+                token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
+            };
+
             crate::common::setup00000::build_kernel_rpm(
-                dry_run, &ushell, login, git_branch, CONFIG_SET, "ztier",
+                dry_run,
+                &ushell,
+                login,
+                zerosim_repo,
+                git_branch,
+                CONFIG_SET,
+                "ztier",
             )?;
 
             // Build cpupower
@@ -186,13 +215,12 @@ where
     vshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
 
     // Install benchmarks
-    vshell.run(
-        cmd!(
-            "git clone {} 0sim-experiments",
-            crate::common::setup00000::ZEROSIM_EXPERIMENTS_SRC_REPO
-        )
-        .cwd("/home/vagrant/"),
-    )?;
+    let zerosim_exp_repo = GitHubRepo::Https {
+        repo: ZEROSIM_EXPERIMENTS_SRC_REPO.into(),
+        token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
+    };
+
+    vshell.run(cmd!("git clone {} 0sim-experiments", zerosim_exp_repo).cwd("/home/vagrant/"))?;
 
     vshell.run(
         cmd!("/root/.cargo/bin/cargo build --release").cwd("/home/vagrant/0sim-experiments"),

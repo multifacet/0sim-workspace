@@ -14,6 +14,33 @@ pub struct Login<'u, A: std::net::ToSocketAddrs + std::fmt::Display> {
     pub username: Username<'u>,
 }
 
+pub enum GitHubRepo {
+    #[allow(dead_code)]
+    Ssh {
+        /// Repo git URL (e.g. `git@github.com:mark-i-m/spurs`)
+        repo: String,
+    },
+    Https {
+        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`)
+        repo: String,
+        /// (Username, OAuth token) for authentication, if needed
+        token: Option<(String, String)>,
+    },
+}
+
+impl std::fmt::Display for GitHubRepo {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            GitHubRepo::Ssh { repo } => write!(f, "{}", repo),
+            GitHubRepo::Https {
+                repo,
+                token: Some((user, token)),
+            } => write!(f, "https://{}:{}@{}", user, token, repo),
+            GitHubRepo::Https { repo, .. } => write!(f, "https://{}", repo),
+        }
+    }
+}
+
 pub mod setup00000 {
     use std::process::Command;
 
@@ -22,10 +49,11 @@ pub mod setup00000 {
         ssh::{Execute, SshShell},
     };
 
-    pub use super::{Login, Username};
+    pub use super::{GitHubRepo, Login, Username};
 
-    pub const LINUX_KERNEL_SRC_REPO: &str = "https://github.com/mark-i-m/0sim";
-    pub const ZEROSIM_EXPERIMENTS_SRC_REPO: &str = "https://github.com/mark-i-m/0sim-experiments";
+    pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
+    pub const LINUX_KERNEL_SRC_REPO: &str = "github.com/mark-i-m/0sim";
+    pub const ZEROSIM_EXPERIMENTS_SRC_REPO: &str = "github.com/mark-i-m/0sim-experiments";
 
     /// Push the repo at path `repo` and branch `git_branch` from the local machine to the given
     /// remote via SSH.
@@ -86,11 +114,12 @@ pub mod setup00000 {
         _dry_run: bool,
         ushell: &SshShell,
         login: &Login<A>,
+        repo: GitHubRepo,
         git_branch: &str,
         config_options: &[(&str, bool)],
         kernel_local_version: &str,
     ) -> Result<(), failure::Error> {
-        ushell.run(cmd!("git clone {} linux-dev", LINUX_KERNEL_SRC_REPO))?;
+        ushell.run(cmd!("git clone {} linux-dev", repo))?;
         ushell.run(
             cmd!("git checkout {}", git_branch)
                 .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
@@ -180,6 +209,12 @@ pub mod setup00000 {
 
         Ok(())
     }
+}
+
+pub mod setup00002 {
+    pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
+    pub const LINUX_KERNEL_SRC_REPO: &str = "github.com/mark-i-m/0sim";
+    pub const ZEROSIM_EXPERIMENTS_SRC_REPO: &str = "github.com/mark-i-m/0sim-experiments";
 }
 
 pub mod exp00000 {

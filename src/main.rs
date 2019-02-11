@@ -37,6 +37,8 @@ fn run() -> Result<(), failure::Error> {
              "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
             (@arg ONLY_VM: -v --only_vm
              "(Optional) only setup the VM")
+            (@arg TOKEN: --token +takes_value
+             "(Optional) Required if setting up a kernel. This is the OAuth token for cloning the repo.")
         )
         (@subcommand setup00001 =>
             (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
@@ -55,6 +57,8 @@ fn run() -> Result<(), failure::Error> {
              "The username on the remote (e.g. markm)")
             (@arg GIT_BRANCH: +takes_value -g --git_branch
              "(Optional) The git branch to compile the kernel from (e.g. markm_ztier)")
+            (@arg TOKEN: --token +takes_value
+             "(Optional) Required if setting up a kernel. This is the OAuth token for cloning the repo.")
         )
 
         (@subcommand exp00000 =>
@@ -154,7 +158,8 @@ fn run() -> Result<(), failure::Error> {
             let device = sub_m.value_of("DEVICE");
             let git_branch = sub_m.value_of("GIT_BRANCH");
             let only_vm = sub_m.is_present("ONLY_VM");
-            setup00000::run(dry_run, &login, device, git_branch, only_vm)
+            let token = sub_m.value_of("TOKEN");
+            setup00000::run(dry_run, &login, device, git_branch, only_vm, token)
         }
         ("setup00001", Some(sub_m)) => {
             let login = Login {
@@ -170,7 +175,8 @@ fn run() -> Result<(), failure::Error> {
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let git_branch = sub_m.value_of("GIT_BRANCH");
-            setup00002::run(dry_run, &login, git_branch)
+            let token = sub_m.value_of("TOKEN");
+            setup00002::run(dry_run, &login, git_branch, token)
         }
 
         ("exp00000", Some(sub_m)) => {

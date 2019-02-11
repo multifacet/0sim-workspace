@@ -8,12 +8,16 @@ use spurs::{
     ssh::{Execute, SshShell},
 };
 
-use crate::common::Login;
+use crate::common::{
+    setup00002::{GITHUB_CLONE_USERNAME, LINUX_KERNEL_SRC_REPO, ZEROSIM_EXPERIMENTS_SRC_REPO},
+    GitHubRepo, Login,
+};
 
 pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     git_branch: Option<&str>,
+    token: Option<&str>,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
@@ -25,15 +29,22 @@ where
     }
 
     if let Some(git_branch) = git_branch {
+        let zerosim_repo = GitHubRepo::Https {
+            repo: LINUX_KERNEL_SRC_REPO.into(),
+            token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
+        };
+
         // Build and install the required kernel from source.
         crate::common::setup00000::build_kernel_rpm(
             dry_run,
             &ushell,
             login,
+            zerosim_repo,
             git_branch,
             &[
                 ("CONFIG_PAGE_TABLE_ISOLATION", false),
                 ("CONFIG_RETPOLINE", false),
+                ("CONFIG_FRAME_POINTER", true),
             ],
             "exp",
         )?;
@@ -73,13 +84,12 @@ where
     ushell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
 
     // Install benchmarks
-    ushell.run(
-        cmd!(
-            "git clone {} 0sim-experiments",
-            crate::common::setup00000::ZEROSIM_EXPERIMENTS_SRC_REPO
-        )
-        .cwd("/home/vagrant/"),
-    )?;
+    let zerosim_exp_repo = GitHubRepo::Https {
+        repo: ZEROSIM_EXPERIMENTS_SRC_REPO.into(),
+        token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
+    };
+
+    ushell.run(cmd!("git clone {} 0sim-experiments", zerosim_exp_repo).cwd("/home/vagrant/"))?;
 
     ushell.run(
         cmd!(
