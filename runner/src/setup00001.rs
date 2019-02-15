@@ -3,11 +3,9 @@
 //!
 //! Requires `setup00000`.
 
-use std::process::Command;
-
 use spurs::{cmd, ssh::Execute};
 
-use crate::common::Login;
+use crate::common::{KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE};
 
 pub fn run<A>(dry_run: bool, login: &Login<A>, git_branch: &str) -> Result<(), failure::Error>
 where
@@ -21,54 +19,37 @@ where
     //
     // Building the kernel on the guest is painful, so we will build it on the host and copy it to
     // the guest via NFS.
-    ushell.run(
-        cmd!("git checkout side").cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
-    )?;
+    let user_home = &format!("/users/{}/", login.username.as_str());
+    let kernel_path = &format!(
+        "{}/{}/{}",
+        user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
+    );
 
-    if !dry_run {
-        let _ = Command::new("git")
-            .args(&["checkout", git_branch])
-            .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
-            .status()?;
+    ushell.run(cmd!("git checkout {}", git_branch).cwd(kernel_path))?;
 
-        let _ = Command::new("git")
-            .args(&[
-                "push",
-                "-u",
-                &format!(
-                    "ssh://{}/users/{}/linux-dev",
-                    &login.host,
-                    login.username.as_str()
-                ),
-                git_branch,
-            ])
-            .current_dir("/u/m/a/markm/private/large_mem/software/linux-dev")
-            .status()?;
-    }
-    ushell.run(
-        cmd!("git checkout {}", git_branch)
-            .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
-    )?;
+    const CONFIG_SET: &[(&str, bool)] = &[
+        ("CONFIG_ZSWAP", true),
+        ("CONFIG_ZPOOL", true),
+        ("CONFIG_ZBUD", true),
+        ("CONFIG_ZTIER", true),
+        ("CONFIG_SBALLOC", true),
+        ("CONFIG_ZSMALLOC", true),
+        ("CONFIG_PAGE_TABLE_ISOLATION", false),
+        ("CONFIG_RETPOLINE", false),
+        ("CONFIG_FRAME_POINTER", true),
+    ];
 
-    // compile linux-dev
-    ushell.run(cmd!("cp .config config.bak").cwd(&format!(
-        "/users/{}/linux-dev/kbuild",
-        login.username.as_str()
-    )))?;
-    ushell.run(cmd!("yes '' | make oldconfig").cwd(&format!(
-        "/users/{}/linux-dev/kbuild",
-        login.username.as_str()
-    )))?;
+    let git_hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
+    let git_hash = git_hash.stdout.trim();
 
-    let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
-    let nprocess = nprocess.trim();
-    ushell.run(
-        cmd!("make -j {} binrpm-pkg LOCALVERSION=-thpcmpt", nprocess)
-            .cwd(&format!(
-                "/users/{}/linux-dev/kbuild",
-                login.username.as_str()
-            ))
-            .allow_error(),
+    crate::common::build_kernel(
+        dry_run,
+        &ushell,
+        &kernel_path,
+        git_branch,
+        CONFIG_SET,
+        &format!("{}-{}", git_branch.replace("_", "-"), git_hash),
+        KernelPkgType::Rpm,
     )?;
 
     // Install on the guest. To do this, we need the guest to be up and connected to NFS, so we can
@@ -77,18 +58,15 @@ where
         .run(
             cmd!("ls -t1 | head -n2 | sort | tail -n1")
                 .use_bash()
-                .cwd(&format!(
-                    "/users/{}/rpmbuild/RPMS/x86_64/",
-                    login.username.as_str()
-                )),
+                .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
         )?
         .stdout;
     let kernel_rpm = kernel_rpm.trim();
     ushell.run(cmd!(
-        "cp /users/{}/rpmbuild/RPMS/x86_64/{} /users/{}/vm_shared/",
-        login.username.as_str(),
+        "cp {}/rpmbuild/RPMS/x86_64/{} {}/vm_shared/",
+        user_home,
         kernel_rpm,
-        login.username.as_str(),
+        user_home
     ))?;
 
     vshell.run(cmd!(
