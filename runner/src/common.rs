@@ -1,5 +1,10 @@
 //! A library of routines commonly used in experiments.
 
+use spurs::{
+    cmd,
+    ssh::{Execute, SshShell},
+};
+
 #[derive(Copy, Clone, Debug)]
 pub struct Username<'u>(pub &'u str);
 
@@ -41,180 +46,156 @@ impl std::fmt::Display for GitHubRepo {
     }
 }
 
-pub mod setup00000 {
-    use std::process::Command;
+/// The username to clone the research workspace with.
+pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
 
-    use spurs::{
-        cmd,
-        ssh::{Execute, SshShell},
+/// The github repo URL for the research workspace.
+pub const RESEARCH_WORKSPACE_REPO: &str = "github.com/mark-i-m/research-workspace";
+
+/// The path at which `clone_research_workspace` clones the workspace.
+pub const RESEARCH_WORKSPACE_PATH: &str = "research-workspace";
+
+// Path to certain submodules
+
+/// Path to the 0sim submodule.
+pub const ZEROSIM_KERNEL_SUBMODULE: &str = "0sim";
+
+/// Path to the 0sim-experiments submodule.
+pub const ZEROSIM_EXPERIMENTS_SUBMODULE: &str = "0sim-experiments";
+
+/// Clone the research-workspace and checkout the given submodules. The given token is used as the
+/// Github personal access token.
+///
+/// Returns the git hash of the cloned repo.
+///
+/// *NOTE*: This function intentionally does not take the repo URL. It should always be the above.
+pub fn clone_research_workspace(
+    ushell: &SshShell,
+    token: &str,
+    submodules: &[&str],
+) -> Result<String, failure::Error> {
+    // Clone the repo.
+    let repo = GitHubRepo::Https {
+        repo: RESEARCH_WORKSPACE_REPO.into(),
+        token: Some((GITHUB_CLONE_USERNAME.into(), token.into())),
     };
+    ushell.run(cmd!("git clone {}", repo))?;
 
-    pub use super::{GitHubRepo, Login, Username};
-
-    pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
-    pub const LINUX_KERNEL_SRC_REPO: &str = "github.com/mark-i-m/0sim";
-    pub const ZEROSIM_EXPERIMENTS_SRC_REPO: &str = "github.com/mark-i-m/0sim-experiments";
-
-    /// Push the repo at path `repo` and branch `git_branch` from the local machine to the given
-    /// remote via SSH.
-    #[allow(dead_code)]
-    pub fn push_repo_to_remote<A: std::net::ToSocketAddrs + std::fmt::Display>(
-        dry_run: bool,
-        repo: &str,
-        git_branch: &str,
-        ushell: &SshShell,
-        login: &Login<A>,
-    ) -> Result<(), failure::Error> {
-        ushell.run(cmd!("mkdir -p linux-dev"))?;
-        ushell
-            .run(cmd!("git init").cwd(&format!("/users/{}/linux-dev", login.username.as_str())))?;
+    // Checkout submodules.
+    for submodule in submodules {
         ushell.run(
-            cmd!("git checkout -b side")
-                .cwd(&format!("/users/{}/linux-dev", login.username.as_str()))
-                .allow_error(), // if already exists
+            cmd!("git submodule update --init --recursive -- {}", submodule)
+                .cwd(RESEARCH_WORKSPACE_PATH),
         )?;
-
-        if !dry_run {
-            let _ = Command::new("git")
-                .args(&["checkout", git_branch])
-                .current_dir(repo)
-                .status()?;
-
-            let _ = Command::new("git")
-                .args(&[
-                    "push",
-                    "-u",
-                    &format!(
-                        "ssh://{}/users/{}/linux-dev",
-                        login.host,
-                        login.username.as_str()
-                    ),
-                    git_branch,
-                ])
-                .current_dir(repo)
-                .status()?;
-            let _ = Command::new("git")
-                .args(&["checkout", "side"])
-                .current_dir(repo)
-                .status()?;
-        }
-
-        Ok(())
     }
 
-    /// Build a Linux kernel RPM on the remote host using the given kernel branch and kernel build
-    /// config options.
-    ///
-    /// `config_options` is a list of config option names that should be set or unset before
-    /// building. It is the caller's responsibility to make sure that all dependencies are on too.
-    /// If a config is `true` it is set to "y"; otherwise, it is unset.
-    ///
-    /// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM.
-    pub fn build_kernel_rpm<A: std::net::ToSocketAddrs + std::fmt::Display>(
-        _dry_run: bool,
-        ushell: &SshShell,
-        login: &Login<A>,
-        repo: GitHubRepo,
-        git_branch: &str,
-        config_options: &[(&str, bool)],
-        kernel_local_version: &str,
-    ) -> Result<(), failure::Error> {
-        ushell.run(cmd!("git clone {} linux-dev", repo))?;
-        ushell.run(
-            cmd!("git checkout {}", git_branch)
-                .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
-        )?;
+    // Get the sha hash.
+    let hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
+    let hash = hash.stdout.trim();
 
-        // compile linux-dev
-        ushell.run(cmd!(
-            "mkdir -p /users/{}/linux-dev/kbuild",
-            login.username.as_str()
-        ))?;
-
-        // save old config if there is one
-        ushell.run(
-            cmd!("cp .config config.bak",)
-                .cwd(&format!(
-                    "/users/{}/linux-dev/kbuild",
-                    login.username.as_str()
-                ))
-                .allow_error(),
-        )?;
-
-        ushell.run(
-            cmd!(
-                "make O=/users/{}/linux-dev/kbuild defconfig",
-                login.username.as_str()
-            )
-            .cwd(&format!("/users/{}/linux-dev", login.username.as_str())),
-        )?;
-        let config = ushell
-            .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
-            .stdout;
-        let config = config.trim();
-        ushell.run(cmd!(
-            "cp {} /users/{}/linux-dev/kbuild/.config",
-            config,
-            login.username.as_str(),
-        ))?;
-        ushell.run(cmd!("yes '' | make oldconfig").use_bash().cwd(&format!(
-            "/users/{}/linux-dev/kbuild",
-            login.username.as_str()
-        )))?;
-
-        // make sure some configurations are set
-        for (opt, set) in config_options.iter() {
-            if *set {
-                ushell.run(cmd!(
-                    "sed -i 's/# {} is not set/{}=y/' /users/{}/linux-dev/kbuild/.config",
-                    opt,
-                    opt,
-                    login.username.as_str()
-                ))?;
-            } else {
-                ushell.run(cmd!(
-                    "sed -i 's/{}=y/# {} is not set/' /users/{}/linux-dev/kbuild/.config",
-                    opt,
-                    opt,
-                    login.username.as_str()
-                ))?;
-            }
-        }
-
-        let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
-        let nprocess = nprocess.trim();
-        ushell.run(
-            cmd!(
-                "make -j {} binrpm-pkg LOCALVERSION=-{}",
-                nprocess,
-                kernel_local_version
-            )
-            .cwd(&format!(
-                "/users/{}/linux-dev/kbuild",
-                login.username.as_str()
-            ))
-            .allow_error(),
-        )?;
-        ushell.run(
-            cmd!(
-                "make -j {} binrpm-pkg LOCALVERSION=-{}",
-                nprocess,
-                kernel_local_version
-            )
-            .cwd(&format!(
-                "/users/{}/linux-dev/kbuild",
-                login.username.as_str()
-            )),
-        )?;
-
-        Ok(())
-    }
+    Ok(hash.into())
 }
 
-pub mod setup00002 {
-    pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
-    pub const LINUX_KERNEL_SRC_REPO: &str = "github.com/mark-i-m/0sim";
-    pub const ZEROSIM_EXPERIMENTS_SRC_REPO: &str = "github.com/mark-i-m/0sim-experiments";
+pub enum KernelPkgType {
+    Deb,
+    Rpm,
+}
+
+/// Build a Linux kernel package (RPM or DEB) on the remote host using the given kernel branch
+/// and kernel build config options on the repo at the given path. This command does not install
+/// the new kernel.
+///
+/// The repo should already be cloned at the give path. This function will checkout the given
+/// branch, though, so the repo should be clean.
+///
+/// `config_options` is a list of config option names that should be set or unset before
+/// building. It is the caller's responsibility to make sure that all dependencies are on too.
+/// If a config is `true` it is set to "y"; otherwise, it is unset.
+///
+/// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM.
+pub fn build_kernel(
+    _dry_run: bool,
+    ushell: &SshShell,
+    repo_path: &str,
+    git_branch: &str,
+    config_options: &[(&str, bool)],
+    kernel_local_version: &str,
+    pkg_type: KernelPkgType,
+) -> Result<(), failure::Error> {
+    ushell.run(cmd!("git checkout {}", git_branch).cwd(repo_path))?;
+
+    // kbuild path.
+    let kbuild_path = &format!("{}/kbuild", repo_path);
+
+    ushell.run(cmd!("mkdir -p {}", kbuild_path))?;
+
+    // save old config if there is one.
+    ushell.run(cmd!("cp .config config.bak").cwd(kbuild_path).allow_error())?;
+
+    // configure the new kernel we are about to build.
+    ushell.run(cmd!("make O={} defconfig", kbuild_path).cwd(repo_path))?;
+    let config = ushell
+        .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
+        .stdout;
+    let config = config.trim();
+    ushell.run(cmd!("cp {} {}/.config", config, kbuild_path))?;
+    ushell.run(cmd!("yes '' | make oldconfig").use_bash().cwd(kbuild_path))?;
+
+    for (opt, set) in config_options.iter() {
+        if *set {
+            ushell.run(cmd!(
+                "sed -i 's/# {} is not set/{}=y/' {}/.config",
+                opt,
+                opt,
+                kbuild_path
+            ))?;
+        } else {
+            ushell.run(cmd!(
+                "sed -i 's/{}=y/# {} is not set/' {}/.config",
+                opt,
+                opt,
+                kbuild_path
+            ))?;
+        }
+    }
+
+    // Compile with as many processors as we have.
+    //
+    // NOTE: for some reason, this sometimes fails the first time, so just do it again.
+    let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
+    let nprocess = nprocess.trim();
+
+    let make_target = match pkg_type {
+        KernelPkgType::Deb => "bindeb-pkg",
+        KernelPkgType::Rpm => "binrpm-pkg",
+    };
+
+    ushell.run(
+        cmd!(
+            "make -j {} {} LOCALVERSION=-{}",
+            nprocess,
+            make_target,
+            kernel_local_version
+        )
+        .cwd(kbuild_path)
+        .allow_error(),
+    )?;
+    ushell.run(
+        cmd!(
+            "make -j {} {} LOCALVERSION=-{}",
+            nprocess,
+            make_target,
+            kernel_local_version
+        )
+        .cwd(kbuild_path),
+    )?;
+
+    Ok(())
+}
+
+pub mod setup00000 {
+    /// Path to directory with Vagrantfile on Cloudlab.
+    pub const CLOUDLAB_VAGRANT_PATH: &str = "/proj/superpages-PG0/markm_vagrant";
 }
 
 pub mod exp00000 {

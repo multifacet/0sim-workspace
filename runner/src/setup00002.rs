@@ -9,15 +9,15 @@ use spurs::{
 };
 
 use crate::common::{
-    setup00002::{GITHUB_CLONE_USERNAME, LINUX_KERNEL_SRC_REPO, ZEROSIM_EXPERIMENTS_SRC_REPO},
-    GitHubRepo, Login,
+    KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    ZEROSIM_KERNEL_SUBMODULE,
 };
 
 pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     git_branch: Option<&str>,
-    token: Option<&str>,
+    token: &str,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
@@ -28,42 +28,46 @@ where
         ushell.toggle_dry_run();
     }
 
-    if let Some(git_branch) = git_branch {
-        let zerosim_repo = GitHubRepo::Https {
-            repo: LINUX_KERNEL_SRC_REPO.into(),
-            token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
-        };
+    let user_home = format!("/users/{}/", login.username.as_str());
 
-        // Build and install the required kernel from source.
-        crate::common::setup00000::build_kernel_rpm(
+    // clone the research workspace and build/install the 0sim kernel.
+    if let Some(git_branch) = git_branch {
+        const CONFIG_SET: &[(&str, bool)] = &[
+            ("CONFIG_PAGE_TABLE_ISOLATION", false),
+            ("CONFIG_RETPOLINE", false),
+            ("CONFIG_FRAME_POINTER", true),
+        ];
+
+        let kernel_path = format!(
+            "{}/{}/{}",
+            user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
+        );
+
+        let git_hash =
+            crate::common::clone_research_workspace(&ushell, token, &[ZEROSIM_KERNEL_SUBMODULE])?;
+
+        crate::common::build_kernel(
             dry_run,
             &ushell,
-            login,
-            zerosim_repo,
+            &kernel_path,
             git_branch,
-            &[
-                ("CONFIG_PAGE_TABLE_ISOLATION", false),
-                ("CONFIG_RETPOLINE", false),
-                ("CONFIG_FRAME_POINTER", true),
-            ],
-            "exp",
+            CONFIG_SET,
+            &format!("{}-{}", git_branch.replace("_", "-"), git_hash),
+            KernelPkgType::Rpm,
         )?;
 
         let kernel_rpm = ushell
             .run(
                 cmd!("ls -t1 | head -n2 | sort | tail -n1")
                     .use_bash()
-                    .cwd(&format!(
-                        "/users/{}/rpmbuild/RPMS/x86_64/",
-                        login.username.as_str()
-                    )),
+                    .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
             )?
             .stdout;
         let kernel_rpm = kernel_rpm.trim();
 
         ushell.run(cmd!(
-            "sudo rpm -ivh --force /users/{}/rpmbuild/RPMS/x86_64/{}",
-            login.username.as_str(),
+            "sudo rpm -ivh --force {}/rpmbuild/RPMS/x86_64/{}",
+            user_home,
             kernel_rpm
         ))?;
 
@@ -84,19 +88,11 @@ where
     ushell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
 
     // Install benchmarks
-    let zerosim_exp_repo = GitHubRepo::Https {
-        repo: ZEROSIM_EXPERIMENTS_SRC_REPO.into(),
-        token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
-    };
-
-    ushell.run(cmd!("git clone {} 0sim-experiments", zerosim_exp_repo).cwd("/home/vagrant/"))?;
-
     ushell.run(
-        cmd!(
-            "/users/{}/.cargo/bin/cargo build --release",
-            login.username.as_str()
-        )
-        .cwd(&format!("/users/{}/paperexp", login.username.as_str())),
+        cmd!("{}/.cargo/bin/cargo build --release", user_home).cwd(&format!(
+            "{}/{}/{}",
+            user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+        )),
     )?;
 
     Ok(())

@@ -31,14 +31,14 @@ fn run() -> Result<(), failure::Error> {
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
+            (@arg TOKEN: +required +takes_value
+             "This is the Github personal token for cloning the repo.")
             (@arg DEVICE: +takes_value -d --device
              "(Optional) the device to format and use as a home directory (e.g. -d /dev/sda)")
             (@arg GIT_BRANCH: +takes_value -g --git_branch
              "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
             (@arg ONLY_VM: -v --only_vm
              "(Optional) only setup the VM")
-            (@arg TOKEN: --token +takes_value
-             "(Optional) Required if setting up a kernel. This is the OAuth token for cloning the repo.")
         )
         (@subcommand setup00001 =>
             (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
@@ -55,10 +55,10 @@ fn run() -> Result<(), failure::Error> {
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
+            (@arg TOKEN: +required +takes_value
+             "This is the Github personal token for cloning the repo.")
             (@arg GIT_BRANCH: +takes_value -g --git_branch
              "(Optional) The git branch to compile the kernel from (e.g. markm_ztier)")
-            (@arg TOKEN: --token +takes_value
-             "(Optional) Required if setting up a kernel. This is the OAuth token for cloning the repo.")
         )
 
         (@subcommand exp00000 =>
@@ -158,7 +158,7 @@ fn run() -> Result<(), failure::Error> {
             let device = sub_m.value_of("DEVICE");
             let git_branch = sub_m.value_of("GIT_BRANCH");
             let only_vm = sub_m.is_present("ONLY_VM");
-            let token = sub_m.value_of("TOKEN");
+            let token = sub_m.value_of("TOKEN").unwrap();
             setup00000::run(dry_run, &login, device, git_branch, only_vm, token)
         }
         ("setup00001", Some(sub_m)) => {
@@ -175,7 +175,7 @@ fn run() -> Result<(), failure::Error> {
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let git_branch = sub_m.value_of("GIT_BRANCH");
-            let token = sub_m.value_of("TOKEN");
+            let token = sub_m.value_of("TOKEN").unwrap();
             setup00002::run(dry_run, &login, git_branch, token)
         }
 

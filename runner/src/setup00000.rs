@@ -5,26 +5,21 @@
 
 use std::process::Command;
 
-use failure::Fail;
-
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
 };
 
 use crate::common::{
-    setup00000::{GITHUB_CLONE_USERNAME, LINUX_KERNEL_SRC_REPO, ZEROSIM_EXPERIMENTS_SRC_REPO},
-    GitHubRepo, Login,
+    setup00000::CLOUDLAB_VAGRANT_PATH, KernelPkgType, Login, RESEARCH_WORKSPACE_PATH,
+    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
     "https://releases.hashicorp.com/vagrant/2.1.5/vagrant_2.1.5_x86_64.rpm";
 
-#[derive(Debug, Clone, Copy, Fail)]
-enum Setup00000Error {
-    #[fail(display = "Need a github token to clone repo.")]
-    NoToken,
-}
+/// Location of `.ssh` directory on UW CS AFS so we can install it on experimental machines.
+const SSH_LOCATION: &str = "/u/m/a/markm/.ssh";
 
 pub fn run<A>(
     dry_run: bool,
@@ -32,21 +27,18 @@ pub fn run<A>(
     device: Option<&str>,
     git_branch: Option<&str>,
     only_vm: bool,
-    token: Option<&str>,
+    token: &str,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
 {
-    // Do some sanity checking
-    if git_branch.is_some() && !token.is_some() {
-        return Err(Setup00000Error::NoToken.into());
-    }
-
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
     if dry_run {
         ushell.toggle_dry_run();
     }
+
+    let user_home = &format!("/users/{}/", login.username.as_str());
 
     if !only_vm {
         // Rename `poweroff` so we can't accidentally use it
@@ -96,7 +88,7 @@ where
                 &ushell,
                 dry_run,
                 &format!("{}1", device), // assume it is the first device partition
-                &format!("/users/{}", login.username.as_str()),
+                user_home,
                 login.username.as_str(),
             )?;
         }
@@ -107,7 +99,7 @@ where
             ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
         }
 
-        // clone linux-dev
+        // clone the research workspace and build/install the 0sim kernel.
         if let Some(git_branch) = git_branch {
             const CONFIG_SET: &[(&str, bool)] = &[
                 ("CONFIG_ZSWAP", true),
@@ -121,25 +113,29 @@ where
                 ("CONFIG_FRAME_POINTER", true),
             ];
 
-            let zerosim_repo = GitHubRepo::Https {
-                repo: LINUX_KERNEL_SRC_REPO.into(),
-                token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
-            };
+            const SUBMODULES: &[&str] = &[ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_EXPERIMENTS_SUBMODULE];
 
-            crate::common::setup00000::build_kernel_rpm(
+            let kernel_path = format!(
+                "{}/{}/{}",
+                user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
+            );
+
+            let git_hash = crate::common::clone_research_workspace(&ushell, token, SUBMODULES)?;
+
+            crate::common::build_kernel(
                 dry_run,
                 &ushell,
-                login,
-                zerosim_repo,
+                &kernel_path,
                 git_branch,
                 CONFIG_SET,
-                "ztier",
+                &format!("{}-{}", git_branch.replace("_", "-"), git_hash),
+                KernelPkgType::Rpm,
             )?;
 
             // Build cpupower
             ushell.run(
                 cmd!("make")
-                    .cwd("/users/markm/linux-dev/tools/power/cpupower/")
+                    .cwd(&format!("{}/tools/power/cpupower/", kernel_path))
                     .dry_run(dry_run),
             )?;
 
@@ -147,10 +143,7 @@ where
             ushell.run(
                 cmd!("sudo yum -y install `ls -t1 | head -n2 | sort`")
                     .use_bash()
-                    .cwd(&format!(
-                        "/users/{}/rpmbuild/RPMS/x86_64/",
-                        login.username.as_str()
-                    )),
+                    .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
             )?;
 
             // update grub to choose this entry (new kernel) by default
@@ -162,8 +155,8 @@ where
         ushell.run(cmd!("mkdir -p images"))?;
         ushell.run(cmd!("rm -rf /var/lib/libvirt/images/"))?;
         ushell.run(cmd!(
-            "sudo ln -sf /users/{}/images /var/lib/libvirt/images",
-            login.username.as_str()
+            "sudo ln -sf {}/images /var/lib/libvirt/images",
+            user_home
         ))?;
 
         spurs::util::reboot(&mut ushell, dry_run)?;
@@ -171,21 +164,20 @@ where
 
     // Add ssh key to VM
     crate::common::exp00000::gen_vagrantfile(&ushell, 20, 1)?;
-    ushell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant"))?;
-    ushell.run(cmd!("vagrant up").cwd("/proj/superpages-PG0/markm_vagrant"))?;
+    ushell.run(cmd!("vagrant halt").cwd(CLOUDLAB_VAGRANT_PATH))?;
+    ushell.run(cmd!("vagrant up").cwd(CLOUDLAB_VAGRANT_PATH))?;
 
-    let key = std::fs::read_to_string("/u/m/a/markm/.ssh/id_rsa.pub")?;
+    let key = std::fs::read_to_string(format!("{}/{}", SSH_LOCATION, "id_rsa.pub"))?;
     let key = key.trim();
     ushell.run(
         cmd!(
             "vagrant ssh -- 'echo {} >> /home/vagrant/.ssh/authorized_keys'",
             key
         )
-        .cwd("/proj/superpages-PG0/markm_vagrant"),
+        .cwd(CLOUDLAB_VAGRANT_PATH),
     )?;
     ushell.run(
-        cmd!("vagrant ssh -- sudo cp -r /home/vagrant/.ssh /root/")
-            .cwd("/proj/superpages-PG0/markm_vagrant"),
+        cmd!("vagrant ssh -- sudo cp -r /home/vagrant/.ssh /root/").cwd(CLOUDLAB_VAGRANT_PATH),
     )?;
 
     // Old key will be cached for the VM, but it is likely to have changed
@@ -193,7 +185,7 @@ where
     let _ = Command::new("ssh-keygen")
         .args(&[
             "-f",
-            "/u/m/a/markm/.ssh/known_hosts",
+            &format!("{}/{}", SSH_LOCATION, "known_hosts"),
             "-R",
             &format!("[{}]:{}", host, crate::common::exp00000::VAGRANT_PORT),
         ])
@@ -215,17 +207,15 @@ where
 
     vshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
 
-    // Install benchmarks
-    let zerosim_exp_repo = GitHubRepo::Https {
-        repo: ZEROSIM_EXPERIMENTS_SRC_REPO.into(),
-        token: token.map(|t| (GITHUB_CLONE_USERNAME.into(), t.into())),
-    };
+    // Install benchmarks. First, we need to clone the research workspace in the VM (but we only
+    // need the experiments, not the full kernel).
+    let _ =
+        crate::common::clone_research_workspace(&vshell, token, &[ZEROSIM_EXPERIMENTS_SUBMODULE])?;
 
-    vshell.run(cmd!("git clone {} 0sim-experiments", zerosim_exp_repo).cwd("/home/vagrant/"))?;
-
-    vshell.run(
-        cmd!("/root/.cargo/bin/cargo build --release").cwd("/home/vagrant/0sim-experiments"),
-    )?;
+    vshell.run(cmd!("/root/.cargo/bin/cargo build --release").cwd(&format!(
+        "/home/vagrant/{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    )))?;
 
     Ok(())
 }
