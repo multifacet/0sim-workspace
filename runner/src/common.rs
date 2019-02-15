@@ -1,5 +1,6 @@
 //! A library of routines commonly used in experiments.
 
+#[macro_use]
 pub mod output;
 
 use spurs::{
