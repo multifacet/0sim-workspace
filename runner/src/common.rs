@@ -1,5 +1,7 @@
 //! A library of routines commonly used in experiments.
 
+pub mod output;
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
