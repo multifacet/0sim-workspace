@@ -13,8 +13,6 @@ use crate::common::{
 };
 use crate::settings;
 
-const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
-
 pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
@@ -81,6 +79,7 @@ where
     let pattern = settings.get::<Option<&str>>("pattern");
     let warmup = settings.get::<bool>("warmup");
     let calibrate = settings.get::<bool>("calibrated");
+    let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
 
     // Reboot
     initial_reboot(dry_run, &login)?;
@@ -94,7 +93,7 @@ where
     ushell.run(
         cmd!(
             "echo {} | sudo tee /sys/module/zswap/parameters/max_pool_percent",
-            settings.get::<usize>("zswap_max_pool_percent")
+            zswap_max_pool_percent
         )
         .use_bash(),
     )?;

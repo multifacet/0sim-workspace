@@ -225,6 +225,9 @@ pub mod exp00000 {
     /// The default number of cores of the VM.
     pub const VAGRANT_CORES: usize = 1;
 
+    /// The shared directory for results.
+    pub const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
+
     pub fn run_setup_only<A>(
         dry_run: bool,
         login: &Login<A>,
@@ -733,6 +736,7 @@ pub mod exp00002 {
         connect_and_setup_host_and_vagrant, connect_and_setup_host_only, connect_to_vagrant,
         gen_vagrantfile, initial_reboot, run_setup_only, start_vagrant, turn_off_swapdevs,
         turn_on_swapdevs, turn_on_zswap, virsh_vcpupin, VAGRANT_CORES, VAGRANT_MEM, VAGRANT_PORT,
+        VAGRANT_RESULTS_DIR,
     };
     pub use super::{Login, Username};
 }
