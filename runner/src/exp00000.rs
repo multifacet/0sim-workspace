@@ -49,7 +49,7 @@ where
         workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
         * size: size,
         pattern: pattern,
-        calibrated: true,
+        calibrated: false,
         warmup: warmup,
 
         * vm_size: vm_size,
@@ -80,6 +80,7 @@ where
     let cores = settings.get::<usize>("cores");
     let pattern = settings.get::<Option<&str>>("pattern");
     let warmup = settings.get::<bool>("warmup");
+    let calibrate = settings.get::<bool>("calibrated");
 
     // Reboot
     initial_reboot(dry_run, &login)?;
@@ -104,7 +105,9 @@ where
     );
 
     // Calibrate
-    vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
+    if calibrate {
+        vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
+    }
 
     let (output_file, params_file) = settings.gen_file_names();
     let params = serde_json::to_string(&settings)?;
