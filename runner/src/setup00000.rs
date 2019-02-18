@@ -153,7 +153,7 @@ where
         // change image location
         ushell.run(cmd!("mkdir -p vm_shared/results/"))?;
         ushell.run(cmd!("mkdir -p images"))?;
-        ushell.run(cmd!("rm -rf /var/lib/libvirt/images/"))?;
+        ushell.run(cmd!("sudo rm -rf /var/lib/libvirt/images/"))?;
         ushell.run(cmd!(
             "sudo ln -sf {}/images /var/lib/libvirt/images",
             user_home
