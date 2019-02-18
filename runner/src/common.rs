@@ -464,7 +464,7 @@ pub mod exp00000 {
 
         // Turn on the HDDs as swap devs
         for (dev, size) in devs.iter().zip(sizes.iter()) {
-            if ["2.7T", "3.7T", "931.5G"].iter().any(|s| s == size) {
+            if ["1.1T", "2.7T", "3.7T", "931.5G"].iter().any(|s| s == size) {
                 shell.run(cmd!("sudo swapon /dev/{}", dev))?;
             }
         }
