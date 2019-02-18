@@ -1,6 +1,6 @@
 [submodule "0sim"]
 	path = 0sim
-	url = git@github.com:mark-i-m/0sim
+	url = ../0sim.git
 [submodule "0sim-experiments"]
 	path = 0sim-experiments
-	url = git@github.com:mark-i-m/0sim-experiments
+	url = ../0sim-experiments.git
