@@ -153,6 +153,7 @@ fn run() -> Result<(), failure::Error> {
         ("setup00000", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let device = sub_m.value_of("DEVICE");
@@ -164,6 +165,7 @@ fn run() -> Result<(), failure::Error> {
         ("setup00001", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
@@ -172,6 +174,7 @@ fn run() -> Result<(), failure::Error> {
         ("setup00002", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let git_branch = sub_m.value_of("GIT_BRANCH");
@@ -182,6 +185,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00000", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
@@ -207,6 +211,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00000up", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let vm_size = sub_m
@@ -221,6 +226,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00001", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("DESKTOP").unwrap(),
             };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
@@ -235,6 +241,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00002", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let n = sub_m.value_of("N").unwrap().parse::<usize>().unwrap();
@@ -251,6 +258,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00003", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
@@ -264,6 +272,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00004", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();

@@ -17,8 +17,9 @@ impl Username<'_> {
     }
 }
 
-pub struct Login<'u, A: std::net::ToSocketAddrs + std::fmt::Display> {
+pub struct Login<'u, 'h, A: std::net::ToSocketAddrs + std::fmt::Display> {
     pub host: A,
+    pub hostname: &'h str,
     pub username: Username<'u>,
 }
 
@@ -93,6 +94,10 @@ pub fn clone_research_workspace(
     }
 
     // Get the sha hash.
+    research_workspace_git_hash(ushell)
+}
+
+pub fn research_workspace_git_hash(ushell: &SshShell) -> Result<String, failure::Error> {
     let hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
     let hash = hash.stdout.trim();
 

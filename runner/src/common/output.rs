@@ -47,6 +47,7 @@ impl OutputManager {
 
         let mut base = String::new();
 
+        // append all important settings
         self.append_setting(&mut base, WORKLOAD);
         base.push_str("-");
         self.append_setting(&mut base, GIT_HASH);
@@ -55,6 +56,13 @@ impl OutputManager {
             base.push_str("-");
             self.append_setting(&mut base, setting);
         }
+
+        // append the date
+        base.push_str(
+            &chrono::offset::Local::now()
+                .format("%Y-%m-%d-%H-%M-%S")
+                .to_string(),
+        );
 
         base.push_str(".");
 
@@ -140,9 +148,6 @@ macro_rules! settings {
         let mut manager = crate::common::output::OutputManager::new();
 
         $crate::__settings_helper!(manager, $($tail)*);
-
-        manager.expect($crate::common::output::GIT_HASH);
-        manager.expect($crate::common::output::WORKLOAD);
 
         manager
     }}
