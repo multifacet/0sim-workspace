@@ -102,14 +102,18 @@ where
         // clone the research workspace and build/install the 0sim kernel.
         if let Some(git_branch) = git_branch {
             const CONFIG_SET: &[(&str, bool)] = &[
+                // turn on 0sim
                 ("CONFIG_ZSWAP", true),
                 ("CONFIG_ZPOOL", true),
                 ("CONFIG_ZBUD", true),
                 ("CONFIG_ZTIER", true),
                 ("CONFIG_SBALLOC", true),
                 ("CONFIG_ZSMALLOC", true),
+                ("CONFIG_X86_TSC_OFFSET_HOST_ELAPSED", true),
+                // disable spectre/meltdown mitigations
                 ("CONFIG_PAGE_TABLE_ISOLATION", false),
                 ("CONFIG_RETPOLINE", false),
+                // for `perf` stack traces
                 ("CONFIG_FRAME_POINTER", true),
             ];
 
