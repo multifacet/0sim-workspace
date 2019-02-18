@@ -214,7 +214,7 @@ pub mod exp00000 {
         ssh::{Execute, SshShell},
     };
 
-    pub use super::{Login, Username};
+    pub use super::{Login, Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE};
 
     /// The port that vagrant VMs forward from.
     pub const VAGRANT_PORT: u16 = 5555;
@@ -326,16 +326,31 @@ pub mod exp00000 {
         // Make sure /proj/superpages-PG0 is mounted
         let nfs_mounted = ushell.run(cmd!("mount | grep proj").use_bash()).is_ok();
         if !nfs_mounted {
-            ushell.run(
-            cmd!("sudo mount -t nfs -o rw,relatime,vers=3,rsize=131072,wsize=131072,namlen=255,hard,nolock,proto=tcp,timeo=600,ys,mountaddr=128.104.222.8,mountvers=3,mountport=900,mountproto=tcp,local_lock=all,addr=128.104.222.8 \
-                  128.104.222.8:/proj/superpages-PG0 /proj/superpages-PG0/")
-        )?;
+            ushell.run(cmd!(
+                "sudo mount -t nfs -o rw,relatime,vers=3,rsize=131072,wsize=131072,\
+                 namlen=255,hard,nolock,proto=tcp,timeo=600,ys,mountaddr=128.104.222.8,\
+                 mountvers=3,mountport=900,mountproto=tcp,local_lock=all,addr=128.104.222.8 \
+                 128.104.222.8:/proj/superpages-PG0 /proj/superpages-PG0/"
+            ))?;
         }
 
         println!("Assuming home dir already mounted... uncomment this line if it's not");
         //mount_home_dir(ushell)
 
-        ushell.run(cmd!("sudo /users/markm/linux-dev/tools/power/cpupower/cpupower frequency-set -g performance").dry_run(dry_run))?;
+        let kernel_path = format!(
+            "/users/{}/{}/{}",
+            login.username.as_str(),
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_KERNEL_SUBMODULE
+        );
+
+        ushell.run(
+            cmd!(
+                "sudo {}/tools/power/cpupower/cpupower frequency-set -g performance",
+                kernel_path
+            )
+            .dry_run(dry_run),
+        )?;
 
         ushell.run(cmd!("echo 4 | sudo tee /proc/sys/kernel/printk").use_bash())?;
 
