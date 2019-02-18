@@ -171,7 +171,5 @@ where
 
     ushell.run(cmd!("date"))?;
 
-    spurs::util::reboot(&mut ushell, dry_run)?;
-
     Ok(())
 }
