@@ -193,10 +193,11 @@ where
         .unwrap();
 
     // Start vagrant
-    let vshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
+    let vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
+    let vushell = crate::common::exp00000::connect_to_vagrant_user(&login.host)?;
 
     // Install stuff on the VM
-    vshell.run(spurs::centos::yum_install(&[
+    vrshell.run(spurs::centos::yum_install(&[
         "vim",
         "git",
         "memcached",
@@ -205,17 +206,20 @@ where
         "libcgroup-tools",
     ]))?;
 
-    vshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
+    vrshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
+    vushell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
 
     // Install benchmarks. First, we need to clone the research workspace in the VM (but we only
     // need the experiments, not the full kernel).
     let _ =
-        crate::common::clone_research_workspace(&vshell, token, &[ZEROSIM_EXPERIMENTS_SUBMODULE])?;
+        crate::common::clone_research_workspace(&vushell, token, &[ZEROSIM_EXPERIMENTS_SUBMODULE])?;
 
-    vshell.run(cmd!("/root/.cargo/bin/cargo build --release").cwd(&format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
-    )))?;
+    vushell.run(
+        cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&format!(
+            "/home/vagrant/{}/{}",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+        )),
+    )?;
 
     Ok(())
 }

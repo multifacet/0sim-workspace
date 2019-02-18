@@ -378,6 +378,13 @@ pub mod exp00000 {
         SshShell::with_default_key("root", (host, VAGRANT_PORT))
     }
 
+    pub fn connect_to_vagrant_user<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        cloudlab: A,
+    ) -> Result<SshShell, failure::Error> {
+        let (host, _) = spurs::util::get_host_ip(cloudlab);
+        SshShell::with_default_key("vagrant", (host, VAGRANT_PORT))
+    }
+
     pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         shell: &SshShell,
         cloudlab: A,
