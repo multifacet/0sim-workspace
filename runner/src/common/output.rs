@@ -58,6 +58,7 @@ impl OutputManager {
         }
 
         // append the date
+        base.push_str("-");
         base.push_str(
             &chrono::offset::Local::now()
                 .format("%Y-%m-%d-%H-%M-%S")
@@ -77,6 +78,7 @@ impl OutputManager {
             .expect("important setting not defined");
 
         // sanitize
+        let val = val.trim();
         let val = val.replace(" ", "_");
         let val = val.replace("\"", "_");
         let val = val.replace("\'", "_");
@@ -91,12 +93,6 @@ impl OutputManager {
     {
         serde_json::from_str(self.settings.get(setting).expect("no such setting"))
             .expect("unable to deserialize")
-    }
-
-    pub fn expect(&self, setting: &str) {
-        if self.settings.get(setting).is_none() {
-            panic!("Expected setting {}, but unfound", setting);
-        }
     }
 }
 
