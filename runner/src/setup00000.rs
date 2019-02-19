@@ -210,8 +210,22 @@ where
         "libcgroup-tools",
     ]))?;
 
-    vrshell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
-    vushell.run(cmd!("curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly --no-modify-path -y").use_bash().no_pty())?;
+    vrshell.run(
+        cmd!(
+            "curl https://sh.rustup.rs -sSf | \
+             sh -s -- --default-toolchain nightly --no-modify-path -y"
+        )
+        .use_bash()
+        .no_pty(),
+    )?;
+    vushell.run(
+        cmd!(
+            "curl https://sh.rustup.rs -sSf | \
+             sh -s -- --default-toolchain nightly --no-modify-path -y"
+        )
+        .use_bash()
+        .no_pty(),
+    )?;
 
     // Install benchmarks. First, we need to clone the research workspace in the VM (but we only
     // need the experiments, not the full kernel).
@@ -224,6 +238,9 @@ where
             RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
         )),
     )?;
+
+    // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
+    vrshell.run(cmd!("sudo poweroff"))?;
 
     Ok(())
 }
