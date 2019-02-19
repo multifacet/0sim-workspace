@@ -11,15 +11,15 @@ pub const WORKLOAD: &str = "workload";
 
 #[derive(Debug, Clone)]
 pub struct OutputManager {
-    settings: std::collections::HashMap<String, String>,
-    important: std::collections::HashSet<String>,
+    settings: std::collections::BTreeMap<String, String>,
+    important: std::collections::BTreeSet<String>,
 }
 
 impl OutputManager {
     pub fn new() -> Self {
         OutputManager {
-            settings: std::collections::HashMap::new(),
-            important: std::collections::HashSet::new(),
+            settings: std::collections::BTreeMap::new(),
+            important: std::collections::BTreeSet::new(),
         }
     }
 
@@ -114,12 +114,12 @@ impl<'de> Deserialize<'de> for OutputManager {
     where
         D: Deserializer<'de>,
     {
-        let settings: std::collections::HashMap<String, String> =
+        let settings: std::collections::BTreeMap<String, String> =
             Deserialize::deserialize(deserializer)?;
 
         Ok(Self {
             settings,
-            important: std::collections::HashSet::new(),
+            important: std::collections::BTreeSet::new(),
         })
     }
 }
