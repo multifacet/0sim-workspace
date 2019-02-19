@@ -152,13 +152,19 @@ where
     } else {
         vshell.run(cmd!("memcached -M -m {} -d -u vagrant", (size * 1024)))?;
 
+        // We want to use rdtsc as the time source, so find the cpu freq:
+        let freq = vshell
+            .run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
+        let freq = freq.stdout.trim();
+
         // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
         // This gives much simpler performance behaviors. memcached uses a large amount of the memory
         // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
         vshell.run(
             cmd!(
-                "./target/release/memcached_gen_data localhost:11211 {} > {}/{}",
+                "./target/release/memcached_gen_data localhost:11211 {} --freq {} > {}/{}",
                 size,
+                freq,
                 VAGRANT_RESULTS_DIR,
                 output_file,
             )
