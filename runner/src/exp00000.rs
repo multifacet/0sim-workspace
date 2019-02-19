@@ -153,7 +153,7 @@ where
         vshell.run(cmd!("memcached -M -m {} -d -u vagrant", (size * 1024)))?;
 
         // We want to use rdtsc as the time source, so find the cpu freq:
-        let freq = vshell
+        let freq = ushell
             .run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
         let freq = freq.stdout.trim();
 
