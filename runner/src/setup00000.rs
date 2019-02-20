@@ -239,6 +239,22 @@ where
         )),
     )?;
 
+    // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing
+    // kernel command line and replace it with the same + `tsc=reliable`.
+    let current_cmd_line = vushell
+        .run(
+            cmd!(r#"cat /etc/default/grub | grep -oP 'GRUB_CMDLINE_LINUX="\K.+(?=")'"#).use_bash(),
+        )?
+        .stdout;
+    let current_cmd_line = current_cmd_line.trim();
+
+    vrshell.run(cmd!(
+        "sed -i s/{}/{} tsc=reliable/ /etc/default/grub",
+        current_cmd_line,
+        current_cmd_line
+    ))?;
+    vrshell.run(cmd!("grub2-mkconfig -o /boot/grub2/grub.cfg"))?;
+
     // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
     vrshell.run(cmd!("sudo poweroff"))?;
 
