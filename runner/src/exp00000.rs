@@ -43,6 +43,7 @@ where
     let settings = settings! {
         git_hash: git_hash,
         exp: 00000,
+        local_git_hash: crate::common::local_research_workspace_git_hash(),
 
         workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
         * size: size,
@@ -117,6 +118,10 @@ where
         VAGRANT_RESULTS_DIR,
         params_file
     ))?;
+
+    // disable soft watchdog in guest because it steals CPU from the workload.
+    vshell.run(cmd!("sudo sysctl kernel.soft_watchdog=0"))?;
+    vshell.run(cmd!("cat /proc/sys/kernel/soft_watchdog"))?;
 
     // Run memcached or time_touch_mmap
     if let Some(pattern) = pattern {
