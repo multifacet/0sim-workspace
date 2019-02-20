@@ -97,11 +97,23 @@ pub fn clone_research_workspace(
     research_workspace_git_hash(ushell)
 }
 
+/// Get the git hash of the remote research workspace.
 pub fn research_workspace_git_hash(ushell: &SshShell) -> Result<String, failure::Error> {
     let hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
     let hash = hash.stdout.trim();
 
     Ok(hash.into())
+}
+
+/// Get the git hash of the local research workspace, specifically the workspace from which the
+/// runner is run.
+pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
+    let output = std::process::Command::new("git")
+        .args(&["rev-parse", "HEAD"])
+        .output()?;
+    let output = std::str::from_utf8(&output.stdout)?;
+    let output = output.trim();
+    Ok(output.into())
 }
 
 pub enum KernelPkgType {
