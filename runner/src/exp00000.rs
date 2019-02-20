@@ -119,9 +119,17 @@ where
         params_file
     ))?;
 
-    // disable soft watchdog in guest because it steals CPU from the workload.
-    vshell.run(cmd!("sudo sysctl kernel.soft_watchdog=0"))?;
-    vshell.run(cmd!("cat /proc/sys/kernel/soft_watchdog"))?;
+    // disable soft watchdog in guest because it steals CPU from the workload. If `soft_watchdog`
+    // is not a thing, try `watchdog` instead, which disables NMI watchdog too.
+    if vshell
+        .run(cmd!("sudo sysctl kernel.soft_watchdog=0"))
+        .is_err()
+    {
+        vshell.run(cmd!("sudo sysctl kernel.watchdog=0"))?;
+        vshell.run(cmd!("cat /proc/sys/kernel/watchdog"))?;
+    } else {
+        vshell.run(cmd!("cat /proc/sys/kernel/soft_watchdog"))?;
+    }
 
     // Run memcached or time_touch_mmap
     if let Some(pattern) = pattern {
