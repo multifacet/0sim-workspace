@@ -34,7 +34,7 @@ where
     let settings = settings! {
         git_hash: git_hash,
         exp: 00004,
-        local_git_hash: crate::common::local_research_workspace_git_hash(),
+        local_git_hash: crate::common::local_research_workspace_git_hash()?,
 
         workload: "memcached_thp_ops_per_page_bare_metal",
         * size: size,

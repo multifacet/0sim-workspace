@@ -43,7 +43,7 @@ where
     let settings = settings! {
         git_hash: git_hash,
         exp: 00000,
-        local_git_hash: crate::common::local_research_workspace_git_hash(),
+        local_git_hash: crate::common::local_research_workspace_git_hash()?,
 
         workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
         * size: size,
