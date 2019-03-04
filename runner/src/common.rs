@@ -524,8 +524,8 @@ pub mod exp00000 {
         )?;
 
         // Make a best effort to choose the right network interface.
-        let iface =
-            shell.run(cmd!(r#"route -n | awk '$1 == "0.0.0.0" {{print $8}}'"#).use_bash())?;
+        let iface = shell
+            .run(cmd!(r#"/usr/sbin/route -n | awk '$1 == "0.0.0.0" {{print $8}}'"#).use_bash())?;
         let iface = iface.stdout.trim();
 
         shell.run(
