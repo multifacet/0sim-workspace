@@ -246,10 +246,13 @@ where
             cmd!(r#"cat /etc/default/grub | grep -oP 'GRUB_CMDLINE_LINUX="\K.+(?=")'"#).use_bash(),
         )?
         .stdout;
-    let current_cmd_line = current_cmd_line.trim();
+    let current_cmd_line = current_cmd_line
+        .trim()
+        .replace("/", r"\/")
+        .replace(r"\", r"\\");
 
     vrshell.run(cmd!(
-        "sed -i s/{}/{} tsc=reliable/ /etc/default/grub",
+        "sed -i 's/{}/{} tsc=reliable/' /etc/default/grub",
         current_cmd_line,
         current_cmd_line
     ))?;
