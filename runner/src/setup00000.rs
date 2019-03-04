@@ -259,7 +259,7 @@ where
     vrshell.run(cmd!("grub2-mkconfig -o /boot/grub2/grub.cfg"))?;
 
     // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
-    vrshell.run(cmd!("sudo poweroff"))?;
+    vrshell.run(cmd!("sudo poweroff").allow_error())?;
 
     Ok(())
 }
