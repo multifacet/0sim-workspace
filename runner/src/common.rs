@@ -522,6 +522,19 @@ pub mod exp00000 {
             cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores)
                 .cwd("/proj/superpages-PG0/markm_vagrant/"),
         )?;
+
+        // Make a best effort to choose the right network interface.
+        let iface =
+            shell.run(cmd!(r#"route -n | awk '$1 == "0.0.0.0" {{print $8}}'"#).use_bash())?;
+        let iface = iface.stdout.trim();
+
+        shell.run(
+            cmd!(
+                r#"sed -i 's/iface = "eno1"/iface = "{}"/' Vagrantfile"#,
+                iface
+            )
+            .cwd("/proj/superpages-PG0/markm_vagrant/"),
+        )?;
         Ok(())
     }
 
