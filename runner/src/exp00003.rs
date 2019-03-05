@@ -34,14 +34,13 @@ where
     };
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
-    let git_hash = crate::common::research_workspace_git_hash(&ushell)?;
+    let local_git_hash = crate::common::local_research_workspace_git_hash()?;
+    let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
 
     let settings = settings! {
-        git_hash: git_hash,
+        * workload: "memcached_per_page_thp_ops",
         exp: 00003,
-        local_git_hash: crate::common::local_research_workspace_git_hash()?,
 
-        workload: "memcached_per_page_thp_ops",
         * size: size,
         calibrated: false,
 
@@ -58,6 +57,9 @@ where
 
         username: login.username.as_str(),
         host: login.hostname,
+
+        local_git_hash: local_git_hash,
+        remote_git_hash: remote_git_hash,
     };
 
     run_inner(dry_run, login, settings)

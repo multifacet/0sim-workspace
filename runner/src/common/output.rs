@@ -4,22 +4,17 @@
 
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
-#[doc(hidden)]
-pub const GIT_HASH: &str = "git_hash";
-#[doc(hidden)]
-pub const WORKLOAD: &str = "workload";
-
 #[derive(Debug, Clone)]
 pub struct OutputManager {
     settings: std::collections::BTreeMap<String, String>,
-    important: std::collections::BTreeSet<String>,
+    important: Vec<String>,
 }
 
 impl OutputManager {
     pub fn new() -> Self {
         OutputManager {
             settings: std::collections::BTreeMap::new(),
-            important: std::collections::BTreeSet::new(),
+            important: Vec::new(),
         }
     }
 
@@ -37,7 +32,7 @@ impl OutputManager {
             );
         }
         if important {
-            self.important.insert(name.into());
+            self.important.push(name.into());
         }
     }
 
@@ -47,13 +42,11 @@ impl OutputManager {
 
         let mut base = String::new();
 
-        // append all important settings
-        self.append_setting(&mut base, WORKLOAD);
-        base.push_str("-");
-        self.append_setting(&mut base, GIT_HASH);
-
-        for setting in &self.important {
-            base.push_str("-");
+        // prepend all important settings
+        for (i, setting) in self.important.iter().enumerate() {
+            if i > 0 {
+                base.push_str("-");
+            }
             self.append_setting(&mut base, setting);
         }
 
@@ -119,7 +112,7 @@ impl<'de> Deserialize<'de> for OutputManager {
 
         Ok(Self {
             settings,
-            important: std::collections::BTreeSet::new(),
+            important: Vec::new(),
         })
     }
 }

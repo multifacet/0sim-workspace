@@ -58,6 +58,14 @@ where
             "virt-manager",
             "pciutils-devel",
             "bash-completion",
+            "elfutils-devel",
+            "libunwind-devel",
+            "audit-libs-devel",
+            "slang-devel",
+            "perl-ExtUtils-Embed",
+            "binutils-devel",
+            "xz-devel",
+            "numactl-devel",
         ]))?;
         ushell.run(spurs::util::add_to_group("libvirt"))?;
 
@@ -226,11 +234,20 @@ where
         .use_bash()
         .no_pty(),
     )?;
+    ushell.run(
+        cmd!(
+            "curl https://sh.rustup.rs -sSf | \
+             sh -s -- --default-toolchain nightly --no-modify-path -y"
+        )
+        .use_bash()
+        .no_pty(),
+    )?;
 
-    // Install benchmarks. First, we need to clone the research workspace in the VM (but we only
-    // need the experiments, not the full kernel).
-    let _ =
-        crate::common::clone_research_workspace(&vushell, token, &[ZEROSIM_EXPERIMENTS_SUBMODULE])?;
+    // We share the research-workspace with the VM via a vagrant shared directory (NFS) so that
+    // there is only one version used across both (less versioning to track). Now, just compile the
+    // benchmarks and install rust on the host.
+
+    // Install benchmarks.
 
     vushell.run(
         cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&format!(

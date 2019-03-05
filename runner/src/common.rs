@@ -106,8 +106,19 @@ pub fn research_workspace_git_hash(ushell: &SshShell) -> Result<String, failure:
 }
 
 /// Get the git hash of the local research workspace, specifically the workspace from which the
-/// runner is run.
+/// runner is run. Returns `"dirty"` if the workspace has uncommitted changes.
 pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
+    let is_dirty = std::process::Command::new("git")
+        .args(&["diff", "--quiet"])
+        .status()?
+        .code()
+        .expect("terminated by signal")
+        == 1;
+
+    if is_dirty {
+        return Ok("dirty".into());
+    }
+
     let output = std::process::Command::new("git")
         .args(&["rev-parse", "HEAD"])
         .output()?;
