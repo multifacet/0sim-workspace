@@ -38,14 +38,13 @@ where
     };
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
-    let git_hash = crate::common::research_workspace_git_hash(&ushell)?;
+    let local_git_hash = crate::common::local_research_workspace_git_hash()?;
+    let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
 
     let settings = settings! {
-        git_hash: git_hash,
+        * workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
         exp: 00000,
-        local_git_hash: crate::common::local_research_workspace_git_hash()?,
 
-        workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
         * size: size,
         pattern: pattern,
         calibrated: false,
@@ -58,6 +57,9 @@ where
 
         username: login.username.as_str(),
         host: login.hostname,
+
+        local_git_hash: local_git_hash,
+        remote_git_hash: remote_git_hash,
     };
 
     run_inner(dry_run, login, settings)
@@ -85,8 +87,14 @@ where
     // Reboot
     initial_reboot(dry_run, &login)?;
 
-    // Connect
-    let (mut ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?;
+    // Connect to host
+    let mut ushell = connect_and_setup_host_only(dry_run, &login)?;
+
+    // Turn on SSDSWAP.
+    turn_on_ssdswap(&ushell, dry_run)?;
+
+    // Start and connect to VM
+    let vshell = start_vagrant(&ushell, &login.host, vm_size, cores)?;
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;
@@ -151,7 +159,10 @@ where
             .use_bash(),
         )?;
     } else {
-        vshell.run(cmd!("memcached -M -m {} -d -u vagrant", (size * 1024)))?;
+        vshell.run(cmd!(
+            "taskset -c 0 memcached -M -m {} -d -u vagrant",
+            (size * 1024)
+        ))?;
 
         // We want to use rdtsc as the time source, so find the cpu freq:
         let freq = ushell
@@ -163,7 +174,7 @@ where
         // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
         vshell.run(
             cmd!(
-                "./target/release/memcached_gen_data localhost:11211 {} --freq {} > {}/{}",
+                "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 {} --freq {} > {}/{}",
                 size,
                 freq,
                 VAGRANT_RESULTS_DIR,
