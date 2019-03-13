@@ -473,7 +473,10 @@ pub mod exp00000 {
         Ok(())
     }
 
-    pub fn turn_on_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+    /// Returns a list of swap devices, with SSDs listed first.
+    pub fn list_swapdevs(shell: &SshShell, dry_run: bool) -> Result<Vec<String>, failure::Error> {
+        let mut swapdevs = vec![];
+
         // Find out what swap devs are there
         let devs = spurs::util::get_unpartitioned_devs(shell, dry_run)?;
 
@@ -484,18 +487,54 @@ pub mod exp00000 {
         // Turn on the SSDs as swap devs
         for (dev, size) in devs.iter().zip(sizes.iter()) {
             if size == "447.1G" {
-                shell.run(cmd!("sudo swapon /dev/{}", dev))?;
+                swapdevs.push(dev.clone());
             }
         }
 
         // Turn on the HDDs as swap devs
         for (dev, size) in devs.iter().zip(sizes.iter()) {
             if ["1.1T", "2.7T", "3.7T", "931.5G"].iter().any(|s| s == size) {
-                shell.run(cmd!("sudo swapon /dev/{}", dev))?;
+                swapdevs.push(dev.clone());
             }
         }
 
+        Ok(swapdevs)
+    }
+
+    pub fn turn_on_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+        // Find out what swap devs are there
+        let devs = list_swapdevs(shell, dry_run)?;
+
+        // Turn on swap devs
+        for dev in &devs {
+            shell.run(cmd!("sudo swapon /dev/{}", dev))?;
+        }
+
         shell.run(cmd!("lsblk"))?;
+
+        Ok(())
+    }
+
+    pub fn turn_on_ssdswap(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+        // Find out what swap devs are there
+        let devs = list_swapdevs(shell, dry_run)?;
+
+        // Use SSDSWAP
+        for dev in &devs {
+            shell.run(
+                cmd!(
+                    "echo /dev/{} | sudo tee /sys/module/ssdswap/parameters/device",
+                    dev
+                )
+                .use_bash(),
+            )?;
+        }
+
+        // Remount all swap devs
+        turn_off_swapdevs(shell, dry_run)?;
+        turn_on_swapdevs(shell, dry_run)?;
+
+        shell.run(cmd!("lsblk -o NAME,ROTA"))?;
 
         Ok(())
     }

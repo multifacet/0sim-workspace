@@ -118,6 +118,7 @@ where
                 ("CONFIG_SBALLOC", true),
                 ("CONFIG_ZSMALLOC", true),
                 ("CONFIG_X86_TSC_OFFSET_HOST_ELAPSED", true),
+                ("CONFIG_SSDSWAP", true),
                 // disable spectre/meltdown mitigations
                 ("CONFIG_PAGE_TABLE_ISOLATION", false),
                 ("CONFIG_RETPOLINE", false),
