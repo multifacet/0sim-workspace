@@ -1,5 +1,6 @@
 //! Utilities for handling and tagging generated output.
 
+use chrono::{offset::Local, DateTime};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
 /// `OutputManager` manages all things regarding naming and tagging output with settings and
@@ -16,6 +17,7 @@ use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer}
 pub struct OutputManager {
     settings: std::collections::BTreeMap<String, String>,
     important: Vec<String>,
+    timestamp: DateTime<Local>,
 }
 
 impl OutputManager {
@@ -24,6 +26,7 @@ impl OutputManager {
         OutputManager {
             settings: std::collections::BTreeMap::new(),
             important: Vec::new(),
+            timestamp: Local::now(),
         }
     }
 
@@ -75,11 +78,7 @@ impl OutputManager {
 
         // append the date
         base.push_str("-");
-        base.push_str(
-            &chrono::offset::Local::now()
-                .format("%Y-%m-%d-%H-%M-%S")
-                .to_string(),
-        );
+        base.push_str(&self.timestamp.format("%Y-%m-%d-%H-%M-%S").to_string());
 
         base.push_str(".");
         base.push_str(ext);
@@ -144,6 +143,7 @@ impl<'de> Deserialize<'de> for OutputManager {
         Ok(Self {
             settings,
             important: Vec::new(),
+            timestamp: Local::now(),
         })
     }
 }

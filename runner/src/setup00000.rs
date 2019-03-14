@@ -11,8 +11,9 @@ use spurs::{
 };
 
 use crate::common::{
-    setup00000::CLOUDLAB_VAGRANT_PATH, KernelPkgType, Login, RESEARCH_WORKSPACE_PATH,
-    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
+    setup00000::{CLOUDLAB_SHARED_RESULTS_DIR, CLOUDLAB_VAGRANT_PATH},
+    KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    ZEROSIM_KERNEL_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -164,7 +165,7 @@ where
         }
 
         // change image location
-        ushell.run(cmd!("mkdir -p vm_shared/results/"))?;
+        ushell.run(cmd!("mkdir -p {}", CLOUDLAB_SHARED_RESULTS_DIR))?;
         ushell.run(cmd!("mkdir -p images"))?;
         ushell.run(cmd!("sudo rm -rf /var/lib/libvirt/images/"))?;
         ushell.run(cmd!(

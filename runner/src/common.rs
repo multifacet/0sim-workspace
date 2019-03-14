@@ -227,6 +227,8 @@ pub fn build_kernel(
 pub mod setup00000 {
     /// Path to directory with Vagrantfile on Cloudlab.
     pub const CLOUDLAB_VAGRANT_PATH: &str = "/proj/superpages-PG0/markm_vagrant";
+
+    pub const CLOUDLAB_SHARED_RESULTS_DIR: &str = "vm_shared/results/";
 }
 
 pub mod exp00000 {
