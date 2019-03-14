@@ -9,7 +9,8 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    exp00000::*, output::OutputManager, setup00000::CLOUDLAB_SHARED_RESULTS_DIR,
+    RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
 
@@ -112,6 +113,8 @@ where
         RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
+    let zerosim_path_host = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
+
     // Calibrate
     if calibrate {
         vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
@@ -169,6 +172,35 @@ where
             .run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
         let freq = freq.stdout.trim();
 
+        // Measure host stats with perf while the workload is running. We measure at the beginning
+        // of the workload and later in the workload after the "cliff".
+        const PERF_MEASURE_TIME: usize = 50; // seconds
+        const PERF_LATE_DELAY_MS: usize = 85;
+
+        let perf_output_early = settings.gen_file_name("perfdata0");
+        let perf_output_late = settings.gen_file_name("perfdata1");
+
+        let spawn_handle0 = ushell.spawn(cmd!(
+            "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 5000 \
+             -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+             page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            zerosim_path_host,
+            CLOUDLAB_SHARED_RESULTS_DIR,
+            perf_output_early,
+            PERF_MEASURE_TIME,
+        ))?;
+
+        let spawn_handle1 = ushell.spawn(cmd!(
+            "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 5000 -D {} \
+             -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+             page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            zerosim_path_host,
+            PERF_LATE_DELAY_MS,
+            CLOUDLAB_SHARED_RESULTS_DIR,
+            perf_output_late,
+            PERF_MEASURE_TIME,
+        ))?;
+
         // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
         // This gives much simpler performance behaviors. memcached uses a large amount of the memory
         // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
@@ -184,6 +216,9 @@ where
             .use_bash()
             .allow_error(),
         )?;
+
+        let _ = spawn_handle0.join()?;
+        let _ = spawn_handle1.join()?;
     }
 
     ushell.run(cmd!("date"))?;
