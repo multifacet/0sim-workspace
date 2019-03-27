@@ -30,6 +30,7 @@ pub fn run<A>(
     git_branch: Option<&str>,
     only_vm: bool,
     token: &str,
+    swap_devs: Vec<&str>,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
@@ -44,17 +45,24 @@ where
 
     if !only_vm {
         // Rename `poweroff` so we can't accidentally use it
-        ushell.run(
-            cmd!(
-                "type poweroff && sudo mv $(type poweroff | awk '{{print $3}}') \
-                 /usr/sbin/poweroff-actually || echo already renamed"
-            )
-            .use_bash(),
-        )?;
+        if let Ok(res) = ushell.run(
+            cmd!("PATH='/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin':$PATH type poweroff")
+                .use_bash(),
+        ) {
+            ushell.run(
+                cmd!(
+                    "sudo mv $(echo '{}' | awk '{{print $3}}') /usr/sbin/poweroff-actually",
+                    res.stdout.trim()
+                )
+                .use_bash(),
+            )?;
+        }
 
         // Install a bunch of stuff
         ushell.run(cmd!("sudo yum group install -y 'Development Tools'"))?;
         ushell.run(spurs::centos::yum_install(&[
+            "bc",
+            "openssl-devel",
             "libvirt",
             "libvirt-devel",
             "qemu-kvm",
@@ -104,10 +112,19 @@ where
             )?;
         }
 
-        // Setup all other devices as swap devices
-        let unpartitioned = spurs::util::get_unpartitioned_devs(&ushell, dry_run)?;
-        for dev in unpartitioned.iter() {
-            ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+        // Setup swap devices, and leave a research-settings.json file. If no swap devices were
+        // specififed, use all unpartitioned, unmounted devices.
+        if swap_devs.is_empty() {
+            let unpartitioned = spurs::util::get_unpartitioned_devs(&ushell, dry_run)?;
+            for dev in unpartitioned.iter() {
+                ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+            }
+        } else {
+            for dev in swap_devs.iter() {
+                ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+            }
+
+            crate::common::set_remote_research_setting(&ushell, "swap-devices", &swap_devs)?;
         }
 
         // clone the research workspace and build/install the 0sim kernel.

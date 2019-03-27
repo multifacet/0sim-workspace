@@ -39,6 +39,9 @@ fn run() -> Result<(), failure::Error> {
              "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
             (@arg ONLY_VM: -v --only_vm
              "(Optional) only setup the VM")
+            (@arg SWAP_DEV: -s --swap +takes_value ...
+             "(Optional) specify which devices to use as swap devices. By default all \
+              unpartitioned, unmounted devices are used.")
         )
         (@subcommand setup00001 =>
             (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
@@ -160,7 +163,13 @@ fn run() -> Result<(), failure::Error> {
             let git_branch = sub_m.value_of("GIT_BRANCH");
             let only_vm = sub_m.is_present("ONLY_VM");
             let token = sub_m.value_of("TOKEN").unwrap();
-            setup00000::run(dry_run, &login, device, git_branch, only_vm, token)
+            let swap_devs = sub_m
+                .values_of("SWAP_DEV")
+                .map(|i| i.collect())
+                .unwrap_or_else(|| vec![]);
+            setup00000::run(
+                dry_run, &login, device, git_branch, only_vm, token, swap_devs,
+            )
         }
         ("setup00001", Some(sub_m)) => {
             let login = Login {

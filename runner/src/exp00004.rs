@@ -32,6 +32,7 @@ where
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
+    let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
         * workload: "memcached_thp_ops_per_page_bare_metal",
@@ -50,6 +51,8 @@ where
 
         local_git_hash: local_git_hash,
         remote_git_hash: remote_git_hash,
+
+        remote_research_settings: remote_research_settings,
     };
 
     run_inner(dry_run, login, settings)
@@ -92,7 +95,7 @@ where
     let params = serde_json::to_string(&settings)?;
 
     ushell.run(cmd!(
-        "echo {} > {}/{}/{}",
+        "echo '{}' > {}/{}/{}",
         escape_for_bash(&params),
         user_home,
         BARE_METAL_RESULTS_DIR,

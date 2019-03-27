@@ -3,6 +3,8 @@
 #[macro_use]
 pub mod output;
 
+use serde::{Deserialize, Serialize};
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
@@ -131,6 +133,65 @@ pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
 pub fn get_user_home_dir(ushell: &SshShell) -> Result<String, failure::Error> {
     let user_home = ushell.run(cmd!("echo $HOME").use_bash())?;
     Ok(user_home.stdout.trim().to_owned())
+}
+
+/// There are some settings that are per-machine, rather than per-experiment (e.g. which devices to
+/// turn on as swap devices). We keep these settings in a per-machine file called
+/// `research-settings.json`, which is generated at the time of the setup.
+///
+/// This function sets the given setting or overwrites its current value.
+pub fn set_remote_research_setting<V: Serialize>(
+    ushell: &SshShell,
+    setting: &str,
+    value: V,
+) -> Result<(), failure::Error> {
+    // Make sure the file exists
+    ushell.run(cmd!("touch research-settings.json"))?;
+
+    // We don't care too much about efficiency, so whenever we update, we will just read,
+    // deserialize, update, and reserialize.
+    let mut settings = get_remote_research_settings(ushell)?;
+
+    let serialized = serde_json::to_string(&value).expect("unable to serialize");
+    settings.insert(setting.into(), serialized);
+
+    let new_contents = serde_json::to_string(&settings).expect("unable to serialize");
+
+    ushell.run(cmd!("echo '{}' > research-settings.json", new_contents))?;
+
+    Ok(())
+}
+
+/// Return all research settings. The user can then use `get_remote_research_setting` to parse out
+/// a single value.
+pub fn get_remote_research_settings(
+    ushell: &SshShell,
+) -> Result<std::collections::BTreeMap<String, String>, failure::Error> {
+    let file_contents = ushell.run(cmd!("cat research-settings.json"))?;
+    let file_contents = file_contents.stdout.trim();
+
+    if file_contents.is_empty() {
+        Ok(std::collections::BTreeMap::new())
+    } else {
+        Ok(serde_json::from_str(file_contents).expect("unable to deserialize"))
+    }
+}
+
+/// Returns the value of the given setting if it is set.
+pub fn get_remote_research_setting<'s, 'd, V: Deserialize<'d>>(
+    settings: &'s std::collections::BTreeMap<String, String>,
+    setting: &str,
+) -> Result<Option<V>, failure::Error>
+where
+    's: 'd,
+{
+    if let Some(setting) = settings.get(setting) {
+        Ok(Some(
+            serde_json::from_str(setting).expect("unable to deserialize"),
+        ))
+    } else {
+        Ok(None)
+    }
 }
 
 pub enum KernelPkgType {
@@ -510,9 +571,19 @@ pub mod exp00000 {
         Ok(swapdevs)
     }
 
+    /// Turn on swap devices. This function will respect any `swap-devices` setting in
+    /// `research-settings.json`. If there are no such settings, then all unpartitioned, unmounted
+    /// swap devices of the right size are used (according to `list_swapdevs`).
     pub fn turn_on_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
         // Find out what swap devs are there
-        let devs = list_swapdevs(shell, dry_run)?;
+        let devs = if let Some(devs) = {
+            let settings = crate::common::get_remote_research_settings(shell)?;
+            crate::common::get_remote_research_setting(&settings, "swap-devices")?
+        } {
+            devs
+        } else {
+            list_swapdevs(shell, dry_run)?
+        };
 
         // Turn on swap devs
         for dev in &devs {
@@ -524,9 +595,19 @@ pub mod exp00000 {
         Ok(())
     }
 
+    /// Turn on swap devices and SSDSWAP. This function will respect any `swap-devices` setting in
+    /// `research-settings.json`. If there are no such settings, then all unpartitioned, unmounted
+    /// swap devices of the right size are used (according to `list_swapdevs`).
     pub fn turn_on_ssdswap(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
         // Find out what swap devs are there
-        let devs = list_swapdevs(shell, dry_run)?;
+        let devs = if let Some(devs) = {
+            let settings = crate::common::get_remote_research_settings(shell)?;
+            crate::common::get_remote_research_setting(&settings, "swap-devices")?
+        } {
+            devs
+        } else {
+            list_swapdevs(shell, dry_run)?
+        };
 
         // Use SSDSWAP
         for dev in &devs {
