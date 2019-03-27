@@ -11,9 +11,8 @@ use spurs::{
 };
 
 use crate::common::{
-    get_user_home_dir,
-    setup00000::{CLOUDLAB_SHARED_RESULTS_DIR, CLOUDLAB_VAGRANT_PATH},
-    KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    get_user_home_dir, setup00000::CLOUDLAB_SHARED_RESULTS_DIR, KernelPkgType, Login,
+    RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_EXPERIMENTS_SUBMODULE,
     ZEROSIM_KERNEL_SUBMODULE,
 };
 
@@ -196,9 +195,11 @@ where
     }
 
     // Add ssh key to VM
+    let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+
     crate::common::exp00000::gen_vagrantfile(&ushell, 20, 1)?;
-    ushell.run(cmd!("vagrant halt").cwd(CLOUDLAB_VAGRANT_PATH))?;
-    ushell.run(cmd!("vagrant up").cwd(CLOUDLAB_VAGRANT_PATH))?;
+    ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
+    ushell.run(cmd!("vagrant up").cwd(vagrant_path))?;
 
     let key = std::fs::read_to_string(format!("{}/{}", SSH_LOCATION, "id_rsa.pub"))?;
     let key = key.trim();
@@ -207,11 +208,9 @@ where
             "vagrant ssh -- 'echo {} >> /home/vagrant/.ssh/authorized_keys'",
             key
         )
-        .cwd(CLOUDLAB_VAGRANT_PATH),
+        .cwd(vagrant_path),
     )?;
-    ushell.run(
-        cmd!("vagrant ssh -- sudo cp -r /home/vagrant/.ssh /root/").cwd(CLOUDLAB_VAGRANT_PATH),
-    )?;
+    ushell.run(cmd!("vagrant ssh -- sudo cp -r /home/vagrant/.ssh /root/").cwd(vagrant_path))?;
 
     // Old key will be cached for the VM, but it is likely to have changed
     let (host, _) = spurs::util::get_host_ip(&login.host);
