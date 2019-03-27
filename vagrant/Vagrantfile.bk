@@ -56,9 +56,9 @@ Vagrant.configure("2") do |config|
     #    :destination => "~/.ssh/me.pub"
 
     # Shared folders via NFS
-    vagrant_dir = '/proj/superpages-PG0/markm_vagrant'
-    vm_shared_dir = '/users/markm/vm_shared'
-    research_workspace_dir = '/users/markm/research-workspace'
+    vagrant_dir = 'research-workspace/vagrant'
+    vm_shared_dir = 'vm_shared'
+    research_workspace_dir = 'research-workspace'
     config.vm.synced_folder vagrant_dir, '/vagrant',
         :disabled => true
 

@@ -69,6 +69,9 @@ pub const ZEROSIM_KERNEL_SUBMODULE: &str = "0sim";
 /// Path to the 0sim-experiments submodule.
 pub const ZEROSIM_EXPERIMENTS_SUBMODULE: &str = "0sim-experiments";
 
+/// Path to the `vagrant` subdirectory where `gen_vagrantfile` will do its work.
+pub const VAGRANT_SUBDIRECTORY: &str = "vagrant";
+
 /// Clone the research-workspace and checkout the given submodules. The given token is used as the
 /// Github personal access token.
 ///
@@ -293,9 +296,6 @@ pub fn build_kernel(
 }
 
 pub mod setup00000 {
-    /// Path to directory with Vagrantfile on Cloudlab.
-    pub const CLOUDLAB_VAGRANT_PATH: &str = "/proj/superpages-PG0/markm_vagrant";
-
     pub const CLOUDLAB_SHARED_RESULTS_DIR: &str = "vm_shared/results/";
 }
 
@@ -307,7 +307,9 @@ pub mod exp00000 {
         ssh::{Execute, SshShell},
     };
 
-    pub use super::{Login, Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE};
+    pub use super::{
+        Login, Username, RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_KERNEL_SUBMODULE,
+    };
 
     /// The port that vagrant VMs forward from.
     pub const VAGRANT_PORT: u16 = 5555;
@@ -419,17 +421,6 @@ pub mod exp00000 {
         turn_off_swapdevs(&ushell, dry_run)?;
         turn_on_swapdevs(&ushell, dry_run)?;
 
-        // Make sure /proj/superpages-PG0 is mounted
-        let nfs_mounted = ushell.run(cmd!("mount | grep proj").use_bash()).is_ok();
-        if !nfs_mounted {
-            ushell.run(cmd!(
-                "sudo mount -t nfs -o rw,relatime,vers=3,rsize=131072,wsize=131072,\
-                 namlen=255,hard,nolock,proto=tcp,timeo=600,ys,mountaddr=128.104.222.8,\
-                 mountvers=3,mountport=900,mountproto=tcp,local_lock=all,addr=128.104.222.8 \
-                 128.104.222.8:/proj/superpages-PG0 /proj/superpages-PG0/"
-            ))?;
-        }
-
         println!("Assuming home dir already mounted... uncomment this line if it's not");
         //mount_home_dir(ushell)
 
@@ -508,12 +499,10 @@ pub mod exp00000 {
 
         gen_vagrantfile(shell, memgb, cores)?;
 
-        shell.run(cmd!("vagrant halt").cwd("/proj/superpages-PG0/markm_vagrant/"))?;
-        shell.run(
-            cmd!("vagrant up")
-                .no_pty()
-                .cwd("/proj/superpages-PG0/markm_vagrant/"),
-        )?;
+        let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+
+        shell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
+        shell.run(cmd!("vagrant up").no_pty().cwd(vagrant_path))?;
         shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
         let vshell = connect_to_vagrant(cloudlab)?;
 
@@ -651,17 +640,13 @@ pub mod exp00000 {
         memgb: usize,
         cores: usize,
     ) -> Result<(), failure::Error> {
+        let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+
+        shell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
         shell.run(
-            cmd!("cp Vagrantfile.bk Vagrantfile").cwd("/proj/superpages-PG0/markm_vagrant/"),
+            cmd!("sed -i 's/memory = 1023/memory = {}/' Vagrantfile", memgb).cwd(vagrant_path),
         )?;
-        shell.run(
-            cmd!("sed -i 's/memory = 1023/memory = {}/' Vagrantfile", memgb)
-                .cwd("/proj/superpages-PG0/markm_vagrant/"),
-        )?;
-        shell.run(
-            cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores)
-                .cwd("/proj/superpages-PG0/markm_vagrant/"),
-        )?;
+        shell.run(cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores).cwd(vagrant_path))?;
 
         // Make a best effort to choose the right network interface.
         let iface = shell
@@ -673,7 +658,7 @@ pub mod exp00000 {
                 r#"sed -i 's/iface = "eno1"/iface = "{}"/' Vagrantfile"#,
                 iface
             )
-            .cwd("/proj/superpages-PG0/markm_vagrant/"),
+            .cwd(vagrant_path),
         )?;
         Ok(())
     }
