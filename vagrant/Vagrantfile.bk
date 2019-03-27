@@ -56,16 +56,19 @@ Vagrant.configure("2") do |config|
     #    :destination => "~/.ssh/me.pub"
 
     # Shared folders via NFS
-    config.vm.synced_folder '/proj/superpages-PG0/markm_vagrant', '/vagrant',
+    vagrant_dir = '/proj/superpages-PG0/markm_vagrant'
+    vm_shared_dir = '/users/markm/vm_shared'
+    research_workspace_dir = '/users/markm/research-workspace'
+    config.vm.synced_folder vagrant_dir, '/vagrant',
         :disabled => true
 
-    config.vm.synced_folder '/users/markm/vm_shared', '/vagrant/vm_shared',
+    config.vm.synced_folder vm_shared_dir, '/vagrant/vm_shared',
         :disabled => false,
-	:nfs => true
+        :nfs => true
 
-    config.vm.synced_folder '/users/markm/research-workspace', '/home/vagrant/research-workspace',
+    config.vm.synced_folder research_workspace_dir, '/home/vagrant/research-workspace',
         :disabled => false,
-	:nfs => true
+        :nfs => true
 
     # 9p shared folder (seems to be read-only)
     # config.vm.synced_folder '/home/markm/vagrant/vm_shared', '/vagrant/vm_shared',
