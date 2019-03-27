@@ -648,9 +648,16 @@ pub mod exp00000 {
         )?;
         shell.run(cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores).cwd(vagrant_path))?;
 
-        // Make a best effort to choose the right network interface.
-        let iface = shell
-            .run(cmd!(r#"/usr/sbin/route -n | awk '$1 == "0.0.0.0" {{print $8}}'"#).use_bash())?;
+        // Choose the interface that actually gives network access. We do this by looking for the
+        // interface that gives a route 1.1.1.1 (Cloudflare DNS).
+        let iface = shell.run(
+            cmd!(
+                r#"/usr/sbin/ip route get 1.1.1.1 |\
+                         grep -oE 'dev [a-z0-9]+ ' |\
+                         awk '{{print $2}}'"#
+            )
+            .use_bash(),
+        )?;
         let iface = iface.stdout.trim();
 
         shell.run(
