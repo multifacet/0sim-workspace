@@ -149,10 +149,23 @@ where
             )?;
         }
 
+        const PERF_MEASURE_TIME: usize = 960; // seconds
+
+        let perf_output_early = settings.gen_file_name("perfdata0");
+        let spawn_handle0 = ushell.spawn(cmd!(
+            "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
+             -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+             page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            zerosim_path_host,
+            CLOUDLAB_SHARED_RESULTS_DIR,
+            perf_output_early,
+            PERF_MEASURE_TIME,
+        ))?;
+
         // Then, run the actual experiment
         vshell.run(
             cmd!(
-                "sudo ./target/release/time_mmap_touch {} {} > {}/{}",
+                "time sudo ./target/release/time_mmap_touch {} {} > {}/{}",
                 (size << 30) >> 12,
                 pattern,
                 VAGRANT_RESULTS_DIR,
@@ -161,6 +174,8 @@ where
             .cwd(zerosim_exp_path)
             .use_bash(),
         )?;
+
+        let _ = spawn_handle0.join()?;
     } else {
         vshell.run(cmd!(
             "taskset -c 0 memcached -M -m {} -d -u vagrant",
@@ -172,34 +187,34 @@ where
             .run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
         let freq = freq.stdout.trim();
 
-        // Measure host stats with perf while the workload is running. We measure at the beginning
-        // of the workload and later in the workload after the "cliff".
-        const PERF_MEASURE_TIME: usize = 50; // seconds
-        const PERF_LATE_DELAY_MS: usize = 85 * 1000; // ms
+        // // Measure host stats with perf while the workload is running. We measure at the beginning
+        // // of the workload and later in the workload after the "cliff".
+        // const PERF_MEASURE_TIME: usize = 50; // seconds
+        // const PERF_LATE_DELAY_MS: usize = 85 * 1000; // ms
 
-        let perf_output_early = settings.gen_file_name("perfdata0");
-        let perf_output_late = settings.gen_file_name("perfdata1");
+        // let perf_output_early = settings.gen_file_name("perfdata0");
+        // let perf_output_late = settings.gen_file_name("perfdata1");
 
-        let spawn_handle0 = ushell.spawn(cmd!(
-            "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 \
-             -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-             page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
-            zerosim_path_host,
-            CLOUDLAB_SHARED_RESULTS_DIR,
-            perf_output_early,
-            PERF_MEASURE_TIME,
-        ))?;
+        // let spawn_handle0 = ushell.spawn(cmd!(
+        //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 \
+        //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+        //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+        //     zerosim_path_host,
+        //     CLOUDLAB_SHARED_RESULTS_DIR,
+        //     perf_output_early,
+        //     PERF_MEASURE_TIME,
+        // ))?;
 
-        let spawn_handle1 = ushell.spawn(cmd!(
-            "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 -D {} \
-             -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-             page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
-            zerosim_path_host,
-            PERF_LATE_DELAY_MS,
-            CLOUDLAB_SHARED_RESULTS_DIR,
-            perf_output_late,
-            PERF_MEASURE_TIME,
-        ))?;
+        // let spawn_handle1 = ushell.spawn(cmd!(
+        //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 -D {} \
+        //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+        //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+        //     zerosim_path_host,
+        //     PERF_LATE_DELAY_MS,
+        //     CLOUDLAB_SHARED_RESULTS_DIR,
+        //     perf_output_late,
+        //     PERF_MEASURE_TIME,
+        // ))?;
 
         // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
         // This gives much simpler performance behaviors. memcached uses a large amount of the memory
@@ -217,8 +232,8 @@ where
             .allow_error(),
         )?;
 
-        let _ = spawn_handle0.join()?;
-        let _ = spawn_handle1.join()?;
+        // let _ = spawn_handle0.join()?;
+        // let _ = spawn_handle1.join()?;
     }
 
     ushell.run(cmd!("date"))?;
