@@ -1,0 +1,77 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+#required_plugins = %w(vagrant-libvirt)
+#
+#plugins_to_install = required_plugins.select { |plugin| not Vagrant.has_plugin? plugin }
+#if not plugins_to_install.empty?
+#    puts "Installing plugins: #{plugins_to_install.join(' ')}"
+#    if system "vagrant plugin install #{plugins_to_install.join(' ')}"
+#        exec "vagrant #{ARGV.join(' ')}"
+#    else
+#        abort "Installation of one or more plugins has failed. Aborting."
+#    end
+#end
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure("2") do |config|
+  config.vm.provider :libvirt do |libvirt|
+    # provider
+    libvirt.driver = "kvm"
+    libvirt.video_type = "qxl"
+
+    # machine
+    libvirt.cpus = 2
+    libvirt.memory = 1024 * 1024 # MB
+
+    # kernel
+    #libvirt.kernel = '/home/markm/linux-4.14.18/kbuild/arch/x86_64/boot/bzImage'
+  end
+
+  config.vm.define :test_vm do |test_vm|
+    # Guest OS distribution
+    #test_vm.vm.box = "debian/jessie64"
+    #test_vm.vm.box = "generic/ubuntu1604"
+    test_vm.vm.box = "centos/7"
+    #test_vm.vm.box = "generic/fedora27"
+
+    # Make sure the guest can connect to the host network
+    iface = "enp1s0f0"
+    config.vm.network :public_network,
+        :bridge => iface,
+        :dev => iface
+
+    # Forward host port 5555 to guest SSH port so we can ssh -p 5555 vagrant@localhost
+    config.vm.network :forwarded_port,
+        :guest => 22,
+        :host => 5555,
+        :host_ip => "0.0.0.0"
+
+    # Copy host ssh key to guest
+    #config.vm.provision "file", 
+    #    :source => "~/.ssh/id_rsa.pub", 
+    #    :destination => "~/.ssh/me.pub"
+
+    # Shared folders via NFS
+    config.vm.synced_folder '/proj/superpages-PG0/markm_vagrant', '/vagrant',
+        :disabled => true
+
+    config.vm.synced_folder '/users/markm/vm_shared', '/vagrant/vm_shared',
+        :disabled => false,
+	:nfs => true
+
+    config.vm.synced_folder '/users/markm/research-workspace', '/home/vagrant/research-workspace',
+        :disabled => false,
+	:nfs => true
+
+    # 9p shared folder (seems to be read-only)
+    # config.vm.synced_folder '/home/markm/vagrant/vm_shared', '/vagrant/vm_shared',
+    #     :type => '9p',
+    #     :disabled => false,
+    #     :accessmode => 'squash',
+    #     :owner => 'any'
+  end
+end
