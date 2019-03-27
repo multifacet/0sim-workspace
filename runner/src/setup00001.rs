@@ -5,7 +5,9 @@
 
 use spurs::{cmd, ssh::Execute};
 
-use crate::common::{KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE};
+use crate::common::{
+    get_user_home_dir, KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE,
+};
 
 pub fn run<A>(dry_run: bool, login: &Login<A>, git_branch: &str) -> Result<(), failure::Error>
 where
@@ -19,7 +21,7 @@ where
     //
     // Building the kernel on the guest is painful, so we will build it on the host and copy it to
     // the guest via NFS.
-    let user_home = &format!("/users/{}/", login.username.as_str());
+    let user_home = &get_user_home_dir(&ushell)?;
     let kernel_path = &format!(
         "{}/{}/{}",
         user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE

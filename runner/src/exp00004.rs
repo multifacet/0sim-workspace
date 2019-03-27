@@ -11,7 +11,8 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00004::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    exp00004::*, get_user_home_dir, output::OutputManager, RESEARCH_WORKSPACE_PATH,
+    ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
 
@@ -81,7 +82,7 @@ where
     // Connect
     let ushell = connect_and_setup_host_only(dry_run, &login)?;
 
-    let user_home = &format!("/users/{}/", login.username.as_str());
+    let user_home = &get_user_home_dir(&ushell)?;
     let zerosim_exp_path = &format!(
         "{}/{}/{}",
         user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE

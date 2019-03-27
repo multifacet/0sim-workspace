@@ -127,7 +127,14 @@ pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
     Ok(output.into())
 }
 
+/// Get the path of the user's home directory.
+pub fn get_user_home_dir(ushell: &SshShell) -> Result<String, failure::Error> {
+    let user_home = ushell.run(cmd!("echo $HOME").use_bash())?;
+    Ok(user_home.stdout.trim().to_owned())
+}
+
 pub enum KernelPkgType {
+    #[allow(dead_code)]
     Deb,
     Rpm,
 }
@@ -365,11 +372,11 @@ pub mod exp00000 {
         println!("Assuming home dir already mounted... uncomment this line if it's not");
         //mount_home_dir(ushell)
 
+        let user_home = crate::common::get_user_home_dir(&ushell)?;
+
         let kernel_path = format!(
-            "/users/{}/{}/{}",
-            login.username.as_str(),
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_KERNEL_SUBMODULE
+            "{}/{}/{}",
+            user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
         );
 
         ushell.run(

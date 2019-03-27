@@ -11,6 +11,7 @@ use spurs::{
 };
 
 use crate::common::{
+    get_user_home_dir,
     setup00000::{CLOUDLAB_SHARED_RESULTS_DIR, CLOUDLAB_VAGRANT_PATH},
     KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
     ZEROSIM_KERNEL_SUBMODULE,
@@ -39,7 +40,7 @@ where
         ushell.toggle_dry_run();
     }
 
-    let user_home = &format!("/users/{}/", login.username.as_str());
+    let user_home = &get_user_home_dir(&ushell)?;
 
     if !only_vm {
         // Rename `poweroff` so we can't accidentally use it
@@ -52,6 +53,7 @@ where
         )?;
 
         // Install a bunch of stuff
+        ushell.run(cmd!("sudo yum group install -y 'Development Tools'"))?;
         ushell.run(spurs::centos::yum_install(&[
             "libvirt",
             "libvirt-devel",

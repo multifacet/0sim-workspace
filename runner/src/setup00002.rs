@@ -9,8 +9,8 @@ use spurs::{
 };
 
 use crate::common::{
-    KernelPkgType, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
-    ZEROSIM_KERNEL_SUBMODULE,
+    get_user_home_dir, KernelPkgType, Login, RESEARCH_WORKSPACE_PATH,
+    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
 };
 
 pub fn run<A>(
@@ -28,7 +28,7 @@ where
         ushell.toggle_dry_run();
     }
 
-    let user_home = format!("/users/{}/", login.username.as_str());
+    let user_home = &get_user_home_dir(&ushell)?;
 
     // clone the research workspace and build/install the 0sim kernel.
     if let Some(git_branch) = git_branch {
