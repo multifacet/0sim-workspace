@@ -186,15 +186,18 @@ where
 
         // change image location
         ushell.run(cmd!("mkdir -p images/"))?;
+        ushell.run(cmd!("chmod +x ."))?;
+        ushell.run(cmd!("chmod +x images/"))?;
+        ushell.run(cmd!("chown {}:qemu images/", login.username.as_str()))?;
         ushell.run(cmd!("sudo virsh pool-destroy default"))?;
         ushell.run(cmd!("sudo virsh pool-undefine default"))?;
         ushell.run(cmd!(
-            "virsh pool-define-as --name default --type dir --target {}/images/",
+            "sudo virsh pool-define-as --name default --type dir --target {}/images/",
             user_home
         ))?;
-        ushell.run(cmd!("virsh pool-autostart default"))?;
-        ushell.run(cmd!("virsh pool-start default"))?;
-        ushell.run(cmd!("virsh pool-list"))?;
+        ushell.run(cmd!("sudo virsh pool-autostart default"))?;
+        ushell.run(cmd!("sudo virsh pool-start default"))?;
+        ushell.run(cmd!("sudo virsh pool-list"))?;
 
         spurs::util::reboot(&mut ushell, dry_run)?;
     }
