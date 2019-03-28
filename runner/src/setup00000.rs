@@ -182,14 +182,19 @@ where
             ushell.run(cmd!("sudo grub2-set-default 0"))?;
         }
 
-        // change image location
         ushell.run(cmd!("mkdir -p {}", CLOUDLAB_SHARED_RESULTS_DIR))?;
-        ushell.run(cmd!("mkdir -p images"))?;
-        ushell.run(cmd!("sudo rm -rf /var/lib/libvirt/images/"))?;
+
+        // change image location
+        ushell.run(cmd!("mkdir -p images/"))?;
+        ushell.run(cmd!("sudo virsh pool-destroy default"))?;
+        ushell.run(cmd!("sudo virsh pool-undefine default"))?;
         ushell.run(cmd!(
-            "sudo ln -sf {}/images /var/lib/libvirt/images",
+            "virsh pool-define-as --name default --type dir --target {}/images/",
             user_home
         ))?;
+        ushell.run(cmd!("virsh pool-autostart default"))?;
+        ushell.run(cmd!("virsh pool-start default"))?;
+        ushell.run(cmd!("virsh pool-list"))?;
 
         spurs::util::reboot(&mut ushell, dry_run)?;
     }
