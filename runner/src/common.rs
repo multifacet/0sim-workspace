@@ -655,6 +655,39 @@ pub mod exp00000 {
         )?;
         shell.run(cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores).cwd(vagrant_path))?;
 
+        let user_home = crate::common::get_user_home_dir(shell)?;
+        let vagrant_full_path = &format!("{}/{}", user_home, vagrant_path).replace("/", r#"\/"#);
+        let vm_shared_full_path = &format!(
+            "{}/{}",
+            user_home,
+            crate::common::setup00000::CLOUDLAB_SHARED_RESULTS_DIR
+        )
+        .replace("/", r#"\/"#);
+        let research_workspace_full_path =
+            &format!("{}/{}", user_home, RESEARCH_WORKSPACE_PATH).replace("/", r#"\/"#);
+
+        shell.run(
+            cmd!(
+                r#"sed -i 's/vagrant_dir = ''/vagrant_dir = "{}"/' Vagrantfile"#,
+                vagrant_full_path
+            )
+            .cwd(vagrant_path),
+        )?;
+        shell.run(
+            cmd!(
+                r#"sed -i 's/vm_shared_dir = ''/vm_shared_dir = "{}"/' Vagrantfile"#,
+                vm_shared_full_path
+            )
+            .cwd(vagrant_path),
+        )?;
+        shell.run(
+            cmd!(
+                r#"sed -i 's/research_workspace_dir = ''/research_workspace_dir = "{}"/' Vagrantfile"#,
+                research_workspace_full_path
+            )
+            .cwd(vagrant_path),
+        )?;
+
         // Choose the interface that actually gives network access. We do this by looking for the
         // interface that gives a route 1.1.1.1 (Cloudflare DNS).
         let iface = shell.run(
