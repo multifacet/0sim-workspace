@@ -216,6 +216,9 @@ where
         spurs::util::reboot(&mut ushell, dry_run)?;
     }
 
+    // Disable firewalld because it causes VM issues
+    ushell.run(cmd!("sudo systemctl disable firewalld"))?;
+
     // Create the VM and add our ssh key to it.
     let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
@@ -251,8 +254,19 @@ where
         .unwrap();
 
     // Start vagrant
-    let vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
-    let vushell = crate::common::exp00000::connect_to_vagrant_user(&login.host)?;
+    let mut vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
+    let mut vushell = crate::common::exp00000::connect_to_vagrant_user(&login.host)?;
+
+    // Sometimes on adsl, networking is kind of messed up until a host restart. Check for
+    // connectivity, and try restarting.
+    let pub_net = vushell.run(cmd!("ping -c 1 -W 10 1.1.1.1")).is_ok();
+    if !pub_net {
+        ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
+        spurs::util::reboot(&mut ushell, dry_run)?;
+
+        vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
+        vushell = crate::common::exp00000::connect_to_vagrant_user(&login.host)?;
+    }
 
     // Install stuff on the VM
     vrshell.run(spurs::centos::yum_install(&[
