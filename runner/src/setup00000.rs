@@ -216,8 +216,10 @@ where
         spurs::util::reboot(&mut ushell, dry_run)?;
     }
 
-    // Disable firewalld because it causes VM issues
+    // Disable firewalld because it causes VM issues. When we do that, we need to reastart
+    // libvirtd.
     ushell.run(cmd!("sudo systemctl disable firewalld"))?;
+    ushell.run(cmd!("sudo service libvirtd restart"))?;
 
     // Create the VM and add our ssh key to it.
     let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
