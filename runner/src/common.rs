@@ -312,6 +312,7 @@ pub fn build_kernel(
 }
 
 pub mod setup00000 {
+    pub const CLOUDLAB_SHARED_DIR: &str = "vm_shared/";
     pub const CLOUDLAB_SHARED_RESULTS_DIR: &str = "vm_shared/results/";
 }
 
@@ -689,7 +690,7 @@ pub mod exp00000 {
         let vm_shared_full_path = &format!(
             "{}/{}",
             user_home,
-            crate::common::setup00000::CLOUDLAB_SHARED_RESULTS_DIR
+            crate::common::setup00000::CLOUDLAB_SHARED_DIR
         )
         .replace("/", r#"\/"#);
         let research_workspace_full_path =
