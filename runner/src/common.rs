@@ -204,6 +204,15 @@ where
     }
 }
 
+/// Generate a new vagrant domain name and update the Vagrantfile.
+pub fn gen_new_vagrantdomain(shell: &SshShell) -> Result<(), failure::Error> {
+    let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+    let uniq = shell.run(cmd!("date | sha256sum | head -c 10"))?;
+    let uniq = uniq.stdout.trim();
+    shell.run(cmd!("sed -i 's/:test_vm/:test_vm_{}/' Vagrantfile", uniq).cwd(vagrant_path))?;
+    Ok(())
+}
+
 pub enum KernelPkgType {
     #[allow(dead_code)]
     Deb,
@@ -625,23 +634,37 @@ pub mod exp00000 {
         Ok(())
     }
 
+    /// Get the VM domain name from `virsh` for the first running VM.
+    pub fn virsh_domain_name(shell: &SshShell) -> Result<String, failure::Error> {
+        Ok(shell
+            .run(cmd!(
+                "sudo virsh list | tail -n 2 | head -n1 | awk '{{print $2}}'"
+            ))?
+            .stdout
+            .trim()
+            .into())
+    }
+
     /// For `(v, p)` in `mapping`, pin vcpu `v` to host cpu `p`.
     pub fn virsh_vcpupin(
         shell: &SshShell,
         mapping: &HashMap<usize, usize>,
     ) -> Result<(), failure::Error> {
-        shell.run(cmd!("sudo virsh vcpuinfo markm_vagrant_test_vm"))?;
+        let domain = virsh_domain_name(shell)?;
+
+        shell.run(cmd!("sudo virsh vcpuinfo {}", domain))?;
 
         for (v, p) in mapping {
-            shell.run(cmd!("sudo virsh vcpupin markm_vagrant_test_vm {} {}", v, p))?;
+            shell.run(cmd!("sudo virsh vcpupin {} {} {}", domain, v, p))?;
         }
 
-        shell.run(cmd!("sudo virsh vcpuinfo markm_vagrant_test_vm"))?;
+        shell.run(cmd!("sudo virsh vcpuinfo {}", domain))?;
 
         Ok(())
     }
 
-    /// Generate a Vagrantfile for a VM with the given amount of memory and number of cores.
+    /// Generate a Vagrantfile for a VM with the given amount of memory and number of cores. A
+    /// Vagrantfile should already exist containing the correct domain name.
     pub fn gen_vagrantfile(
         shell: &SshShell,
         memgb: usize,
@@ -649,7 +672,13 @@ pub mod exp00000 {
     ) -> Result<(), failure::Error> {
         let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
+        // Keep the same VM domain name though...
+        let current_name =
+            shell.run(cmd!("grep -oE ':test_vm[0-9a-zA-Z_]+' Vagrantfile").cwd(vagrant_path))?;
+        let current_name = current_name.stdout.trim();
+
         shell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
+        shell.run(cmd!("sed -i 's/:test_vm/{}/' Vagrantfile", current_name).cwd(vagrant_path))?;
         shell.run(
             cmd!("sed -i 's/memory = 1023/memory = {}/' Vagrantfile", memgb).cwd(vagrant_path),
         )?;

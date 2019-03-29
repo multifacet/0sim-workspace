@@ -76,6 +76,7 @@ where
             "binutils-devel",
             "xz-devel",
             "numactl-devel",
+            "lsof",
         ]))?;
         ushell.run(spurs::util::add_to_group("libvirt"))?;
 
@@ -202,12 +203,16 @@ where
         spurs::util::reboot(&mut ushell, dry_run)?;
     }
 
-    // Add ssh key to VM
+    // Create the VM and add our ssh key to it.
     let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
+    ushell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
+    crate::common::gen_new_vagrantdomain(&ushell)?;
+
     crate::common::exp00000::gen_vagrantfile(&ushell, 20, 1)?;
+
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
-    ushell.run(cmd!("vagrant up").cwd(vagrant_path))?;
+    ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
 
     let key = std::fs::read_to_string(format!("{}/{}", SSH_LOCATION, "id_rsa.pub"))?;
     let key = key.trim();
