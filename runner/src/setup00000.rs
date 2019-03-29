@@ -88,7 +88,13 @@ where
             ushell.run(cmd!("sudo yum -y install {}", VAGRANT_RPM_URL))?;
         }
 
-        ushell.run(cmd!("vagrant plugin install vagrant-libvirt"))?;
+        let installed = ushell
+            .run(cmd!("vagrant plugin list | grep -q libvirt"))
+            .is_ok();
+
+        if !installed {
+            ushell.run(cmd!("vagrant plugin install vagrant-libvirt"))?;
+        }
 
         // Need a new shell so that we get the new user group
         let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
@@ -189,9 +195,16 @@ where
         ushell.run(cmd!("mkdir -p images/"))?;
         ushell.run(cmd!("chmod +x ."))?;
         ushell.run(cmd!("chmod +x images/"))?;
-        ushell.run(cmd!("chown {}:qemu images/", login.username.as_str()))?;
-        ushell.run(cmd!("sudo virsh pool-destroy default"))?;
-        ushell.run(cmd!("sudo virsh pool-undefine default"))?;
+        ushell.run(cmd!("sudo chown {}:qemu images/", login.username.as_str()))?;
+
+        let def_exists = ushell
+            .run(cmd!("sudo virsh pool-list --all | grep -q default"))
+            .is_ok();
+        if def_exists {
+            ushell.run(cmd!("sudo virsh pool-destroy default"))?;
+            ushell.run(cmd!("sudo virsh pool-undefine default"))?;
+        }
+
         ushell.run(cmd!(
             "sudo virsh pool-define-as --name default --type dir --target {}/images/",
             user_home
