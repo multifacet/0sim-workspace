@@ -177,6 +177,9 @@ pub fn set_remote_research_setting<V: Serialize>(
 pub fn get_remote_research_settings(
     ushell: &SshShell,
 ) -> Result<std::collections::BTreeMap<String, String>, failure::Error> {
+    // Make sure the file exists
+    ushell.run(cmd!("touch research-settings.json"))?;
+
     let file_contents = ushell.run(cmd!("cat research-settings.json"))?;
     let file_contents = file_contents.stdout.trim();
 
