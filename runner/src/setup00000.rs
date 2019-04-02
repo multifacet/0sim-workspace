@@ -197,6 +197,8 @@ where
         ushell.run(cmd!("chmod +x images/"))?;
         ushell.run(cmd!("sudo chown {}:qemu images/", login.username.as_str()))?;
 
+        ushell.run(cmd!("sudo systemctl start libvirtd"))?;
+
         let def_exists = ushell
             .run(cmd!("sudo virsh pool-list --all | grep -q default"))
             .is_ok();
