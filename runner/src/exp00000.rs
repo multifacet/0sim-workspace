@@ -21,6 +21,7 @@ pub fn run<A>(
     vm_size: Option<usize>, // GB
     cores: Option<usize>,
     warmup: bool,
+    prefault: bool,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
@@ -48,6 +49,7 @@ where
 
         * size: size,
         pattern: pattern,
+        prefault: prefault,
         calibrated: false,
         warmup: warmup,
 
@@ -84,6 +86,7 @@ where
     let cores = settings.get::<usize>("cores");
     let pattern = settings.get::<Option<&str>>("pattern");
     let warmup = settings.get::<bool>("warmup");
+    let prefault = settings.get::<bool>("prefault");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
 
@@ -152,9 +155,10 @@ where
         // Then, run the actual experiment
         vshell.run(
             cmd!(
-                "time sudo ./target/release/time_mmap_touch {} {} > {}/{}",
+                "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
                 (size << 30) >> 12,
                 pattern,
+                if prefault { "-p" } else { "" },
                 VAGRANT_RESULTS_DIR,
                 output_file,
             )

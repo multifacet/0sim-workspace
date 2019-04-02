@@ -106,6 +106,9 @@ fn run() -> Result<(), failure::Error> {
              "The number of cores of the VM (defaults to 1)")
             (@arg WARMUP: -w --warmup
              "Pass this flag to warmup the VM before running the main workload.")
+            (@arg PREFAULT: -p --prefault
+             "Pass this flag to prefault memory before running the main workload \
+             (ignored for memcached).")
         )
         (@subcommand exp00000up =>
             (about: "Only start the VM for exp00000. Requires `sudo`.")
@@ -237,8 +240,11 @@ fn run() -> Result<(), failure::Error> {
                 .value_of("CORES")
                 .map(|value| value.parse::<usize>().unwrap());
             let warmup = sub_m.is_present("WARMUP");
+            let prefault = sub_m.is_present("PREFAULT");
 
-            exp00000::run(dry_run, &login, gbs, pattern, vm_size, cores, warmup)
+            exp00000::run(
+                dry_run, &login, gbs, pattern, vm_size, cores, warmup, prefault,
+            )
         }
         ("exp00000up", Some(sub_m)) => {
             let login = Login {
