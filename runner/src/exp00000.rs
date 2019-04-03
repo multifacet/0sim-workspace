@@ -133,25 +133,23 @@ where
         params_file
     ))?;
 
+    // Warm up
+    if warmup {
+        //const WARM_UP_SIZE: usize = 50; // GB
+        const WARM_UP_PATTERN: &str = "-z";
+        vshell.run(
+            cmd!(
+                "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                (size << 30) >> 12,
+                WARM_UP_PATTERN,
+            )
+            .cwd(zerosim_exp_path)
+            .use_bash(),
+        )?;
+    }
+
     // Run memcached or time_touch_mmap
     if let Some(pattern) = pattern {
-        // Warm up
-        //const WARM_UP_SIZE: usize = 50; // GB
-        if warmup {
-            const WARM_UP_PATTERN: &str = "-z";
-            vshell.run(
-                cmd!(
-                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                    //(WARM_UP_SIZE << 30) >> 12,
-                    //WARM_UP_PATTERN,
-                    (size << 30) >> 12,
-                    WARM_UP_PATTERN,
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
-            )?;
-        }
-
         // Then, run the actual experiment
         vshell.run(
             cmd!(
