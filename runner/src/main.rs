@@ -1,8 +1,6 @@
 //! This program runs different routines remotely. Which routine is chosen by passing different
 //! command line arguments. certain routines require extra arguments.
 
-#![feature(asm)]
-
 // Useful common routines
 mod common;
 

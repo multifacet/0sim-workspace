@@ -138,22 +138,6 @@ where
         vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    // Set the PF time
-
-    const HV_PF_TIME: usize = 0xC;
-    const PF_TIME_AMT: usize = 1000; // cyc
-
-    unsafe {
-        asm!("vmcall"
-		: 
-		: "{eax}"(HV_PF_TIME), "{rbx}"(PF_TIME_AMT)
-		: "eax"
-		: "volatile");
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-
     let (output_file, params_file) = settings.gen_file_names();
     let params = serde_json::to_string(&settings)?;
 
