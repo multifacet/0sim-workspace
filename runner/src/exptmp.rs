@@ -162,16 +162,11 @@ where
             const WARM_UP_PATTERN: &str = "-z";
             vshell.run(
                 cmd!(
-                    "sudo ./target/release/time_mmap_touch {} {} {} > /dev/null",
+                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
                     //(WARM_UP_SIZE << 30) >> 12,
                     //WARM_UP_PATTERN,
                     (size << 30) >> 12,
                     WARM_UP_PATTERN,
-                    if let Some(pf_time) = pf_time {
-                        format!("{}", pf_time)
-                    } else {
-                        "".into()
-                    },
                 )
                 .cwd(zerosim_exp_path)
                 .use_bash(),
@@ -194,9 +189,14 @@ where
         // Then, run the actual experiment
         vshell.run(
             cmd!(
-                "time sudo ./target/release/time_mmap_touch {} {} > {}/{}",
+                "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
                 (size << 30) >> 12,
                 pattern,
+                if let Some(pf_time) = pf_time {
+                    format!("--pftime {}", pf_time)
+                } else {
+                    "".into()
+                },
                 VAGRANT_RESULTS_DIR,
                 output_file,
             )
@@ -250,9 +250,14 @@ where
         // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
         vshell.run(
             cmd!(
-                "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 {} --freq {} > {}/{}",
+                "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 {} --freq {} {} > {}/{}",
                 size,
                 freq,
+                if let Some(pf_time) = pf_time {
+                    format!("--pftime {}", pf_time)
+                } else {
+                    "".into()
+                },
                 VAGRANT_RESULTS_DIR,
                 output_file,
             )
