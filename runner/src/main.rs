@@ -85,6 +85,8 @@ fn run() -> Result<(), failure::Error> {
              "The number of cores of the VM (defaults to 1)")
             (@arg WARMUP: -w --warmup
              "Pass this flag to warmup the VM before running the main workload.")
+            (@arg PFTIME: +takes_value {is_usize} --pftime
+             "Pass this flag to set the pf_time value for the workload.")
         )
         (@subcommand exp00000 =>
             (about: "Run experiment 00000. Requires `sudo`.")

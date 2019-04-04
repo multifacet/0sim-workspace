@@ -53,6 +53,10 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
         VAGRANT_CORES
     };
 
+    let pf_time = sub_m
+        .value_of("PFTIME")
+        .map(|s| s.to_string().parse::<u64>().unwrap());
+
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
@@ -66,6 +70,7 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
         pattern: pattern,
         calibrated: false,
         warmup: warmup,
+        pf_time: pf_time,
 
         * vm_size: vm_size,
         cores: cores,
@@ -102,6 +107,7 @@ where
     let warmup = settings.get::<bool>("warmup");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
+    let pf_time = settings.get::<Option<u64>>("pf_time");
 
     // Reboot
     initial_reboot(dry_run, &login)?;
@@ -156,11 +162,16 @@ where
             const WARM_UP_PATTERN: &str = "-z";
             vshell.run(
                 cmd!(
-                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                    "sudo ./target/release/time_mmap_touch {} {} {} > /dev/null",
                     //(WARM_UP_SIZE << 30) >> 12,
                     //WARM_UP_PATTERN,
                     (size << 30) >> 12,
                     WARM_UP_PATTERN,
+                    if let Some(pf_time) = pf_time {
+                        format!("{}", pf_time)
+                    } else {
+                        "".into()
+                    },
                 )
                 .cwd(zerosim_exp_path)
                 .use_bash(),
