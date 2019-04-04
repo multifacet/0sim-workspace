@@ -12,7 +12,7 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::*, output::OutputManager, setup00000::CLOUDLAB_SHARED_RESULTS_DIR,
+    exp00000::*, output::OutputManager, /* setup00000::CLOUDLAB_SHARED_RESULTS_DIR, */
     RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
@@ -131,12 +131,28 @@ where
         RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
-    let zerosim_path_host = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
+    // let zerosim_path_host = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
 
     // Calibrate
     if calibrate {
         vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
     }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Set the PF time
+
+    const HV_PF_TIME: usize = 0xC;
+    const PF_TIME_AMT: usize = 1000; // cyc
+
+    unsafe {
+        asm!("vmcall"
+		: 
+		: "{eax}"(HV_PF_TIME), "{rbx}"(PF_TIME_AMT)
+		: "eax"
+		: "volatile");
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
 
     let (output_file, params_file) = settings.gen_file_names();
     let params = serde_json::to_string(&settings)?;
@@ -167,18 +183,18 @@ where
             )?;
         }
 
-        const PERF_MEASURE_TIME: usize = 960; // seconds
+        // const PERF_MEASURE_TIME: usize = 960; // seconds
 
-        let perf_output_early = settings.gen_file_name("perfdata0");
-        let spawn_handle0 = ushell.spawn(cmd!(
-            "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
-             -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-             page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
-            zerosim_path_host,
-            CLOUDLAB_SHARED_RESULTS_DIR,
-            perf_output_early,
-            PERF_MEASURE_TIME,
-        ))?;
+        // let perf_output_early = settings.gen_file_name("perfdata0");
+        // let spawn_handle0 = ushell.spawn(cmd!(
+        //     "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
+        //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+        //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+        //     zerosim_path_host,
+        //     CLOUDLAB_SHARED_RESULTS_DIR,
+        //     perf_output_early,
+        //     PERF_MEASURE_TIME,
+        // ))?;
 
         // Then, run the actual experiment
         vshell.run(
@@ -193,7 +209,7 @@ where
             .use_bash(),
         )?;
 
-        let _ = spawn_handle0.join()?;
+    // let _ = spawn_handle0.join()?;
     } else {
         vshell.run(cmd!(
             "taskset -c 0 memcached -M -m {} -d -u vagrant",
