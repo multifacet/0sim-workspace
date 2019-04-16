@@ -4,3 +4,6 @@
 [submodule "0sim-experiments"]
 	path = 0sim-experiments
 	url = ../0sim-experiments.git
+[submodule "0sim-trace"]
+	path = 0sim-trace
+	url = ../0sim-trace.git
