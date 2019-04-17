@@ -13,7 +13,7 @@ use spurs::{
 use crate::common::{
     get_user_home_dir, setup00000::CLOUDLAB_SHARED_RESULTS_DIR, KernelPkgType, Login,
     RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_EXPERIMENTS_SUBMODULE,
-    ZEROSIM_KERNEL_SUBMODULE,
+    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -152,7 +152,11 @@ where
                 ("CONFIG_FRAME_POINTER", true),
             ];
 
-            const SUBMODULES: &[&str] = &[ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_EXPERIMENTS_SUBMODULE];
+            const SUBMODULES: &[&str] = &[
+                ZEROSIM_KERNEL_SUBMODULE,
+                ZEROSIM_EXPERIMENTS_SUBMODULE,
+                ZEROSIM_TRACE_SUBMODULE,
+            ];
 
             let kernel_path = format!(
                 "{}/{}/{}",
