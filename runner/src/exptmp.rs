@@ -13,9 +13,37 @@ use spurs::{
 
 use crate::common::{
     exp00000::*, output::OutputManager, /* setup00000::CLOUDLAB_SHARED_RESULTS_DIR, */
-    RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 use crate::settings;
+
+#[derive(Copy, Clone, Debug)]
+enum Workload {
+    Memcached,
+    Zeros,
+    Counter,
+    Locality,
+}
+
+impl Workload {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Workload::Memcached => "memcached_gen_data",
+            Workload::Zeros | Workload::Counter => "time_mmap_touch",
+            Workload::Locality => "locality_mem_access",
+        }
+    }
+
+    pub fn from_str(s: &str, pat: Option<&str>) -> Self {
+        match (s, pat) {
+            ("memcached_gen_data", None) => Workload::Memcached,
+            ("time_mmap_touch", Some("-z")) => Workload::Zeros,
+            ("time_mmap_touch", Some("-c")) => Workload::Counter,
+            ("locality_mem_access", None) => Workload::Locality,
+            _ => panic!("unknown workload: {:?} {:?}", s, pat),
+        }
+    }
+}
 
 pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
@@ -24,14 +52,16 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
         host: sub_m.value_of("CLOUDLAB").unwrap(),
     };
     let size = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
-    let pattern = if sub_m.is_present("memcached") {
-        None
+    let workload = if sub_m.is_present("memcached") {
+        Workload::Memcached
+    } else if sub_m.is_present("zeros") {
+        Workload::Zeros
+    } else if sub_m.is_present("counter") {
+        Workload::Counter
+    } else if sub_m.is_present("locality") {
+        Workload::Locality
     } else {
-        Some(if sub_m.is_present("zeros") {
-            "-z"
-        } else {
-            "-c"
-        })
+        panic!("unknown workload")
     };
     let vm_size = sub_m
         .value_of("VMSIZE")
@@ -63,11 +93,15 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
-        * workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
+        * workload: workload.to_str(),
         exp: "tmp",
 
         * size: size,
-        pattern: pattern,
+        pattern: match workload {
+            Workload::Memcached | Workload::Locality => None,
+            Workload::Zeros => Some("-z"),
+            Workload::Counter => Some("-c"),
+        },
         calibrated: false,
         warmup: warmup,
         pf_time: pf_time,
@@ -104,6 +138,7 @@ where
     let size = settings.get::<usize>("size");
     let cores = settings.get::<usize>("cores");
     let pattern = settings.get::<Option<&str>>("pattern");
+    let workload = Workload::from_str(settings.get::<&str>("workload"), pattern);
     let warmup = settings.get::<bool>("warmup");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
@@ -154,120 +189,186 @@ where
         params_file
     ))?;
 
-    // Run memcached or time_touch_mmap
-    if let Some(pattern) = pattern {
-        // Warm up
-        //const WARM_UP_SIZE: usize = 50; // GB
-        if warmup {
-            const WARM_UP_PATTERN: &str = "-z";
+    // Run the workload
+    match workload {
+        Workload::Zeros | Workload::Counter => {
+            let pattern = pattern.unwrap();
+
+            // Warm up
+            //const WARM_UP_SIZE: usize = 50; // GB
+            if warmup {
+                const WARM_UP_PATTERN: &str = "-z";
+                vshell.run(
+                    cmd!(
+                        "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                        //(WARM_UP_SIZE << 30) >> 12,
+                        //WARM_UP_PATTERN,
+                        (size << 30) >> 12,
+                        WARM_UP_PATTERN,
+                    )
+                    .cwd(zerosim_exp_path)
+                    .use_bash(),
+                )?;
+            }
+
+            // const PERF_MEASURE_TIME: usize = 960; // seconds
+
+            // let perf_output_early = settings.gen_file_name("perfdata0");
+            // let spawn_handle0 = ushell.spawn(cmd!(
+            //     "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
+            //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //     zerosim_path_host,
+            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     perf_output_early,
+            //     PERF_MEASURE_TIME,
+            // ))?;
+
+            // Then, run the actual experiment
             vshell.run(
                 cmd!(
-                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                    //(WARM_UP_SIZE << 30) >> 12,
-                    //WARM_UP_PATTERN,
+                    "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
                     (size << 30) >> 12,
-                    WARM_UP_PATTERN,
+                    pattern,
+                    if let Some(pf_time) = pf_time {
+                        format!("--pftime {}", pf_time)
+                    } else {
+                        "".into()
+                    },
+                    VAGRANT_RESULTS_DIR,
+                    output_file,
                 )
                 .cwd(zerosim_exp_path)
                 .use_bash(),
             )?;
+
+            // let _ = spawn_handle0.join()?;
         }
+        Workload::Memcached => {
+            vshell.run(cmd!(
+                "taskset -c 0 memcached -M -m {} -d -u vagrant",
+                (size * 1024)
+            ))?;
 
-        // const PERF_MEASURE_TIME: usize = 960; // seconds
+            // We want to use rdtsc as the time source, so find the cpu freq:
+            let freq = ushell.run(
+                cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash(),
+            )?;
+            let freq = freq.stdout.trim();
 
-        // let perf_output_early = settings.gen_file_name("perfdata0");
-        // let spawn_handle0 = ushell.spawn(cmd!(
-        //     "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
-        //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-        //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
-        //     zerosim_path_host,
-        //     CLOUDLAB_SHARED_RESULTS_DIR,
-        //     perf_output_early,
-        //     PERF_MEASURE_TIME,
-        // ))?;
+            // // Measure host stats with perf while the workload is running. We measure at the beginning
+            // // of the workload and later in the workload after the "cliff".
+            // const PERF_MEASURE_TIME: usize = 50; // seconds
+            // const PERF_LATE_DELAY_MS: usize = 85 * 1000; // ms
 
-        // Then, run the actual experiment
-        vshell.run(
-            cmd!(
-                "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
-                (size << 30) >> 12,
-                pattern,
-                if let Some(pf_time) = pf_time {
-                    format!("--pftime {}", pf_time)
-                } else {
-                    "".into()
-                },
+            // let perf_output_early = settings.gen_file_name("perfdata0");
+            // let perf_output_late = settings.gen_file_name("perfdata1");
+
+            // let spawn_handle0 = ushell.spawn(cmd!(
+            //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 \
+            //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //     zerosim_path_host,
+            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     perf_output_early,
+            //     PERF_MEASURE_TIME,
+            // ))?;
+
+            // let spawn_handle1 = ushell.spawn(cmd!(
+            //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 -D {} \
+            //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //     zerosim_path_host,
+            //     PERF_LATE_DELAY_MS,
+            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     perf_output_late,
+            //     PERF_MEASURE_TIME,
+            // ))?;
+
+            // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
+            // This gives much simpler performance behaviors. memcached uses a large amount of the memory
+            // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
+            vshell.run(
+                cmd!(
+                    "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 \
+                     {} --freq {} {} > {}/{}",
+                    size,
+                    freq,
+                    if let Some(pf_time) = pf_time {
+                        format!("--pftime {}", pf_time)
+                    } else {
+                        "".into()
+                    },
+                    VAGRANT_RESULTS_DIR,
+                    output_file,
+                )
+                .cwd(zerosim_exp_path)
+                .use_bash()
+                .allow_error(),
+            )?;
+
+            // let _ = spawn_handle0.join()?;
+            // let _ = spawn_handle1.join()?;
+        }
+        Workload::Locality => {
+            // Warm up
+            if warmup {
+                const WARM_UP_PATTERN: &str = "-z";
+                vshell.run(
+                    cmd!(
+                        "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                        (size << 30) >> 12,
+                        WARM_UP_PATTERN,
+                    )
+                    .cwd(zerosim_exp_path)
+                    .use_bash(),
+                )?;
+            }
+
+            // const PERF_MEASURE_TIME: usize = 960; // seconds
+
+            // let perf_output_early = settings.gen_file_name("perfdata0");
+            // let spawn_handle0 = ushell.spawn(cmd!(
+            //     "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
+            //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //     zerosim_path_host,
+            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     perf_output_early,
+            //     PERF_MEASURE_TIME,
+            // ))?;
+
+            let debug_start = std::time::Instant::now();
+
+            let trace_output = settings.gen_file_name("trace");
+            let spawn_handle0 = ushell.spawn(cmd!(
+                "sudo taskset -c 3 {}/{}/target/release/zerosim-trace {} {} {}/{} -t {}",
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_TRACE_SUBMODULE,
+                1000,   // interval
+                150000, // buffer size
                 VAGRANT_RESULTS_DIR,
-                output_file,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash(),
-        )?;
+                trace_output,
+                pf_time.unwrap(),
+            ))?;
 
-    // let _ = spawn_handle0.join()?;
-    } else {
-        vshell.run(cmd!(
-            "taskset -c 0 memcached -M -m {} -d -u vagrant",
-            (size * 1024)
-        ))?;
+            // Then, run the actual experiment
+            vshell.run(
+                cmd!(
+                    "time sudo ./target/release/locality_mem_access > {}/{}",
+                    VAGRANT_RESULTS_DIR,
+                    output_file,
+                )
+                .cwd(zerosim_exp_path)
+                .use_bash(),
+            )?;
 
-        // We want to use rdtsc as the time source, so find the cpu freq:
-        let freq = ushell
-            .run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
-        let freq = freq.stdout.trim();
+            let debug_end = std::time::Instant::now();
 
-        // // Measure host stats with perf while the workload is running. We measure at the beginning
-        // // of the workload and later in the workload after the "cliff".
-        // const PERF_MEASURE_TIME: usize = 50; // seconds
-        // const PERF_LATE_DELAY_MS: usize = 85 * 1000; // ms
+            println!("elapsed: {:?}", debug_end - debug_start);
 
-        // let perf_output_early = settings.gen_file_name("perfdata0");
-        // let perf_output_late = settings.gen_file_name("perfdata1");
-
-        // let spawn_handle0 = ushell.spawn(cmd!(
-        //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 \
-        //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-        //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
-        //     zerosim_path_host,
-        //     CLOUDLAB_SHARED_RESULTS_DIR,
-        //     perf_output_early,
-        //     PERF_MEASURE_TIME,
-        // ))?;
-
-        // let spawn_handle1 = ushell.spawn(cmd!(
-        //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 -D {} \
-        //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-        //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
-        //     zerosim_path_host,
-        //     PERF_LATE_DELAY_MS,
-        //     CLOUDLAB_SHARED_RESULTS_DIR,
-        //     perf_output_late,
-        //     PERF_MEASURE_TIME,
-        // ))?;
-
-        // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
-        // This gives much simpler performance behaviors. memcached uses a large amount of the memory
-        // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
-        vshell.run(
-            cmd!(
-                "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 {} --freq {} {} > {}/{}",
-                size,
-                freq,
-                if let Some(pf_time) = pf_time {
-                    format!("--pftime {}", pf_time)
-                } else {
-                    "".into()
-                },
-                VAGRANT_RESULTS_DIR,
-                output_file,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash()
-            .allow_error(),
-        )?;
-
-        // let _ = spawn_handle0.join()?;
-        // let _ = spawn_handle1.join()?;
+            let _ = spawn_handle0.join()?;
+        }
     }
 
     ushell.run(cmd!("date"))?;
