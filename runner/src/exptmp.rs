@@ -342,7 +342,7 @@ where
 
             let trace_output = settings.gen_file_name("trace");
             let spawn_handle0 = ushell.spawn(cmd!(
-                "sudo taskset -c 3 {}/{}/target/release/zerosim-trace {} {} {}/{} -t {}",
+                "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
                 RESEARCH_WORKSPACE_PATH,
                 ZEROSIM_TRACE_SUBMODULE,
                 1000,   // interval
