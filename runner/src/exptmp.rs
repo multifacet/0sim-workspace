@@ -12,7 +12,7 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::*, output::OutputManager, /* setup00000::CLOUDLAB_SHARED_RESULTS_DIR, */
+    exp00000::*, output::OutputManager, setup00000::CLOUDLAB_SHARED_RESULTS_DIR,
     RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 use crate::settings;
@@ -345,9 +345,9 @@ where
                 "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
                 RESEARCH_WORKSPACE_PATH,
                 ZEROSIM_TRACE_SUBMODULE,
-                1000,   // interval
-                150000, // buffer size
-                VAGRANT_RESULTS_DIR,
+                1000,  // interval
+                50000, // buffer size
+                CLOUDLAB_SHARED_RESULTS_DIR,
                 trace_output,
                 pf_time.unwrap(),
             ))?;
