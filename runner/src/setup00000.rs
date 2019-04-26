@@ -311,6 +311,16 @@ where
         .no_pty(),
     )?;
 
+    // Build 0sim trace tool
+    ushell.run(
+        cmd!("$HOME/.cargo/bin/cargo build --release")
+            .use_bash()
+            .cwd(format!(
+                "{}/{}",
+                RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE
+            )),
+    )?;
+
     // We share the research-workspace with the VM via a vagrant shared directory (NFS) so that
     // there is only one version used across both (less versioning to track). Now, just compile the
     // benchmarks and install rust on the host.
