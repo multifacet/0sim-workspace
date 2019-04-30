@@ -340,7 +340,8 @@ where
 
             let debug_start = std::time::Instant::now();
 
-            let trace_output = settings.gen_file_name("trace");
+            let trace_output_local = settings.gen_file_name("tracelocal");
+            let trace_output_nonlocal = settings.gen_file_name("tracenonlocal");
             let spawn_handle0 = ushell.spawn(cmd!(
                 "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
                 RESEARCH_WORKSPACE_PATH,
@@ -348,16 +349,50 @@ where
                 1000,  // interval
                 50000, // buffer size
                 CLOUDLAB_SHARED_RESULTS_DIR,
-                trace_output,
+                trace_output_local,
                 pf_time.unwrap(),
             ))?;
 
-            // Then, run the actual experiment
+            let output_local = settings.gen_file_name("local");
+            let output_nonlocal = settings.gen_file_name("nonlocal");
+
+            // Then, run the actual experiment.
+            // 1) Do local accesses
+            // 2) Do non-local accesses
             vshell.run(
                 cmd!(
-                    "time sudo ./target/release/locality_mem_access > {}/{}",
+                    "time sudo ./target/release/locality_mem_access -l > {}/{}",
                     VAGRANT_RESULTS_DIR,
-                    output_file,
+                    output_local
+                )
+                .cwd(zerosim_exp_path)
+                .use_bash(),
+            )?;
+
+            let debug_end = std::time::Instant::now();
+
+            println!("elapsed: {:?}", debug_end - debug_start);
+
+            let _ = spawn_handle0.join()?;
+
+            let debug_start = std::time::Instant::now();
+
+            let spawn_handle0 = ushell.spawn(cmd!(
+                "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_TRACE_SUBMODULE,
+                1000,  // interval
+                50000, // buffer size
+                CLOUDLAB_SHARED_RESULTS_DIR,
+                trace_output_nonlocal,
+                pf_time.unwrap(),
+            ))?;
+
+            vshell.run(
+                cmd!(
+                    "time sudo ./target/release/locality_mem_access -n > {}/{}",
+                    VAGRANT_RESULTS_DIR,
+                    output_nonlocal
                 )
                 .cwd(zerosim_exp_path)
                 .use_bash(),
