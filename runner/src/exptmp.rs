@@ -150,6 +150,11 @@ where
     // Connect to host
     let mut ushell = connect_and_setup_host_only(dry_run, &login)?;
 
+    // TODO: turned off tsc offsetting
+    ushell.run(
+        cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
+    )?;
+
     // Turn on SSDSWAP.
     turn_on_ssdswap(&ushell, dry_run)?;
 
