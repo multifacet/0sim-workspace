@@ -322,11 +322,17 @@ where
                 vshell.run(
                     cmd!(
                         "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                        (size << 30) >> 12,
+                        ((vm_size - 2) << 30) >> 12,
                         WARM_UP_PATTERN,
                     )
                     .cwd(zerosim_exp_path)
                     .use_bash(),
+                )?;
+
+                vshell.run(
+                    cmd!("sudo ./target/release/locality_mem_access -l > /dev/null",)
+                        .cwd(zerosim_exp_path)
+                        .use_bash(),
                 )?;
             }
 
