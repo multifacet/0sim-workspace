@@ -222,6 +222,11 @@ where
         spurs::util::reboot(&mut ushell, dry_run)?;
     }
 
+    // Disable TSC offsetting so that setup runs faster
+    ushell.run(
+        cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
+    )?;
+
     // Disable firewalld because it causes VM issues. When we do that, we need to reastart
     // libvirtd.
     ushell.run(cmd!("sudo systemctl disable firewalld"))?;
