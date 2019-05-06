@@ -150,11 +150,6 @@ where
     // Connect to host
     let mut ushell = connect_and_setup_host_only(dry_run, &login)?;
 
-    // TODO: turned off tsc offsetting
-    ushell.run(
-        cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
-    )?;
-
     // Turn on SSDSWAP.
     turn_on_ssdswap(&ushell, dry_run)?;
 
@@ -357,8 +352,8 @@ where
                 "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
                 RESEARCH_WORKSPACE_PATH,
                 ZEROSIM_TRACE_SUBMODULE,
-                1000,  // interval
-                50000, // buffer size
+                500,    // interval
+                100000, // buffer size
                 CLOUDLAB_SHARED_RESULTS_DIR,
                 trace_output_local,
                 pf_time.unwrap(),
@@ -392,8 +387,8 @@ where
                 "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
                 RESEARCH_WORKSPACE_PATH,
                 ZEROSIM_TRACE_SUBMODULE,
-                1000,  // interval
-                50000, // buffer size
+                500,    // interval
+                100000, // buffer size
                 CLOUDLAB_SHARED_RESULTS_DIR,
                 trace_output_nonlocal,
                 pf_time.unwrap(),
