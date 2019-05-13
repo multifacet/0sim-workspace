@@ -12,8 +12,8 @@ use spurs::{
 
 use crate::common::{
     get_user_home_dir, setup00000::CLOUDLAB_SHARED_RESULTS_DIR, KernelPkgType, Login,
-    RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_EXPERIMENTS_SUBMODULE,
-    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
+    RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
+    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -77,6 +77,9 @@ where
             "xz-devel",
             "numactl-devel",
             "lsof",
+            "java-1.8.0-openjdk",
+            "centos-release-scl",
+            "devtoolset-7-gcc*",
         ]))?;
         ushell.run(spurs::util::add_to_group("libvirt"))?;
 
@@ -289,6 +292,7 @@ where
         "gcc",
         "libcgroup",
         "libcgroup-tools",
+        "java-1.8.0-openjdk",
     ]))?;
 
     vrshell.run(
@@ -336,6 +340,33 @@ where
         cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&format!(
             "/home/vagrant/{}/{}",
             RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+        )),
+    )?;
+
+    ushell.run(cmd!("tar xvf NPB3.4.tar.gz").cwd(&format!(
+        "{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+    )))?;
+    ushell.run(
+        cmd!("cp config/NAS.samples/make.def_gcc config/make.def").cwd(&format!(
+            "{}/{}/NPB3.4/NPB3.4-OMP",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+        )),
+    )?;
+    ushell.run(
+        cmd!(
+            "sed -i 's/FFLAGS  = -O3 -fopenmp/FFLAGS  = -O3 -fopenmp\
+             -m64 -fdefault-integer-8/' config/make.def"
+        )
+        .cwd(&format!(
+            "{}/{}/NPB3.4/NPB3.4-OMP",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+        )),
+    )?;
+    ushell.run(
+        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )").cwd(&format!(
+            "{}/{}/NPB3.4/NPB3.4-OMP",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
         )),
     )?;
 

@@ -79,6 +79,9 @@ pub const ZEROSIM_EXPERIMENTS_SUBMODULE: &str = "0sim-experiments";
 /// Path to the 0sim-trace submodule.
 pub const ZEROSIM_TRACE_SUBMODULE: &str = "0sim-trace";
 
+/// Path to benchmarks directory.
+pub const ZEROSIM_BENCHMARKS_DIR: &str = "bmks";
+
 /// Path to the `vagrant` subdirectory where `gen_vagrantfile` will do its work.
 pub const VAGRANT_SUBDIRECTORY: &str = "vagrant";
 
