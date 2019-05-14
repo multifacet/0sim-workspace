@@ -15,6 +15,7 @@ mod exp00001;
 mod exp00002;
 mod exp00003;
 mod exp00004;
+mod exp00005;
 mod exptmp;
 
 use clap::clap_app;
@@ -173,6 +174,19 @@ fn run() -> Result<(), failure::Error> {
             (@arg SIZE: +required +takes_value {is_usize}
              "The number of GBs of the workload (e.g. 500)")
         )
+        (@subcommand exp00005 =>
+            (about: "Run experiment 00005. Requires `sudo`.")
+            (@arg CLOUDLAB: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
+            (@arg WARMUP: -w --warmup
+             "Pass this flag to warmup the VM before running the main workload.")
+            (@arg VMSIZE: +takes_value {is_usize}
+             "The number of GBs of the VM (defaults to 2048)")
+            (@arg CORES: +takes_value {is_usize} -C --cores
+             "The number of cores of the VM (defaults to 1)")
+        )
     }
     .setting(clap::AppSettings::SubcommandRequired)
     .setting(clap::AppSettings::DisableVersion)
@@ -319,6 +333,22 @@ fn run() -> Result<(), failure::Error> {
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
 
             exp00004::run(dry_run, &login, gbs)
+        }
+        ("exp00005", Some(sub_m)) => {
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
+                host: sub_m.value_of("CLOUDLAB").unwrap(),
+            };
+            let vm_size = sub_m
+                .value_of("VMSIZE")
+                .map(|value| value.parse::<usize>().unwrap());
+            let cores = sub_m
+                .value_of("CORES")
+                .map(|value| value.parse::<usize>().unwrap());
+            let warmup = sub_m.is_present("WARMUP");
+
+            exp00005::run(dry_run, &login, vm_size, cores, warmup)
         }
 
         _ => {
