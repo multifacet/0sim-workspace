@@ -307,6 +307,7 @@ where
         "libcgroup",
         "libcgroup-tools",
         "java-1.8.0-openjdk",
+        "maven",
     ]))?;
 
     vrshell.run(
@@ -392,6 +393,13 @@ where
     vushell.run(cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty())?;
     vushell.run(cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"))?;
 
+    vushell.run(cmd!(
+        "echo 'source {}/{}/{}/hadoop_env.sh' >> ~/.bashrc",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_BENCHMARKS_DIR,
+        ZEROSIM_HADOOP_PATH
+    ))?;
+
     ushell.run(
         cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL).cwd(&format!(
             "{}/{}/{}",
@@ -423,12 +431,13 @@ where
     )))?;
 
     vushell.run(
-        cmd!("source hadoop_env.sh ; sh -x setup.sh")
+        cmd!("sh -x setup.sh")
             .use_bash()
             .cwd(&format!(
                 "{}/{}/{}",
                 RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-            )),
+            ))
+            .use_bash(),
     )?;
 
     // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing
