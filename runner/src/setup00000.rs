@@ -79,7 +79,9 @@ where
             "lsof",
             "java-1.8.0-openjdk",
             "centos-release-scl",
+            "scl-utils",
             "devtoolset-7-gcc*",
+            "maven",
         ]))?;
         ushell.run(spurs::util::add_to_group("libvirt"))?;
 
@@ -355,7 +357,7 @@ where
     )?;
     ushell.run(
         cmd!(
-            "sed -i 's/FFLAGS  = -O3 -fopenmp/FFLAGS  = -O3 -fopenmp\
+            "sed -i 's/^FFLAGS.*$/FFLAGS  = -O3 -fopenmp \
              -m64 -fdefault-integer-8/' config/make.def"
         )
         .cwd(&format!(
