@@ -80,7 +80,6 @@ where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
 {
     let vm_size = settings.get::<usize>("vm_size");
-    let size = settings.get::<usize>("size");
     let cores = settings.get::<usize>("cores");
     let warmup = settings.get::<bool>("warmup");
     let calibrate = settings.get::<bool>("calibrated");
@@ -135,12 +134,11 @@ where
 
     // Warm up
     if warmup {
-        //const WARM_UP_SIZE: usize = 50; // GB
         const WARM_UP_PATTERN: &str = "-z";
         vshell.run(
             cmd!(
                 "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                (size << 30) >> 12,
+                (vm_size << 30) >> 12,
                 WARM_UP_PATTERN,
             )
             .cwd(zerosim_exp_path)
