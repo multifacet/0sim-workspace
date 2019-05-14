@@ -336,8 +336,11 @@ where
     // there is only one version used across both (less versioning to track). Now, just compile the
     // benchmarks and install rust on the host.
 
+    ////////////////////////////////////////////////////////////////////////////////
     // Install benchmarks.
+    ////////////////////////////////////////////////////////////////////////////////
 
+    // 0sim-experiments
     vushell.run(
         cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&format!(
             "/home/vagrant/{}/{}",
@@ -345,6 +348,7 @@ where
         )),
     )?;
 
+    // NAS 3.4
     ushell.run(cmd!("tar xvf NPB3.4.tar.gz").cwd(&format!(
         "{}/{}",
         RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
@@ -370,6 +374,22 @@ where
             "{}/{}/NPB3.4/NPB3.4-OMP",
             RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
         )),
+    )?;
+
+    // Hadoop/spark/hibench
+    vushell.run(cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty())?;
+    vushell.run(cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"))?;
+    vushell.run(cmd!("tar xvzf zerosim-hadoop.tar.gz").cwd(&format!(
+        "{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+    )))?;
+    vushell.run(
+        cmd!("source hadoop_env.sh ; sh -x setup.sh")
+            .use_bash()
+            .cwd(&format!(
+                "{}/{}/zerosim-hadoop/",
+                RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+            )),
     )?;
 
     // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing

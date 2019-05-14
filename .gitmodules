@@ -7,3 +7,6 @@
 [submodule "0sim-trace"]
 	path = 0sim-trace
 	url = ../0sim-trace.git
+[submodule "bmks/zerosim-hadoop/HiBench"]
+	path = bmks/zerosim-hadoop/HiBench
+	url = https://github.com/Intel-bigdata/HiBench.git
