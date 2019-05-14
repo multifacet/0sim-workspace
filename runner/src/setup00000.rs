@@ -13,11 +13,22 @@ use spurs::{
 use crate::common::{
     get_user_home_dir, setup00000::CLOUDLAB_SHARED_RESULTS_DIR, KernelPkgType, Login,
     RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
-    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
+    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
+    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
     "https://releases.hashicorp.com/vagrant/2.1.5/vagrant_2.1.5_x86_64.rpm";
+
+const HADOOP_TARBALL: &str =
+    "http://apache.cs.utah.edu/hadoop/common/hadoop-3.1.2/hadoop-3.1.2.tar.gz";
+const HADOOP_TARBALL_NAME: &str = "hadoop-3.1.2.tar.gz";
+const HADOOP_HOME: &str = "hadoop-3.1.2";
+
+const SPARK_TARBALL: &str =
+    "http://apache.cs.utah.edu/spark/spark-2.4.3/spark-2.4.3-bin-hadoop2.7.tgz";
+const SPARK_TARBALL_NAME: &str = "spark-2.4.3-bin-hadoop2.7.tgz";
+const SPARK_HOME: &str = "spark-2.4.3-bin-hadoop2.7";
 
 /// Location of `.ssh` directory on UW CS AFS so we can install it on experimental machines.
 const SSH_LOCATION: &str = "/u/m/a/markm/.ssh";
@@ -80,7 +91,7 @@ where
             "java-1.8.0-openjdk",
             "centos-release-scl",
             "scl-utils",
-            "devtoolset-7-gcc*",
+            "devtoolset-7",
             "maven",
         ]))?;
         ushell.run(spurs::util::add_to_group("libvirt"))?;
@@ -161,6 +172,7 @@ where
                 ZEROSIM_KERNEL_SUBMODULE,
                 ZEROSIM_EXPERIMENTS_SUBMODULE,
                 ZEROSIM_TRACE_SUBMODULE,
+                ZEROSIM_HIBENCH_SUBMODULE,
             ];
 
             let kernel_path = format!(
@@ -379,16 +391,43 @@ where
     // Hadoop/spark/hibench
     vushell.run(cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty())?;
     vushell.run(cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"))?;
-    vushell.run(cmd!("tar xvzf zerosim-hadoop.tar.gz").cwd(&format!(
-        "{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+
+    ushell.run(
+        cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL).cwd(&format!(
+            "{}/{}/{}",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        )),
+    )?;
+    ushell.run(cmd!("tar xvzf {}", HADOOP_TARBALL_NAME).cwd(&format!(
+        "{}/{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
     )))?;
+    ushell.run(cmd!("tar xvzf {}", SPARK_TARBALL_NAME).cwd(&format!(
+        "{}/{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+    )))?;
+
+    ushell.run(
+        cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME).cwd(&format!(
+            "{}/{}/{}",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        )),
+    )?;
+    ushell.run(cmd!("cp spark-conf/* {}/conf/", SPARK_HOME).cwd(&format!(
+        "{}/{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+    )))?;
+    ushell.run(cmd!("cp hibench-conf/* HiBench/conf/").cwd(&format!(
+        "{}/{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+    )))?;
+
     vushell.run(
         cmd!("source hadoop_env.sh ; sh -x setup.sh")
             .use_bash()
             .cwd(&format!(
-                "{}/{}/zerosim-hadoop/",
-                RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+                "{}/{}/{}",
+                RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
             )),
     )?;
 

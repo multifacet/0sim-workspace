@@ -79,8 +79,14 @@ pub const ZEROSIM_EXPERIMENTS_SUBMODULE: &str = "0sim-experiments";
 /// Path to the 0sim-trace submodule.
 pub const ZEROSIM_TRACE_SUBMODULE: &str = "0sim-trace";
 
+/// Path to the HiBench submodule.
+pub const ZEROSIM_HIBENCH_SUBMODULE: &str = "bmks/zerosim-hadoop/HiBench";
+
 /// Path to benchmarks directory.
 pub const ZEROSIM_BENCHMARKS_DIR: &str = "bmks";
+
+/// Path to Hadoop benchmark stuff within the benchmarks dir.
+pub const ZEROSIM_HADOOP_PATH: &str = "zerosim-hadoop";
 
 /// Path to the `vagrant` subdirectory where `gen_vagrantfile` will do its work.
 pub const VAGRANT_SUBDIRECTORY: &str = "vagrant";
