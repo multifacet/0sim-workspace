@@ -9,10 +9,12 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR,
-    ZEROSIM_EXPERIMENTS_SUBMODULE,
+    exp00000::*, output::OutputManager, setup00000::CLOUDLAB_SHARED_RESULTS_DIR,
+    RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
+
+const NAS_CG_TIME: usize = 7200; // seconds
 
 pub fn run<A>(
     dry_run: bool,
@@ -146,7 +148,34 @@ where
         )?;
     }
 
-    vshell.run(
+    // Record vmstat on guest
+    let vmstat_file = settings.gen_file_name("vmstat");
+    let _vmstats_handle = vshell.spawn(
+        cmd!(
+            "for (( c=1 ; c<={} ; c++ )) ; do \
+             cat /proc/vmstat >> {}/{} ; sleep 1 ; done",
+            NAS_CG_TIME,
+            VAGRANT_RESULTS_DIR,
+            vmstat_file
+        )
+        .use_bash(),
+    )?;
+
+    let zswapstats_file = settings.gen_file_name("zswapstats");
+    let zswapstats_handle = ushell.spawn(
+        cmd!(
+            "for (( c=1 ; c<={} ; c++ )) ; do \
+             sudo tail `sudo find  /sys/kernel/debug/zswap/ -type f`\
+             >> {}/{} ; sleep 1 ; done",
+            NAS_CG_TIME,
+            CLOUDLAB_SHARED_RESULTS_DIR,
+            zswapstats_file
+        )
+        .use_bash(),
+    )?;
+
+    // The workload takes a very long time, so we only use the first 2 hours (of wall-clock time).
+    vshell.spawn(
         cmd!(
             "taskset -c 0 ./bin/cg.E.x > {}/{}",
             VAGRANT_RESULTS_DIR,
@@ -154,6 +183,8 @@ where
         )
         .cwd(&format!("{}/NPB3.4/NPB3.4-OMP", zerosim_bmk_path)),
     )?;
+
+    zswapstats_handle.join()?;
 
     ushell.run(cmd!("date"))?;
 
