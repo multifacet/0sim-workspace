@@ -37,6 +37,7 @@ pub fn run<A>(
     dry_run: bool,
     login: &Login<A>,
     device: Option<&str>,
+    mapper_device: Option<&str>,
     git_branch: Option<&str>,
     only_vm: bool,
     token: &str,
@@ -136,7 +137,24 @@ where
 
         // Setup swap devices, and leave a research-settings.json file. If no swap devices were
         // specififed, use all unpartitioned, unmounted devices.
-        if swap_devs.is_empty() {
+        if let Some(mapper_device) = mapper_device {
+            // Setup a thinkly provisioned swap device
+
+            const DM_META_FILE: &str = "dm.meta";
+
+            // create a 1GB zeroed file to be mounted as a loopback device for use as metadata dev for thin pool
+            ushell.run(cmd!("sudo fallocate -z -l 1073741824 {}", DM_META_FILE))?;
+
+            crate::common::exp00000::create_and_turn_on_thin_swap(
+                &ushell,
+                DM_META_FILE,
+                mapper_device,
+            )?;
+
+            // Save so that we can mount on reboot.
+            crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
+            crate::common::set_remote_research_setting(&ushell, "dm-data", mapper_device)?;
+        } else if swap_devs.is_empty() {
             let unpartitioned = spurs::util::get_unpartitioned_devs(&ushell, dry_run)?;
             for dev in unpartitioned.iter() {
                 ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;

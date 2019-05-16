@@ -37,6 +37,8 @@ fn run() -> Result<(), failure::Error> {
              "This is the Github personal token for cloning the repo.")
             (@arg DEVICE: +takes_value -d --device
              "(Optional) the device to format and use as a home directory (e.g. -d /dev/sda)")
+            (@arg MAPPER_DEVICE: +takes_value -m --mapper_device
+             "(Optional) the device to use with device mapper as a thinly-provisioned swap space (e.g. -d /dev/sda)")
             (@arg GIT_BRANCH: +takes_value -g --git_branch
              "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
             (@arg ONLY_VM: -v --only_vm
@@ -202,6 +204,7 @@ fn run() -> Result<(), failure::Error> {
                 host: sub_m.value_of("CLOUDLAB").unwrap(),
             };
             let device = sub_m.value_of("DEVICE");
+            let mapper_device = sub_m.value_of("MAPPER_DEVICE");
             let git_branch = sub_m.value_of("GIT_BRANCH");
             let only_vm = sub_m.is_present("ONLY_VM");
             let token = sub_m.value_of("TOKEN").unwrap();
@@ -209,8 +212,18 @@ fn run() -> Result<(), failure::Error> {
                 .values_of("SWAP_DEV")
                 .map(|i| i.collect())
                 .unwrap_or_else(|| vec![]);
+
+            assert!(mapper_device.is_none() || swap_devs.is_empty());
+
             setup00000::run(
-                dry_run, &login, device, git_branch, only_vm, token, swap_devs,
+                dry_run,
+                &login,
+                device,
+                mapper_device,
+                git_branch,
+                only_vm,
+                token,
+                swap_devs,
             )
         }
         ("setup00001", Some(sub_m)) => {
