@@ -92,9 +92,10 @@ where
             "java-1.8.0-openjdk",
             "centos-release-scl",
             "scl-utils",
-            "devtoolset-7",
             "maven",
         ]))?;
+        ushell.run(spurs::centos::yum_install(&["devtoolset-7"]))?;
+
         ushell.run(spurs::util::add_to_group("libvirt"))?;
 
         let installed = ushell
