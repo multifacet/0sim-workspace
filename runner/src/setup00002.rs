@@ -24,9 +24,7 @@ where
 {
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
-    if dry_run {
-        ushell.toggle_dry_run();
-    }
+    ushell.set_dry_run(dry_run);
 
     let user_home = &get_user_home_dir(&ushell)?;
 

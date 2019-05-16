@@ -48,9 +48,7 @@ where
 {
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
-    if dry_run {
-        ushell.toggle_dry_run();
-    }
+    ushell.set_dry_run(dry_run);
 
     let user_home = &get_user_home_dir(&ushell)?;
 
@@ -116,9 +114,7 @@ where
 
         // Need a new shell so that we get the new user group
         let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
-        if dry_run {
-            ushell.toggle_dry_run();
-        }
+        ushell.set_dry_run(dry_run);
 
         if let Some(device) = device {
             // Set up home device/directory
