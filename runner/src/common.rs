@@ -389,9 +389,7 @@ pub mod exp00000 {
     {
         // Connect to the remote
         let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
-        if dry_run {
-            ushell.toggle_dry_run();
-        }
+        ushell.set_dry_run(dry_run);
 
         // Reboot the remote to make sure we have a clean slate
         spurs::util::reboot(&mut ushell, dry_run)?;
@@ -478,9 +476,7 @@ pub mod exp00000 {
 
     /// Turn on Zswap with some default parameters.
     pub fn turn_on_zswap(shell: &mut SshShell, dry_run: bool) -> Result<(), failure::Error> {
-        if dry_run {
-            shell.toggle_dry_run();
-        }
+        shell.set_dry_run(dry_run);
 
         // apparently permissions can get weird
         shell.run(cmd!("sudo chmod +w /sys/module/zswap/parameters/*").use_bash())?;
@@ -498,9 +494,7 @@ pub mod exp00000 {
         shell.run(cmd!("echo y | sudo tee /sys/module/zswap/parameters/enabled").use_bash())?;
         shell.run(cmd!("sudo tail /sys/module/zswap/parameters/*").use_bash())?;
 
-        if dry_run {
-            shell.toggle_dry_run();
-        }
+        shell.set_dry_run(false);
 
         Ok(())
     }
@@ -598,10 +592,11 @@ pub mod exp00000 {
     ///
     /// The metadata volume only needs to be a few megabytes large (e.g. 1GB would be overkill).
     /// The data volume should be as large and fast as needed.
-    pub fn create_and_turn_on_thin_swap(
+    fn create_and_turn_on_thin_swap_inner(
         shell: &SshShell,
         meta_file: &str,
         data_dev: &str,
+        new: bool,
     ) -> Result<(), failure::Error> {
         // create loopback
         shell.run(cmd!("sudo losetup -f {}", meta_file))?;
@@ -631,14 +626,16 @@ pub mod exp00000 {
             data_dev,
         ))?;
 
-        // create a thin volume
-        // - /dev/mapper/mypool is the name of the pool device above
-        // - 0 is the sector number on the pool
-        // - create_thin indicates the pool should create a new thin volume
-        // - 0 is a unique 24-bit volume id
-        shell.run(cmd!(
-            "sudo dmsetup message /dev/mapper/mypool 0 'create_thin 0'"
-        ))?;
+        if new {
+            // create a thin volume
+            // - /dev/mapper/mypool is the name of the pool device above
+            // - 0 is the sector number on the pool
+            // - create_thin indicates the pool should create a new thin volume
+            // - 0 is a unique 24-bit volume id
+            shell.run(cmd!(
+                "sudo dmsetup message /dev/mapper/mypool 0 'create_thin 0'"
+            ))?;
+        }
 
         // init the volume
         // - 0 is the start sector
@@ -656,6 +653,34 @@ pub mod exp00000 {
         Ok(())
     }
 
+    /// Create and mount a thinly-partitioned swap device using device mapper. Device mapper
+    /// requires two devices: a metadata volume and a data volume. We use a file mounted as a
+    /// loopback device for the metadata volume and another arbitrary device as the data volume.
+    ///
+    /// The metadata volume only needs to be a few megabytes large (e.g. 1GB would be overkill).
+    /// The data volume should be as large and fast as needed.
+    pub fn turn_on_thin_swap(
+        shell: &SshShell,
+        meta_file: &str,
+        data_dev: &str,
+    ) -> Result<(), failure::Error> {
+        create_and_turn_on_thin_swap_inner(shell, meta_file, data_dev, false)
+    }
+
+    /// Create a new thinly-partitioned swap device using device mapper. Device mapper
+    /// requires two devices: a metadata volume and a data volume. We use a file mounted as a
+    /// loopback device for the metadata volume and another arbitrary device as the data volume.
+    ///
+    /// The metadata volume only needs to be a few megabytes large (e.g. 1GB would be overkill).
+    /// The data volume should be as large and fast as needed.
+    pub fn create_thin_swap(
+        shell: &SshShell,
+        meta_file: &str,
+        data_dev: &str,
+    ) -> Result<(), failure::Error> {
+        create_and_turn_on_thin_swap_inner(shell, meta_file, data_dev, true)
+    }
+
     /// Turn on swap devices. This function will respect any `swap-devices` setting in
     /// `research-settings.json`. If there are no such settings, then all unpartitioned, unmounted
     /// swap devices of the right size are used (according to `list_swapdevs`).
@@ -668,7 +693,7 @@ pub mod exp00000 {
             crate::common::get_remote_research_setting(&settings, "dm-data")?,
         ) {
             // If a thinly-provisioned swap space is setup, load and mount it.
-            return create_and_turn_on_thin_swap(shell, dm_meta, dm_data);
+            return turn_on_thin_swap(shell, dm_meta, dm_data);
         }
 
         let devs = if let Some(devs) =
@@ -846,9 +871,7 @@ pub mod exp00001 {
 
     /// Turn on Zswap with some default parameters.
     pub fn turn_on_zswap(shell: &mut SshShell, dry_run: bool) -> Result<(), failure::Error> {
-        if dry_run {
-            shell.toggle_dry_run();
-        }
+        shell.set_dry_run(dry_run);
 
         // apparently permissions can get weird
         shell.run(cmd!("chmod +w /sys/module/zswap/parameters/*").use_bash())?;
@@ -860,9 +883,7 @@ pub mod exp00001 {
         shell.run(cmd!("echo y > /sys/module/zswap/parameters/enabled").use_bash())?;
         shell.run(cmd!("tail /sys/module/zswap/parameters/*").use_bash())?;
 
-        if dry_run {
-            shell.toggle_dry_run();
-        }
+        shell.set_dry_run(false);
 
         Ok(())
     }
@@ -944,9 +965,7 @@ pub mod exp00001 {
     {
         // Connect to the remote
         let mut ushell = SshShell::with_default_key("root", &desktop)?;
-        if dry_run {
-            ushell.toggle_dry_run();
-        }
+        ushell.set_dry_run(dry_run);
 
         // Reboot the remote to make sure we have a clean slate
         reboot(&mut ushell, dry_run)?;
