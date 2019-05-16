@@ -592,62 +592,73 @@ pub mod exp00000 {
     ///
     /// The metadata volume only needs to be a few megabytes large (e.g. 1GB would be overkill).
     /// The data volume should be as large and fast as needed.
+    ///
+    /// This is idempotent.
     fn create_and_turn_on_thin_swap_inner(
         shell: &SshShell,
         meta_file: &str,
         data_dev: &str,
         new: bool,
     ) -> Result<(), failure::Error> {
-        // create loopback
-        shell.run(cmd!("sudo losetup -f {}", meta_file))?;
+        // Check if thin device is already created.
+        let already = shell
+            .run(cmd!("sudo dmsetup ls"))?
+            .stdout
+            .contains("mythin");
 
-        // find out which loopback device was created
-        let out = shell.run(cmd!("sudo losetup -j {}", meta_file))?.stdout;
-        let loopback = out.trim().split(":").next().expect("expected device name");
+        if !already {
+            // create loopback
+            shell.run(cmd!("sudo losetup -f {}", meta_file))?;
 
-        // find out the size of the mapper_device
-        let out = shell
-            .run(cmd!("lsblk -o SIZE -b {} | sed '2q;d'", data_dev).use_bash())?
-            .stdout;
-        let mapper_device_size = out.trim().parse::<u64>().unwrap() >> 9; // 512B sectors
+            // find out which loopback device was created
+            let out = shell.run(cmd!("sudo losetup -j {}", meta_file))?.stdout;
+            let loopback = out.trim().split(":").next().expect("expected device name");
 
-        // create a thin pool
-        // - 0 is the start sector
-        // - `mapper_device_size` is the end sector of the pool. This should be the size of the data device.
-        // - `loopback` is the metadata device
-        // - `mapper_device` is the data device
-        // - 256000 = 128MB is the block size
-        // - 0 indicates no dm event on low-watermark
-        shell.run(cmd!(
-            "sudo dmsetup create mypool --table \
-             '0 {} thin-pool {} {} 256000 0'",
-            mapper_device_size,
-            loopback,
-            data_dev,
-        ))?;
+            // find out the size of the mapper_device
+            let out = shell
+                .run(cmd!("lsblk -o SIZE -b {} | sed '2q;d'", data_dev).use_bash())?
+                .stdout;
+            let mapper_device_size = out.trim().parse::<u64>().unwrap() >> 9; // 512B sectors
 
-        if new {
-            // create a thin volume
-            // - /dev/mapper/mypool is the name of the pool device above
-            // - 0 is the sector number on the pool
-            // - create_thin indicates the pool should create a new thin volume
-            // - 0 is a unique 24-bit volume id
+            // create a thin pool
+            // - 0 is the start sector
+            // - `mapper_device_size` is the end sector of the pool. This should be the size of the data device.
+            // - `loopback` is the metadata device
+            // - `mapper_device` is the data device
+            // - 256000 = 128MB is the block size
+            // - 0 indicates no dm event on low-watermark
             shell.run(cmd!(
-                "sudo dmsetup message /dev/mapper/mypool 0 'create_thin 0'"
+                "sudo dmsetup create mypool --table \
+                 '0 {} thin-pool {} {} 256000 0'",
+                mapper_device_size,
+                loopback,
+                data_dev,
             ))?;
+
+            if new {
+                // create a thin volume
+                // - /dev/mapper/mypool is the name of the pool device above
+                // - 0 is the sector number on the pool
+                // - create_thin indicates the pool should create a new thin volume
+                // - 0 is a unique 24-bit volume id
+                shell.run(cmd!(
+                    "sudo dmsetup message /dev/mapper/mypool 0 'create_thin 0'"
+                ))?;
+            }
+
+            // init the volume
+            // - 0 is the start sector
+            // - 21474836480 = 10TB is the end sector
+            // - thin is the device type
+            // - /dev/mapper/mypool is the pool to use
+            // - 0 is the volume id from above
+            shell.run(cmd!(
+                "sudo dmsetup create mythin --table '0 21474836480 thin /dev/mapper/mypool 0'"
+            ))?;
+
+            shell.run(cmd!("sudo mkswap /dev/mapper/mythin"))?;
         }
 
-        // init the volume
-        // - 0 is the start sector
-        // - 21474836480 = 10TB is the end sector
-        // - thin is the device type
-        // - /dev/mapper/mypool is the pool to use
-        // - 0 is the volume id from above
-        shell.run(cmd!(
-            "sudo dmsetup create mythin --table '0 21474836480 thin /dev/mapper/mypool 0'"
-        ))?;
-
-        shell.run(cmd!("sudo mkswap /dev/mapper/mythin"))?;
         shell.run(cmd!("sudo swapon /dev/mapper/mythin"))?;
 
         Ok(())
