@@ -259,6 +259,10 @@ where
     // libvirtd.
     ushell.run(cmd!("sudo systemctl disable firewalld"))?;
     ushell.run(cmd!("sudo service libvirtd restart"))?;
+    ushell.run(cmd!("sudo firewall-cmd --permanent --add-service=nfs"))?;
+    ushell.run(cmd!("sudo firewall-cmd --permanent --add-service=rpc-bind"))?;
+    ushell.run(cmd!("sudo firewall-cmd --permanent --add-service=mountd"))?;
+    ushell.run(cmd!("sudo firewall-cmd --reload"))?;
 
     // Create the VM and add our ssh key to it.
     let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
