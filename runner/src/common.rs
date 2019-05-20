@@ -386,6 +386,42 @@ pub mod exp00000 {
         Ok((ushell, vshell))
     }
 
+    /// Turn off all previous swap spaces, and turn on the configured ones (e.g. via
+    /// research-settings.json).
+    pub fn setup_swapping(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+        turn_off_swapdevs(shell, dry_run)?;
+        turn_on_swapdevs(shell, dry_run)?;
+        Ok(())
+    }
+
+    /// Set the scaling governor to "performance".
+    pub fn set_perf_scaling_gov(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+        let user_home = crate::common::get_user_home_dir(shell)?;
+
+        let kernel_path = format!(
+            "{}/{}/{}",
+            user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
+        );
+
+        shell.run(
+            cmd!(
+                "sudo {}/tools/power/cpupower/cpupower frequency-set -g performance",
+                kernel_path
+            )
+            .dry_run(dry_run),
+        )?;
+
+        Ok(())
+    }
+
+    /// Set the kernel `printk` level that gets logged to `dmesg`. `0` is only high-priority
+    /// messages. `7` is all messages.
+    pub fn set_kernel_printk_level(shell: &SshShell, level: usize) -> Result<(), failure::Error> {
+        assert!(level <= 7);
+        shell.run(cmd!("echo {} | sudo tee /proc/sys/kernel/printk", level).use_bash())?;
+        Ok(())
+    }
+
     /// Connects to the host, waiting for it to come up if necessary. Turn on only the swap devices we
     /// want. Set the scaling governor. Returns the shell to the host.
     pub fn connect_and_setup_host_only<A>(
@@ -421,28 +457,14 @@ pub mod exp00000 {
         ushell.run(cmd!("uname -a").dry_run(dry_run))?;
 
         // Set up swapping
-        turn_off_swapdevs(&ushell, dry_run)?;
-        turn_on_swapdevs(&ushell, dry_run)?;
+        setup_swapping(&ushell, dry_run)?;
 
         println!("Assuming home dir already mounted... uncomment this line if it's not");
         //mount_home_dir(ushell)
 
-        let user_home = crate::common::get_user_home_dir(&ushell)?;
+        set_perf_scaling_gov(&ushell, dry_run)?;
 
-        let kernel_path = format!(
-            "{}/{}/{}",
-            user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
-        );
-
-        ushell.run(
-            cmd!(
-                "sudo {}/tools/power/cpupower/cpupower frequency-set -g performance",
-                kernel_path
-            )
-            .dry_run(dry_run),
-        )?;
-
-        ushell.run(cmd!("echo 4 | sudo tee /proc/sys/kernel/printk").use_bash())?;
+        set_kernel_printk_level(&ushell, 4)?;
 
         Ok(ushell)
     }

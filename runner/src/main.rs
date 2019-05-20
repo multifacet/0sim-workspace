@@ -75,14 +75,25 @@ fn run() -> Result<(), failure::Error> {
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
-            (@arg REBOOT:
+            (@arg REBOOT: --reboot
              "(Optional) If present, reboots the host machine.")
-            (@arg VMSIZE: +takes_value {is_usize}
-             "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
-            (@arg CORES: +takes_value {is_usize} -C --cores
-             "The number of cores of the VM (defaults to 1)")
-            (@arg WARMUP: -w --warmup
-             "Pass this flag to warmup the VM before running the main workload.")
+            (@arg SWAP: --setup_swap
+             "(Optional) If present, setup swapping")
+            (@arg PERF: --perfgov
+             "(Optional) If present, set the scaling governor to \"performance\"")
+            (@arg PRINTK: --printk +takes_value {is_usize}
+             "(Optional) If present, set the printk logging level for dmesg. \
+              0 = high-priority only. 7 = everything.")
+            (@arg SSDSWAP: --ssdswap
+             "(Optional) If present, turn on ssdswap.")
+            (@arg VM: --vm
+             "(Optional) Start the vagrant VM. Use other flags to set VM memory and vCPUS.")
+            (@arg VMSIZE: --vm_size +takes_value {is_usize}
+             "Only valid with --vm. The number of GBs of the VM (defaults to 1024) (e.g. 500)")
+            (@arg VMCORES: --vm_cores +takes_value {is_usize}
+             "Only valid with --vm. The number of cores of the VM (defaults to 1)")
+            (@arg ZSWAP: --zswap +takes_value {is_usize}
+             "(Optional) Turn on zswap with the given `max_pool_percent`")
         )
 
         (@subcommand exptmp =>
