@@ -41,9 +41,11 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
     let vm_cores = sub_m
         .value_of("VMCORES")
         .map(|value| value.parse::<usize>().unwrap());
+    let disable_tsc = sub_m.is_present("DISABLETSC");
     let zswap = sub_m
         .value_of("ZSWAP")
         .map(|value| value.parse::<usize>().unwrap());
+    let disable_ept = sub_m.is_present("DISABLE_EPT");
 
     // Reboot
     if reboot {
@@ -72,6 +74,14 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
         turn_on_ssdswap(&ushell, dry_run)?;
     }
 
+    // disable Intel EPT if needed
+    if disable_ept {
+        ushell.run(
+            cmd!(r#"echo "options kvm-intel ept=0" | sudo tee /etc/modprobe.d/kvm-intel.conf"#)
+                .use_bash(),
+        )?;
+    }
+
     // Boot VM
     if vm {
         let vm_size = if let Some(vm_size) = vm_size {
@@ -86,8 +96,24 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
             VAGRANT_CORES
         };
 
+        if disable_tsc {
+            // Disable TSC offsetting so that setup runs faster
+            ushell.run(
+                cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
+                    .use_bash(),
+            )?;
+        }
+
         // Start and connect to VM
         let _ = start_vagrant(&ushell, &login.host, vm_size, vm_cores)?;
+
+        if disable_tsc {
+            // Enable again
+            ushell.run(
+                cmd!("echo 1 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
+                    .use_bash(),
+            )?;
+        }
     }
 
     // Turn on zswap

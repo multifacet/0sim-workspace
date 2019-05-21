@@ -47,6 +47,8 @@ fn run() -> Result<(), failure::Error> {
             (@arg SWAP_DEV: -s --swap +takes_value ...
              "(Optional) specify which devices to use as swap devices. By default all \
               unpartitioned, unmounted devices are used.")
+            (@arg DISABLE_EPT: --disable_ept
+             "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
         )
         (@subcommand setup00001 =>
             (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
@@ -89,11 +91,15 @@ fn run() -> Result<(), failure::Error> {
             (@arg VM: --vm
              "(Optional) Start the vagrant VM. Use other flags to set VM memory and vCPUS.")
             (@arg VMSIZE: --vm_size +takes_value {is_usize}
-             "Only valid with --vm. The number of GBs of the VM (defaults to 1024) (e.g. 500)")
+             "(Only valid with --vm) The number of GBs of the VM (defaults to 1024) (e.g. 500)")
             (@arg VMCORES: --vm_cores +takes_value {is_usize}
-             "Only valid with --vm. The number of cores of the VM (defaults to 1)")
+             "(Only valid with --vm) The number of cores of the VM (defaults to 1)")
+            (@arg DISABLETSC: --disable_tsc
+             "(Only valid with --vm) Disable TSC offsetting during boot to speed it up.")
             (@arg ZSWAP: --zswap +takes_value {is_usize}
              "(Optional) Turn on zswap with the given `max_pool_percent`")
+            (@arg DISABLE_EPT: --disable_ept
+             "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
         )
 
         (@subcommand exptmp =>
@@ -217,6 +223,7 @@ fn run() -> Result<(), failure::Error> {
                 .values_of("SWAP_DEV")
                 .map(|i| i.collect())
                 .unwrap_or_else(|| vec![]);
+            let disable_ept = sub_m.is_present("DISABLE_EPT");
 
             assert!(mapper_device.is_none() || swap_devs.is_empty());
 
@@ -229,6 +236,7 @@ fn run() -> Result<(), failure::Error> {
                 only_vm,
                 token,
                 swap_devs,
+                disable_ept,
             )
         }
         ("setup00001", Some(sub_m)) => {

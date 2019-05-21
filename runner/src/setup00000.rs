@@ -42,6 +42,7 @@ pub fn run<A>(
     only_vm: bool,
     token: &str,
     swap_devs: Vec<&str>,
+    disable_ept: bool,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
@@ -216,6 +217,20 @@ where
                     .use_bash()
                     .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
             )?;
+
+            // disable Intel EPT if needed
+            if disable_ept {
+                ushell.run(
+                    cmd!(
+                        r#"echo "options kvm-intel ept=0" | \
+                           sudo tee /etc/modprobe.d/kvm-intel.conf"#
+                    )
+                    .use_bash(),
+                )?;
+
+                ushell.run(cmd!("sudo rmmod kvm_intel"))?;
+                ushell.run(cmd!("sudo modprobe kvm_intel"))?;
+            }
 
             // update grub to choose this entry (new kernel) by default
             ushell.run(cmd!("sudo grub2-set-default 0"))?;
