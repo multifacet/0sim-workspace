@@ -230,6 +230,8 @@ where
 
                 ushell.run(cmd!("sudo rmmod kvm_intel"))?;
                 ushell.run(cmd!("sudo modprobe kvm_intel"))?;
+
+                ushell.run(cmd!("sudo tail /sys/module/kvm_intel/parameters/ept"))?;
             }
 
             // update grub to choose this entry (new kernel) by default

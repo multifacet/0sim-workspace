@@ -80,6 +80,11 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
             cmd!(r#"echo "options kvm-intel ept=0" | sudo tee /etc/modprobe.d/kvm-intel.conf"#)
                 .use_bash(),
         )?;
+
+        ushell.run(cmd!("sudo rmmod kvm_intel"))?;
+        ushell.run(cmd!("sudo modprobe kvm_intel"))?;
+
+        ushell.run(cmd!("sudo tail /sys/module/kvm_intel/parameters/ept"))?;
     }
 
     // Boot VM
