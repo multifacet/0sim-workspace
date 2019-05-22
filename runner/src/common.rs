@@ -797,6 +797,15 @@ pub mod exp00000 {
     ) -> Result<(), failure::Error> {
         let (domain, running) = virsh_domain_name(shell)?;
 
+        // We may have just changed the number of vcpus in the vagrant config, so we need to make
+        // sure that libvirt is up to date.
+        shell.run(cmd!(
+            "sudo virsh setvcpus {} {} --maximum {}",
+            domain,
+            mapping.len(),
+            if running { "" } else { "--config" }
+        ))?;
+
         shell.run(cmd!("sudo virsh vcpuinfo {}", domain))?;
 
         for (v, p) in mapping {
@@ -809,7 +818,7 @@ pub mod exp00000 {
             ))?;
         }
 
-        shell.run(cmd!("sudo virsh vcpuinfo {}", domain))?;
+        shell.run(cmd!("sudo virsh vcpupin {}", domain))?;
 
         Ok(())
     }
