@@ -49,6 +49,8 @@ fn run() -> Result<(), failure::Error> {
               unpartitioned, unmounted devices are used.")
             (@arg DISABLE_EPT: --disable_ept
              "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
+            (@arg HADOOP: --hadoop
+             "(Optional) set up hadoop stack on VM.")
         )
         (@subcommand setup00001 =>
             (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
@@ -224,6 +226,7 @@ fn run() -> Result<(), failure::Error> {
                 .map(|i| i.collect())
                 .unwrap_or_else(|| vec![]);
             let disable_ept = sub_m.is_present("DISABLE_EPT");
+            let setup_hadoop = sub_m.is_present("HADOOP");
 
             assert!(mapper_device.is_none() || swap_devs.is_empty());
 
@@ -237,6 +240,7 @@ fn run() -> Result<(), failure::Error> {
                 token,
                 swap_devs,
                 disable_ept,
+                setup_hadoop,
             )
         }
         ("setup00001", Some(sub_m)) => {

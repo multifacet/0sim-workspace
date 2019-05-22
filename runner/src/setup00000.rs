@@ -43,6 +43,7 @@ pub fn run<A>(
     token: &str,
     swap_devs: Vec<&str>,
     disable_ept: bool,
+    setup_hadoop: bool,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
@@ -426,55 +427,57 @@ where
     )?;
 
     // Hadoop/spark/hibench
-    vushell.run(cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty())?;
-    vushell.run(cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"))?;
+    if setup_hadoop {
+        vushell.run(cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty())?;
+        vushell.run(cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"))?;
 
-    vushell.run(cmd!(
-        "echo 'source {}/{}/{}/hadoop_env.sh' >> ~/.bashrc",
-        RESEARCH_WORKSPACE_PATH,
-        ZEROSIM_BENCHMARKS_DIR,
-        ZEROSIM_HADOOP_PATH
-    ))?;
+        vushell.run(cmd!(
+            "echo 'source {}/{}/{}/hadoop_env.sh' >> ~/.bashrc",
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            ZEROSIM_HADOOP_PATH
+        ))?;
 
-    ushell.run(
-        cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL).cwd(&format!(
-            "{}/{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-        )),
-    )?;
-    ushell.run(cmd!("tar xvzf {}", HADOOP_TARBALL_NAME).cwd(&format!(
-        "{}/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-    )))?;
-    ushell.run(cmd!("tar xvzf {}", SPARK_TARBALL_NAME).cwd(&format!(
-        "{}/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-    )))?;
-
-    ushell.run(
-        cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME).cwd(&format!(
-            "{}/{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-        )),
-    )?;
-    ushell.run(cmd!("cp spark-conf/* {}/conf/", SPARK_HOME).cwd(&format!(
-        "{}/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-    )))?;
-    ushell.run(cmd!("cp hibench-conf/* HiBench/conf/").cwd(&format!(
-        "{}/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-    )))?;
-
-    vushell.run(
-        cmd!("sh -x setup.sh")
-            .use_bash()
-            .cwd(&format!(
+        ushell.run(
+            cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL).cwd(&format!(
                 "{}/{}/{}",
                 RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-            ))
-            .use_bash(),
-    )?;
+            )),
+        )?;
+        ushell.run(cmd!("tar xvzf {}", HADOOP_TARBALL_NAME).cwd(&format!(
+            "{}/{}/{}",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        )))?;
+        ushell.run(cmd!("tar xvzf {}", SPARK_TARBALL_NAME).cwd(&format!(
+            "{}/{}/{}",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        )))?;
+
+        ushell.run(
+            cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME).cwd(&format!(
+                "{}/{}/{}",
+                RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+            )),
+        )?;
+        ushell.run(cmd!("cp spark-conf/* {}/conf/", SPARK_HOME).cwd(&format!(
+            "{}/{}/{}",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        )))?;
+        ushell.run(cmd!("cp hibench-conf/* HiBench/conf/").cwd(&format!(
+            "{}/{}/{}",
+            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        )))?;
+
+        vushell.run(
+            cmd!("sh -x setup.sh")
+                .use_bash()
+                .cwd(&format!(
+                    "{}/{}/{}",
+                    RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+                ))
+                .use_bash(),
+        )?;
+    }
 
     // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing
     // kernel command line and replace it with the same + `tsc=reliable`.
