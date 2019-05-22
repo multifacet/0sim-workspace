@@ -1,4 +1,4 @@
-//! Setup the given cloudlab node such that it is using the kernel compiled from the given kernel
+//! Setup the given test node such that it is using the kernel compiled from the given kernel
 //! branch.
 //!
 //! Requires `setup00000`.

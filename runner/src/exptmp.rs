@@ -12,7 +12,7 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::*, output::OutputManager, setup00000::CLOUDLAB_SHARED_RESULTS_DIR,
+    exp00000::*, output::OutputManager, setup00000::HOSTNAME_SHARED_RESULTS_DIR,
     RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 use crate::settings;
@@ -48,8 +48,8 @@ impl Workload {
 pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
         username: Username(sub_m.value_of("USERNAME").unwrap()),
-        hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-        host: sub_m.value_of("CLOUDLAB").unwrap(),
+        hostname: sub_m.value_of("HOSTNAME").unwrap(),
+        host: sub_m.value_of("HOSTNAME").unwrap(),
     };
     let size = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
     let workload = if sub_m.is_present("memcached") {
@@ -219,7 +219,7 @@ where
             //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
             //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
             //     zerosim_path_host,
-            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     HOSTNAME_SHARED_RESULTS_DIR,
             //     perf_output_early,
             //     PERF_MEASURE_TIME,
             // ))?;
@@ -269,7 +269,7 @@ where
             //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
             //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
             //     zerosim_path_host,
-            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     HOSTNAME_SHARED_RESULTS_DIR,
             //     perf_output_early,
             //     PERF_MEASURE_TIME,
             // ))?;
@@ -280,7 +280,7 @@ where
             //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
             //     zerosim_path_host,
             //     PERF_LATE_DELAY_MS,
-            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     HOSTNAME_SHARED_RESULTS_DIR,
             //     perf_output_late,
             //     PERF_MEASURE_TIME,
             // ))?;
@@ -339,7 +339,7 @@ where
             //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
             //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
             //     zerosim_path_host,
-            //     CLOUDLAB_SHARED_RESULTS_DIR,
+            //     HOSTNAME_SHARED_RESULTS_DIR,
             //     perf_output_early,
             //     PERF_MEASURE_TIME,
             // ))?;
@@ -354,7 +354,7 @@ where
                 ZEROSIM_TRACE_SUBMODULE,
                 500,    // interval
                 100000, // buffer size
-                CLOUDLAB_SHARED_RESULTS_DIR,
+                HOSTNAME_SHARED_RESULTS_DIR,
                 trace_output_local,
                 pf_time.unwrap(),
             ))?;
@@ -389,7 +389,7 @@ where
                 ZEROSIM_TRACE_SUBMODULE,
                 500,    // interval
                 100000, // buffer size
-                CLOUDLAB_SHARED_RESULTS_DIR,
+                HOSTNAME_SHARED_RESULTS_DIR,
                 trace_output_nonlocal,
                 pf_time.unwrap(),
             ))?;

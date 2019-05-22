@@ -1,4 +1,4 @@
-//! Setup the given cloudlab node for vagrant via libvirt and install a custom kernel from source.
+//! Setup the given test node for vagrant via libvirt and install a custom kernel from source.
 //! This does not set up the guest -- only the host. It allows formatting and setting up a device
 //! as the home directory of the given user. It also allows choosing the git branch to compile the
 //! kernel from.
@@ -11,7 +11,7 @@ use spurs::{
 };
 
 use crate::common::{
-    get_user_home_dir, setup00000::CLOUDLAB_SHARED_RESULTS_DIR, KernelPkgType, Login,
+    get_user_home_dir, setup00000::HOSTNAME_SHARED_RESULTS_DIR, KernelPkgType, Login,
     RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
     ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
     ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
@@ -239,7 +239,7 @@ where
             ushell.run(cmd!("sudo grub2-set-default 0"))?;
         }
 
-        ushell.run(cmd!("mkdir -p {}", CLOUDLAB_SHARED_RESULTS_DIR))?;
+        ushell.run(cmd!("mkdir -p {}", HOSTNAME_SHARED_RESULTS_DIR))?;
 
         // change image location
         ushell.run(cmd!("mkdir -p images/"))?;

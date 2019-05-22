@@ -327,8 +327,8 @@ pub fn build_kernel(
 }
 
 pub mod setup00000 {
-    pub const CLOUDLAB_SHARED_DIR: &str = "vm_shared/";
-    pub const CLOUDLAB_SHARED_RESULTS_DIR: &str = "vm_shared/results/";
+    pub const HOSTNAME_SHARED_DIR: &str = "vm_shared/";
+    pub const HOSTNAME_SHARED_RESULTS_DIR: &str = "vm_shared/results/";
 }
 
 pub mod exp00000 {
@@ -495,22 +495,22 @@ pub mod exp00000 {
     }
 
     pub fn connect_to_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
-        cloudlab: A,
+        hostname: A,
     ) -> Result<SshShell, failure::Error> {
-        let (host, _) = spurs::util::get_host_ip(cloudlab);
+        let (host, _) = spurs::util::get_host_ip(hostname);
         SshShell::with_default_key("root", (host, VAGRANT_PORT))
     }
 
     pub fn connect_to_vagrant_user<A: std::net::ToSocketAddrs + std::fmt::Display>(
-        cloudlab: A,
+        hostname: A,
     ) -> Result<SshShell, failure::Error> {
-        let (host, _) = spurs::util::get_host_ip(cloudlab);
+        let (host, _) = spurs::util::get_host_ip(hostname);
         SshShell::with_default_key("vagrant", (host, VAGRANT_PORT))
     }
 
     pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         shell: &SshShell,
-        cloudlab: A,
+        hostname: A,
         memgb: usize,
         cores: usize,
     ) -> Result<SshShell, failure::Error> {
@@ -543,7 +543,7 @@ pub mod exp00000 {
         shell.run(cmd!("vagrant up").no_pty().cwd(vagrant_path))?;
 
         shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
-        let vshell = connect_to_vagrant(cloudlab)?;
+        let vshell = connect_to_vagrant(hostname)?;
 
         Ok(vshell)
     }
@@ -849,7 +849,7 @@ pub mod exp00000 {
         let vm_shared_full_path = &format!(
             "{}/{}",
             user_home,
-            crate::common::setup00000::CLOUDLAB_SHARED_DIR
+            crate::common::setup00000::HOSTNAME_SHARED_DIR
         )
         .replace("/", r#"\/"#);
         let research_workspace_full_path =

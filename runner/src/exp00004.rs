@@ -1,4 +1,4 @@
-//! Run a memcached workload on the remote cloudlab machine designed to induce THP compaction
+//! Run a memcached workload on the remote test machine designed to induce THP compaction
 //! remotely. Measure the number of per-page operations done and undone. Unlike exp00003, run
 //! this on the bare-metal host, rather than in a VM.
 //!

@@ -1,4 +1,4 @@
-//! Setup the given cloudlab node and VM such that the guest VM is using the kernel compiled from
+//! Setup the given test node and VM such that the guest VM is using the kernel compiled from
 //! the given kernel branch.
 //!
 //! Requires `setup00000`.

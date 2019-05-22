@@ -29,8 +29,8 @@ fn run() -> Result<(), failure::Error> {
          different command line arguments. certain routines require extra arguments.")
         (@arg DRY: -d --dry_run "Don't actually execute commands. Just print what would run and exit.")
         (@subcommand setup00000 =>
-            (about: "Sets up the given _centos_ cloudlab machine for use with vagrant. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (about: "Sets up the given _centos_ test machine for use with vagrant. Requires `sudo`.")
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -54,7 +54,7 @@ fn run() -> Result<(), failure::Error> {
         )
         (@subcommand setup00001 =>
             (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -63,7 +63,7 @@ fn run() -> Result<(), failure::Error> {
         )
         (@subcommand setup00002 =>
             (about: "Sets up the given _centos_ machine for use exp00004. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -106,7 +106,7 @@ fn run() -> Result<(), failure::Error> {
 
         (@subcommand exptmp =>
             (about: "Run the temporary experiment.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -130,7 +130,7 @@ fn run() -> Result<(), failure::Error> {
         )
         (@subcommand exp00000 =>
             (about: "Run experiment 00000. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -154,7 +154,7 @@ fn run() -> Result<(), failure::Error> {
         )
         (@subcommand exp00002 =>
             (about: "Run experiment 00002. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -169,7 +169,7 @@ fn run() -> Result<(), failure::Error> {
         )
         (@subcommand exp00003 =>
             (about: "Run experiment 00003. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -182,7 +182,7 @@ fn run() -> Result<(), failure::Error> {
         )
         (@subcommand exp00004 =>
             (about: "Run experiment 00004. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -191,7 +191,7 @@ fn run() -> Result<(), failure::Error> {
         )
         (@subcommand exp00005 =>
             (about: "Run experiment 00005. Requires `sudo`.")
-            (@arg CLOUDLAB: +required +takes_value
+            (@arg HOSTNAME: +required +takes_value
              "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
             (@arg USERNAME: +required +takes_value
              "The username on the remote (e.g. markm)")
@@ -213,8 +213,8 @@ fn run() -> Result<(), failure::Error> {
         ("setup00000", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let device = sub_m.value_of("DEVICE");
             let mapper_device = sub_m.value_of("MAPPER_DEVICE");
@@ -246,8 +246,8 @@ fn run() -> Result<(), failure::Error> {
         ("setup00001", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
             setup00001::run(dry_run, &login, git_branch)
@@ -255,8 +255,8 @@ fn run() -> Result<(), failure::Error> {
         ("setup00002", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let git_branch = sub_m.value_of("GIT_BRANCH");
             let token = sub_m.value_of("TOKEN").unwrap();
@@ -269,8 +269,8 @@ fn run() -> Result<(), failure::Error> {
         ("exp00000", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
             let pattern = if sub_m.is_present("memcached") {
@@ -298,8 +298,8 @@ fn run() -> Result<(), failure::Error> {
         ("exp00002", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let n = sub_m.value_of("N").unwrap().parse::<usize>().unwrap();
             let vm_size = sub_m
@@ -315,8 +315,8 @@ fn run() -> Result<(), failure::Error> {
         ("exp00003", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
             let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
@@ -329,8 +329,8 @@ fn run() -> Result<(), failure::Error> {
         ("exp00004", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let gbs = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
 
@@ -339,8 +339,8 @@ fn run() -> Result<(), failure::Error> {
         ("exp00005", Some(sub_m)) => {
             let login = Login {
                 username: Username(sub_m.value_of("USERNAME").unwrap()),
-                hostname: sub_m.value_of("CLOUDLAB").unwrap(),
-                host: sub_m.value_of("CLOUDLAB").unwrap(),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
             };
             let vm_size = sub_m
                 .value_of("VMSIZE")

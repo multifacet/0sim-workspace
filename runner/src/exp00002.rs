@@ -1,4 +1,4 @@
-//! Run the time_loop workload on the remote cloudlab machine.
+//! Run the time_loop workload on the remote test machine.
 //!
 //! Requires `setup00000`.
 

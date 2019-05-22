@@ -1,4 +1,4 @@
-//! Run the NAS CG class E workload on the remote cloudlab machine.
+//! Run the NAS CG class E workload on the remote test machine.
 //!
 //! Requires `setup00000`.
 
@@ -9,7 +9,7 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::*, output::OutputManager, setup00000::CLOUDLAB_SHARED_RESULTS_DIR,
+    exp00000::*, output::OutputManager, setup00000::HOSTNAME_SHARED_RESULTS_DIR,
     RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
@@ -166,7 +166,7 @@ where
              sudo tail `sudo find  /sys/kernel/debug/zswap/ -type f`\
              >> {}/{} ; sleep 1 ; done",
             NAS_CG_TIME,
-            CLOUDLAB_SHARED_RESULTS_DIR,
+            HOSTNAME_SHARED_RESULTS_DIR,
             zswapstats_file
         )
         .use_bash(),
