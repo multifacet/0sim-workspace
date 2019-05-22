@@ -518,16 +518,18 @@ pub mod exp00000 {
         shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
         shell.run(cmd!("sudo systemctl start nfs-idmap.service"))?;
 
+        // Disable KSM because it creates a lot of overhead when the host is oversubscribed
+        shell.run(cmd!("sudo systemctl stop ksmtuned"))?;
+        shell.run(cmd!("sudo systemctl stop ksm"))?;
+
         gen_vagrantfile(shell, memgb, cores)?;
 
         let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
         shell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
-        shell.run(cmd!("vagrant up").no_pty().cwd(vagrant_path))?;
-        shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
-        let vshell = connect_to_vagrant(cloudlab)?;
 
-        // Pin vcpus
+        // We want to pin the vCPUs as soon as possible because otherwise, they tend to switch
+        // around a lot, causing a lot of printk overhead.
         let pin = {
             let mut pin = HashMap::new();
             for c in 0..cores {
@@ -536,6 +538,11 @@ pub mod exp00000 {
             pin
         };
         virsh_vcpupin(shell, &pin)?;
+
+        shell.run(cmd!("vagrant up").no_pty().cwd(vagrant_path))?;
+
+        shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
+        let vshell = connect_to_vagrant(cloudlab)?;
 
         Ok(vshell)
     }
@@ -754,28 +761,52 @@ pub mod exp00000 {
         Ok(())
     }
 
-    /// Get the VM domain name from `virsh` for the first running VM.
-    pub fn virsh_domain_name(shell: &SshShell) -> Result<String, failure::Error> {
-        Ok(shell
+    /// Get the VM domain name from `virsh` for the first running VM if there is a VM running or
+    /// the first stopped VM if no VM is running. The `bool` returned indicates whether the VM is
+    /// running or not (`true` is running).
+    pub fn virsh_domain_name(shell: &SshShell) -> Result<(String, bool), failure::Error> {
+        let running: String = shell
             .run(cmd!(
                 "sudo virsh list | tail -n 2 | head -n1 | awk '{{print $2}}'"
             ))?
             .stdout
             .trim()
-            .into())
+            .into();
+
+        if running.is_empty() {
+            Ok((
+                shell
+                    .run(cmd!(
+                        "sudo virsh list --all | tail -n 2 | head -n1 | awk '{{print $2}}'"
+                    ))?
+                    .stdout
+                    .trim()
+                    .into(),
+                false,
+            ))
+        } else {
+            Ok((running, true))
+        }
     }
 
-    /// For `(v, p)` in `mapping`, pin vcpu `v` to host cpu `p`.
+    /// For `(v, p)` in `mapping`, pin vcpu `v` to host cpu `p`. `running` indicates whether the VM
+    /// is running or not.
     pub fn virsh_vcpupin(
         shell: &SshShell,
         mapping: &HashMap<usize, usize>,
     ) -> Result<(), failure::Error> {
-        let domain = virsh_domain_name(shell)?;
+        let (domain, running) = virsh_domain_name(shell)?;
 
         shell.run(cmd!("sudo virsh vcpuinfo {}", domain))?;
 
         for (v, p) in mapping {
-            shell.run(cmd!("sudo virsh vcpupin {} {} {}", domain, v, p))?;
+            shell.run(cmd!(
+                "sudo virsh vcpupin {} {} {} {}",
+                domain,
+                if running { "" } else { "--config" },
+                v,
+                p
+            ))?;
         }
 
         shell.run(cmd!("sudo virsh vcpuinfo {}", domain))?;
@@ -858,7 +889,6 @@ pub mod exp00000 {
         )?;
         Ok(())
     }
-
 }
 
 pub mod exp00002 {
