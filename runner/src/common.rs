@@ -517,6 +517,7 @@ pub mod exp00000 {
         shell.run(cmd!("sudo systemctl stop firewalld"))?;
         shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
         shell.run(cmd!("sudo systemctl start nfs-idmap.service"))?;
+        shell.run(cmd!("sudo service libvirtd restart"))?;
 
         // Disable KSM because it creates a lot of overhead when the host is oversubscribed
         shell.run(cmd!("sudo systemctl stop ksmtuned"))?;
