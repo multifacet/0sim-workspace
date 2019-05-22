@@ -801,10 +801,9 @@ pub mod exp00000 {
         // We may have just changed the number of vcpus in the vagrant config, so we need to make
         // sure that libvirt is up to date.
         shell.run(cmd!(
-            "sudo virsh setvcpus {} {} --maximum {}",
+            "sudo virsh setvcpus {} {} --maximum --config",
             domain,
             mapping.len(),
-            if running { "" } else { "--config" }
         ))?;
 
         shell.run(cmd!("sudo virsh vcpuinfo {}", domain))?;
