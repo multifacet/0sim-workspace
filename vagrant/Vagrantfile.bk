@@ -21,11 +21,16 @@ Vagrant.configure("2") do |config|
   config.vm.provider :libvirt do |libvirt|
     # provider
     libvirt.driver = "kvm"
-    libvirt.video_type = "qxl"
+    libvirt.video_type = "cirrus"
 
     # machine
     libvirt.cpus = 1
     libvirt.memory = 1023 * 1024 # MB
+
+    # HACK: libvirt has no way to specify phys-bits, so we just force it to
+    # pass QEMU the -cpu flag twice. QEMU happens to take the second one.
+    libvirt.qemuargs :value => '-cpu'
+    libvirt.qemuargs :value => 'Skylake-Client,phys-bits=48'
 
     # kernel
     #libvirt.kernel = '/home/markm/linux-4.14.18/kbuild/arch/x86_64/boot/bzImage'
