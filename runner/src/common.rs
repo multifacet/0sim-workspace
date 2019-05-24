@@ -251,18 +251,21 @@ pub enum KernelSrc {
     /// The given tarball, which will be untarred and built as is. We assume that the name of the
     /// unpacked source directory is the same as the tarball name without the `.tar.gz` or `.tgz`
     /// extension.
+    #[allow(dead_code)]
     Tar { tarball_path: String },
 }
 
 /// Where to get the base config (on top of which we will apply additional changes)?
 pub enum KernelBaseConfigSource {
     /// Use `make defconfig`
+    #[allow(dead_code)]
     Defconfig,
 
     /// Use the running kernel.
     Current,
 
     /// Use the config from the given path.
+    #[allow(dead_code)]
     Path(String),
 }
 
