@@ -12,9 +12,10 @@ use spurs::{
 
 use crate::common::{
     get_user_home_dir, setup00000::HOSTNAME_SHARED_RESULTS_DIR, KernelBaseConfigSource,
-    KernelConfig, KernelPkgType, KernelSrc, Login, RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY,
-    ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH,
-    ZEROSIM_HIBENCH_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
+    KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction, RESEARCH_WORKSPACE_PATH,
+    VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
+    ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -250,29 +251,30 @@ where
             ushell.run(cmd!("wget {}", QEMU_TARBALL))?;
             ushell.run(cmd!("tar xvf {}", QEMU_TARBALL_NAME))?;
 
-            let qemu_dir = QEMU_TARBALL_NAME
-                .trim_end_matches(".tar.gz")
-                .trim_end_matches(".tgz");
+            let qemu_dir = QEMU_TARBALL_NAME.trim_end_matches(".tar.xz");
+            let ncores = crate::common::get_num_cores(&ushell)?;
 
             ushell.run(cmd!("./configure").cwd(qemu_dir))?;
-            ushell.run(cmd!("make -j").cwd(qemu_dir))?;
+            ushell.run(cmd!("make -j {}", ncores).cwd(qemu_dir))?;
             ushell.run(cmd!("sudo make install").cwd(qemu_dir))?;
 
-            ushell.run(cmd!("chown qemu:kvm /usr/local/bin/qemu-system-x86_64"))?;
+            ushell.run(cmd!(
+                "sudo chown qemu:kvm /usr/local/bin/qemu-system-x86_64"
+            ))?;
 
             // Make sure libvirtd can run the qemu binary
             ushell.run(cmd!(
-                r#"sed -i 's/#security_driver = "selinux"/security_driver = "none"/' \
+                r#"sudo sed -i 's/#security_driver = "selinux"/security_driver = "none"/' \
                         /etc/libvirt/qemu.conf"#
             ))?;
 
             // Make sure libvirtd can access kvm
             ushell.run(cmd!(
-                r#"echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' >\
-                                /lib/udev/rules.d/99-kvm.rules"#
+                r#"echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' |\
+                               sudo tee /lib/udev/rules.d/99-kvm.rules"#
             ))?;
 
-            ushell.run(cmd!("sudo service libvirtd restart"))?;
+            crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
 
             // update grub to choose this entry (new kernel) by default
             ushell.run(cmd!("sudo grub2-set-default 0"))?;
@@ -286,7 +288,7 @@ where
         ushell.run(cmd!("chmod +x images/"))?;
         ushell.run(cmd!("sudo chown {}:qemu images/", login.username.as_str()))?;
 
-        ushell.run(cmd!("sudo systemctl start libvirtd"))?;
+        crate::common::service(&ushell, "libvirtd", ServiceAction::Start)?;
 
         let def_exists = ushell
             .run(cmd!("sudo virsh pool-list --all | grep -q default"))
@@ -320,10 +322,10 @@ where
         ushell.run(cmd!("sudo firewall-cmd --permanent --add-service=rpc-bind"))?;
         ushell.run(cmd!("sudo firewall-cmd --permanent --add-service=mountd"))?;
         ushell.run(cmd!("sudo firewall-cmd --reload"))?;
-        ushell.run(cmd!("sudo systemctl disable firewalld"))?;
+        crate::common::service(&ushell, "firewalld", ServiceAction::Disable)?;
     }
 
-    ushell.run(cmd!("sudo service libvirtd restart"))?;
+    crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
 
     // Create the VM and add our ssh key to it.
     let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);

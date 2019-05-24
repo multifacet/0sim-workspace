@@ -228,6 +228,16 @@ pub fn gen_new_vagrantdomain(shell: &SshShell) -> Result<(), failure::Error> {
     Ok(())
 }
 
+/// Returns the number of processor cores on the machine.
+pub fn get_num_cores(shell: &SshShell) -> Result<usize, failure::Error> {
+    let nprocess = shell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
+    let nprocess = nprocess.trim();
+
+    let nprocess = nprocess.parse::<usize>()?;
+
+    Ok(nprocess)
+}
+
 /// What type of package to produce from the kernel build?
 pub enum KernelPkgType {
     /// `bindeb-pkg`
@@ -365,8 +375,7 @@ pub fn build_kernel(
     // Compile with as many processors as we have.
     //
     // NOTE: for some reason, this sometimes fails the first time, so just do it again.
-    let nprocess = ushell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
-    let nprocess = nprocess.trim();
+    let nprocess = get_num_cores(ushell)?;
 
     let make_target = match pkg_type {
         KernelPkgType::Deb => "bindeb-pkg",
@@ -402,6 +411,48 @@ pub fn build_kernel(
     )?;
 
     Ok(())
+}
+
+/// Something that may be done to a service.
+pub enum ServiceAction {
+    Start,
+    #[allow(dead_code)]
+    Stop,
+    Restart,
+    Disable,
+    #[allow(dead_code)]
+    Enable,
+}
+
+/// Start, stop, enable, disable, or restart a service.
+pub fn service(
+    shell: &SshShell,
+    service: &str,
+    action: ServiceAction,
+) -> Result<(), failure::Error> {
+    match action {
+        ServiceAction::Restart => {
+            shell.run(cmd!("sudo service {} restart", service))?;
+        }
+        ServiceAction::Start => {
+            shell.run(cmd!("sudo service {} start", service))?;
+        }
+        ServiceAction::Stop => {
+            shell.run(cmd!("sudo service {} stop", service))?;
+        }
+        ServiceAction::Enable => {
+            shell.run(cmd!("sudo systemctl enable {}", service))?;
+        }
+        ServiceAction::Disable => {
+            shell.run(cmd!("sudo systemctl disable {}", service))?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failure::Error> {
+    Ok(shell.run(cmd!("systemctl status {}", service)).is_ok())
 }
 
 pub mod setup00000 {
@@ -560,8 +611,12 @@ pub mod exp00000 {
         )?;
 
         // KSM is also not working right
-        shell.run(cmd!("sudo systemctl disable ksm"))?;
-        shell.run(cmd!("sudo systemctl disable ksmtuned"))?;
+        if crate::common::service_is_running(shell, "ksm")? {
+            shell.run(cmd!("sudo systemctl disable ksm"))?;
+        }
+        if crate::common::service_is_running(shell, "ksmtuned")? {
+            shell.run(cmd!("sudo systemctl disable ksmtuned"))?;
+        }
 
         shell.run(cmd!("echo ztier | sudo tee /sys/module/zswap/parameters/zpool").use_bash())?;
         shell.run(cmd!("echo y | sudo tee /sys/module/zswap/parameters/enabled").use_bash())?;
@@ -598,8 +653,12 @@ pub mod exp00000 {
         shell.run(cmd!("sudo service libvirtd restart"))?;
 
         // Disable KSM because it creates a lot of overhead when the host is oversubscribed
-        shell.run(cmd!("sudo systemctl stop ksmtuned"))?;
-        shell.run(cmd!("sudo systemctl stop ksm"))?;
+        if crate::common::service_is_running(shell, "ksm")? {
+            shell.run(cmd!("sudo systemctl disable ksm"))?;
+        }
+        if crate::common::service_is_running(shell, "ksmtuned")? {
+            shell.run(cmd!("sudo systemctl disable ksmtuned"))?;
+        }
 
         gen_vagrantfile(shell, memgb, cores)?;
 
