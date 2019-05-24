@@ -30,6 +30,9 @@ const SPARK_TARBALL: &str =
 const SPARK_TARBALL_NAME: &str = "spark-2.4.3-bin-hadoop2.7.tgz";
 const SPARK_HOME: &str = "spark-2.4.3-bin-hadoop2.7";
 
+const QEMU_TARBALL: &str = "https://download.qemu.org/qemu-4.0.0.tar.xz";
+const QEMU_TARBALL_NAME: &str = "qemu-4.0.0.tar.xz";
+
 /// Location of `.ssh` directory on UW CS AFS so we can install it on experimental machines.
 const SSH_LOCATION: &str = "/u/m/a/markm/.ssh";
 
@@ -76,7 +79,6 @@ where
             "openssl-devel",
             "libvirt",
             "libvirt-devel",
-            "qemu-kvm",
             "virt-manager",
             "pciutils-devel",
             "bash-completion",
@@ -93,6 +95,10 @@ where
             "centos-release-scl",
             "scl-utils",
             "maven",
+            "glib2-devel",
+            "libfdt-devel",
+            "pixman-devel",
+            "zlib-devel",
         ]))?;
         ushell.run(spurs::centos::yum_install(&["devtoolset-7"]))?;
 
@@ -239,6 +245,34 @@ where
 
                 ushell.run(cmd!("sudo tail /sys/module/kvm_intel/parameters/ept"))?;
             }
+
+            // Build and Install QEMU 4.0.0 from source
+            ushell.run(cmd!("wget {}", QEMU_TARBALL))?;
+            ushell.run(cmd!("tar xvf {}", QEMU_TARBALL_NAME))?;
+
+            let qemu_dir = QEMU_TARBALL_NAME
+                .trim_end_matches(".tar.gz")
+                .trim_end_matches(".tgz");
+
+            ushell.run(cmd!("./configure").cwd(qemu_dir))?;
+            ushell.run(cmd!("make -j").cwd(qemu_dir))?;
+            ushell.run(cmd!("sudo make install").cwd(qemu_dir))?;
+
+            ushell.run(cmd!("chown qemu:kvm /usr/local/bin/qemu-system-x86_64"))?;
+
+            // Make sure libvirtd can run the qemu binary
+            ushell.run(cmd!(
+                r#"sed -i 's/#security_driver = "selinux"/security_driver = "none"/' \
+                        /etc/libvirt/qemu.conf"#
+            ))?;
+
+            // Make sure libvirtd can access kvm
+            ushell.run(cmd!(
+                r#"echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' >\
+                                /lib/udev/rules.d/99-kvm.rules"#
+            ))?;
+
+            ushell.run(cmd!("sudo service libvirtd restart"))?;
 
             // update grub to choose this entry (new kernel) by default
             ushell.run(cmd!("sudo grub2-set-default 0"))?;
