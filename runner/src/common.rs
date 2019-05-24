@@ -228,37 +228,91 @@ pub fn gen_new_vagrantdomain(shell: &SshShell) -> Result<(), failure::Error> {
     Ok(())
 }
 
+/// What type of package to produce from the kernel build?
 pub enum KernelPkgType {
+    /// `bindeb-pkg`
     #[allow(dead_code)]
     Deb,
+    /// `binrpm-pkg`
     Rpm,
 }
 
-/// Build a Linux kernel package (RPM or DEB) on the remote host using the given kernel branch
-/// and kernel build config options on the repo at the given path. This command does not install
-/// the new kernel.
+/// Where to build the kernel from?
+pub enum KernelSrc {
+    /// The given git repo and branch.
+    ///
+    /// The repo should already be cloned at the give path. This function will checkout the given
+    /// branch, though, so the repo should be clean.
+    Git {
+        repo_path: String,
+        git_branch: String,
+    },
+
+    /// The given tarball, which will be untarred and built as is. We assume that the name of the
+    /// unpacked source directory is the same as the tarball name without the `.tar.gz` or `.tgz`
+    /// extension.
+    Tar { tarball_path: String },
+}
+
+/// Where to get the base config (on top of which we will apply additional changes)?
+pub enum KernelBaseConfigSource {
+    /// Use `make defconfig`
+    Defconfig,
+
+    /// Use the running kernel.
+    Current,
+
+    /// Use the config from the given path.
+    Path(String),
+}
+
+/// How to configure the kernel build? The config is created by taking some "base config", such as
+/// the one for the running kernel, and applying some changes to it to enable or disable additional
+/// options.
+pub struct KernelConfig<'a> {
+    pub base_config: KernelBaseConfigSource,
+
+    /// A list of config option names that should be set or unset before building. It is the
+    /// caller's responsibility to make sure that all dependencies are on too. If a config is
+    /// `true` it is set to "y"; otherwise, it is unset.
+    pub extra_options: &'a [(&'a str, bool)],
+}
+
+/// Build a Linux kernel package (RPM or DEB). This command does not install the new kernel.
 ///
-/// The repo should already be cloned at the give path. This function will checkout the given
-/// branch, though, so the repo should be clean.
-///
-/// `config_options` is a list of config option names that should be set or unset before
-/// building. It is the caller's responsibility to make sure that all dependencies are on too.
-/// If a config is `true` it is set to "y"; otherwise, it is unset.
-///
-/// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM.
+/// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM, if
+/// any.
 pub fn build_kernel(
     _dry_run: bool,
     ushell: &SshShell,
-    repo_path: &str,
-    git_branch: &str,
-    config_options: &[(&str, bool)],
-    kernel_local_version: &str,
+    source: KernelSrc,
+    config: KernelConfig<'_>,
+    kernel_local_version: Option<&str>,
     pkg_type: KernelPkgType,
 ) -> Result<(), failure::Error> {
-    ushell.run(cmd!("git checkout {}", git_branch).cwd(repo_path))?;
+    // Check out or unpack the source code, returning its path.
+    let source_path = match source {
+        KernelSrc::Git {
+            repo_path,
+            git_branch,
+        } => {
+            ushell.run(cmd!("git checkout {}", git_branch).cwd(&repo_path))?;
+
+            repo_path
+        }
+
+        KernelSrc::Tar { tarball_path } => {
+            ushell.run(cmd!("tar xvf {}", tarball_path))?;
+
+            tarball_path
+                .trim_end_matches(".tar.gz")
+                .trim_end_matches(".tgz")
+                .into()
+        }
+    };
 
     // kbuild path.
-    let kbuild_path = &format!("{}/kbuild", repo_path);
+    let kbuild_path = &format!("{}/kbuild", source_path);
 
     ushell.run(cmd!("mkdir -p {}", kbuild_path))?;
 
@@ -266,15 +320,28 @@ pub fn build_kernel(
     ushell.run(cmd!("cp .config config.bak").cwd(kbuild_path).allow_error())?;
 
     // configure the new kernel we are about to build.
-    ushell.run(cmd!("make O={} defconfig", kbuild_path).cwd(repo_path))?;
-    let config = ushell
-        .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
-        .stdout;
-    let config = config.trim();
-    ushell.run(cmd!("cp {} {}/.config", config, kbuild_path))?;
-    ushell.run(cmd!("yes '' | make oldconfig").use_bash().cwd(kbuild_path))?;
+    ushell.run(cmd!("make O={} defconfig", kbuild_path).cwd(source_path))?;
 
-    for (opt, set) in config_options.iter() {
+    match config.base_config {
+        // Nothing else to do
+        KernelBaseConfigSource::Defconfig => {}
+
+        KernelBaseConfigSource::Current => {
+            let config = ushell
+                .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
+                .stdout;
+            let config = config.trim();
+            ushell.run(cmd!("cp {} {}/.config", config, kbuild_path))?;
+            ushell.run(cmd!("yes '' | make oldconfig").use_bash().cwd(kbuild_path))?;
+        }
+
+        KernelBaseConfigSource::Path(template_path) => {
+            ushell.run(cmd!("cp {} {}/.config", template_path, kbuild_path))?;
+            ushell.run(cmd!("yes '' | make oldconfig").use_bash().cwd(kbuild_path))?;
+        }
+    }
+
+    for (opt, set) in config.extra_options.iter() {
         if *set {
             ushell.run(cmd!(
                 "sed -i 's/# {} is not set/{}=y/' {}/.config",
@@ -305,20 +372,28 @@ pub fn build_kernel(
 
     ushell.run(
         cmd!(
-            "make -j {} {} LOCALVERSION=-{}",
+            "make -j {} {} {}",
             nprocess,
             make_target,
-            kernel_local_version
+            if let Some(kernel_local_version) = kernel_local_version {
+                format!("LOCALVERSION=-{}", kernel_local_version)
+            } else {
+                "".into()
+            }
         )
         .cwd(kbuild_path)
         .allow_error(),
     )?;
     ushell.run(
         cmd!(
-            "make -j {} {} LOCALVERSION=-{}",
+            "make -j {} {} {}",
             nprocess,
             make_target,
-            kernel_local_version
+            if let Some(kernel_local_version) = kernel_local_version {
+                format!("LOCALVERSION=-{}", kernel_local_version)
+            } else {
+                "".into()
+            }
         )
         .cwd(kbuild_path),
     )?;

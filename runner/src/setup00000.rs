@@ -11,10 +11,10 @@ use spurs::{
 };
 
 use crate::common::{
-    get_user_home_dir, setup00000::HOSTNAME_SHARED_RESULTS_DIR, KernelPkgType, Login,
-    RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
-    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
-    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
+    get_user_home_dir, setup00000::HOSTNAME_SHARED_RESULTS_DIR, KernelBaseConfigSource,
+    KernelConfig, KernelPkgType, KernelSrc, Login, RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY,
+    ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH,
+    ZEROSIM_HIBENCH_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -198,10 +198,15 @@ where
             crate::common::build_kernel(
                 dry_run,
                 &ushell,
-                &kernel_path,
-                git_branch,
-                CONFIG_SET,
-                &format!("{}-{}", git_branch.replace("_", "-"), git_hash),
+                KernelSrc::Git {
+                    repo_path: kernel_path.clone(),
+                    git_branch: git_branch.into(),
+                },
+                KernelConfig {
+                    base_config: KernelBaseConfigSource::Current,
+                    extra_options: CONFIG_SET,
+                },
+                Some(&format!("{}-{}", git_branch.replace("_", "-"), git_hash)),
                 KernelPkgType::Rpm,
             )?;
 

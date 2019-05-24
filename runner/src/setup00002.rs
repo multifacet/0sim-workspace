@@ -9,8 +9,8 @@ use spurs::{
 };
 
 use crate::common::{
-    get_user_home_dir, KernelPkgType, Login, RESEARCH_WORKSPACE_PATH,
-    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
+    get_user_home_dir, KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login,
+    RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
 };
 
 pub fn run<A>(
@@ -47,10 +47,15 @@ where
         crate::common::build_kernel(
             dry_run,
             &ushell,
-            &kernel_path,
-            git_branch,
-            CONFIG_SET,
-            &format!("{}-{}", git_branch.replace("_", "-"), git_hash),
+            KernelSrc::Git {
+                repo_path: kernel_path,
+                git_branch: git_branch.into(),
+            },
+            KernelConfig {
+                base_config: KernelBaseConfigSource::Current,
+                extra_options: CONFIG_SET,
+            },
+            Some(&format!("{}-{}", git_branch.replace("_", "-"), git_hash)),
             KernelPkgType::Rpm,
         )?;
 
