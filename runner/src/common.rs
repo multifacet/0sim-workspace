@@ -291,6 +291,10 @@ pub struct KernelConfig<'a> {
     pub extra_options: &'a [(&'a str, bool)],
 }
 
+pub fn get_absolute_path(shell: &SshShell, path: &str) -> Result<String, failure::Error> {
+    Ok(shell.run(cmd!("pwd").cwd(path))?.stdout.trim().into())
+}
+
 /// Build a Linux kernel package (RPM or DEB). This command does not install the new kernel.
 ///
 /// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM, if
@@ -303,7 +307,7 @@ pub fn build_kernel(
     kernel_local_version: Option<&str>,
     pkg_type: KernelPkgType,
 ) -> Result<(), failure::Error> {
-    // Check out or unpack the source code, returning its path.
+    // Check out or unpack the source code, returning its absolute path.
     let source_path = match source {
         KernelSrc::Git {
             repo_path,
@@ -311,17 +315,20 @@ pub fn build_kernel(
         } => {
             ushell.run(cmd!("git checkout {}", git_branch).cwd(&repo_path))?;
 
-            repo_path
+            get_absolute_path(ushell, &repo_path)?
         }
 
         KernelSrc::Tar { tarball_path } => {
             ushell.run(cmd!("tar xvf {}", tarball_path))?;
 
-            tarball_path
-                .trim_end_matches(".tar.gz")
-                .trim_end_matches(".tar.xz")
-                .trim_end_matches(".tgz")
-                .into()
+            get_absolute_path(
+                ushell,
+                tarball_path
+                    .trim_end_matches(".tar.gz")
+                    .trim_end_matches(".tar.xz")
+                    .trim_end_matches(".tgz")
+                    .into(),
+            )?
         }
     };
 
