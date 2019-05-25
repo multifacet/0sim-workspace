@@ -11,11 +11,12 @@ use spurs::{
 };
 
 use crate::common::{
-    get_user_home_dir, setup00000::HOSTNAME_SHARED_RESULTS_DIR, KernelBaseConfigSource,
-    KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction, RESEARCH_WORKSPACE_PATH,
-    VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE,
-    ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
-    ZEROSIM_TRACE_SUBMODULE,
+    get_user_home_dir,
+    setup00000::{HOSTNAME_SHARED_DIR, HOSTNAME_SHARED_RESULTS_DIR},
+    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction,
+    RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
+    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
+    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -33,6 +34,10 @@ const SPARK_HOME: &str = "spark-2.4.3-bin-hadoop2.7";
 
 const QEMU_TARBALL: &str = "https://download.qemu.org/qemu-4.0.0.tar.xz";
 const QEMU_TARBALL_NAME: &str = "qemu-4.0.0.tar.xz";
+
+const KERNEL_RECENT_TARBALL: &str =
+    "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.1.4.tar.xz";
+const KERNEL_RECENT_TARBALL_NAME: &str = "linux-5.1.4.tar.xz";
 
 /// Location of `.ssh` directory on UW CS AFS so we can install it on experimental machines.
 const SSH_LOCATION: &str = "/u/m/a/markm/.ssh";
@@ -426,6 +431,55 @@ where
     // We share the research-workspace with the VM via a vagrant shared directory (NFS) so that
     // there is only one version used across both (less versioning to track). Now, just compile the
     // benchmarks and install rust on the host.
+
+    // Install a recent kernel on the guest.
+    //
+    // We will compile on the host and copy the config and the RPM through the shared directory.
+    let guest_config = vushell
+        .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
+        .stdout;
+    let guest_config = guest_config.trim().into();
+    vushell.run(cmd!(
+        "cp {} {}",
+        guest_config,
+        crate::common::exp00000::VAGRANT_SHARED_DIR
+    ))?;
+
+    ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
+    crate::common::build_kernel(
+        dry_run,
+        &ushell,
+        KernelSrc::Tar {
+            tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
+        },
+        KernelConfig {
+            base_config: KernelBaseConfigSource::Path(guest_config),
+            extra_options: &[
+                // disable spectre/meltdown mitigations
+                ("CONFIG_PAGE_TABLE_ISOLATION", false),
+                ("CONFIG_RETPOLINE", false),
+                // for `perf` stack traces
+                ("CONFIG_FRAME_POINTER", true),
+            ],
+        },
+        None,
+        KernelPkgType::Rpm,
+    )?;
+
+    ushell.run(
+        cmd!(
+            "cp `ls -t1 | head -n2 | sort` {}/{}/",
+            user_home,
+            HOSTNAME_SHARED_DIR
+        )
+        .use_bash()
+        .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
+    )?;
+
+    vrshell.run(cmd!(
+        "rpm -ivh --force {}/*.rpm",
+        crate::common::exp00000::VAGRANT_SHARED_DIR
+    ))?;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Install benchmarks.

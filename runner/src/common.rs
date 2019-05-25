@@ -482,6 +482,9 @@ pub mod exp00000 {
     pub const VAGRANT_CORES: usize = 1;
 
     /// The shared directory for results.
+    pub const VAGRANT_SHARED_DIR: &str = "/vagrant/vm_shared/";
+
+    /// The shared directory for results.
     pub const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
 
     /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
