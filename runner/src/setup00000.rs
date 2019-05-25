@@ -477,7 +477,8 @@ where
     )?;
 
     vrshell.run(cmd!(
-        "rpm -ivh --force {}/*.rpm",
+        "rpm -ivh --force {}/`ls -t1 {} | grep rpm | head -n2 | tail -n1 | sort`",
+        crate::common::exp00000::VAGRANT_SHARED_DIR,
         crate::common::exp00000::VAGRANT_SHARED_DIR
     ))?;
 
