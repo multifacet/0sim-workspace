@@ -259,8 +259,8 @@ pub enum KernelSrc {
     },
 
     /// The given tarball, which will be untarred and built as is. We assume that the name of the
-    /// unpacked source directory is the same as the tarball name without the `.tar.gz` or `.tgz`
-    /// extension.
+    /// unpacked source directory is the same as the tarball name without the `.tar.gz`, `.tar.xz`,
+    /// or `.tgz` extension.
     #[allow(dead_code)]
     Tar { tarball_path: String },
 }
@@ -319,6 +319,7 @@ pub fn build_kernel(
 
             tarball_path
                 .trim_end_matches(".tar.gz")
+                .trim_end_matches(".tar.xz")
                 .trim_end_matches(".tgz")
                 .into()
         }
