@@ -6,8 +6,8 @@
 use spurs::{cmd, ssh::Execute};
 
 use crate::common::{
-    get_user_home_dir, KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login,
-    RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE,
+    get_user_home_dir, setup00000::HOSTNAME_SHARED_DIR, KernelBaseConfigSource, KernelConfig,
+    KernelPkgType, KernelSrc, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE,
 };
 
 pub fn run<A>(dry_run: bool, login: &Login<A>, git_branch: &str) -> Result<(), failure::Error>
@@ -45,6 +45,18 @@ where
     let git_hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
     let git_hash = git_hash.stdout.trim();
 
+    let guest_config = vshell
+        .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
+        .stdout;
+    let guest_config = guest_config.trim().into();
+    vshell.run(cmd!(
+        "cp {} {}",
+        guest_config,
+        crate::common::exp00000::VAGRANT_SHARED_DIR
+    ))?;
+
+    let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
+
     crate::common::build_kernel(
         dry_run,
         &ushell,
@@ -53,7 +65,11 @@ where
             git_branch: git_branch.into(),
         },
         KernelConfig {
-            base_config: KernelBaseConfigSource::Current,
+            base_config: KernelBaseConfigSource::Path(format!(
+                "{}/{}",
+                HOSTNAME_SHARED_DIR,
+                guest_config_base_name.to_str().unwrap()
+            )),
             extra_options: CONFIG_SET,
         },
         Some(&format!("{}-{}", git_branch.replace("_", "-"), git_hash)),

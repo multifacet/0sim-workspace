@@ -477,6 +477,8 @@ where
         crate::common::exp00000::VAGRANT_SHARED_DIR
     ))?;
 
+    let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
+
     ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
     crate::common::build_kernel(
         dry_run,
@@ -485,7 +487,11 @@ where
             tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
         },
         KernelConfig {
-            base_config: KernelBaseConfigSource::Path(guest_config),
+            base_config: KernelBaseConfigSource::Path(format!(
+                "{}/{}",
+                HOSTNAME_SHARED_DIR,
+                guest_config_base_name.to_str().unwrap()
+            )),
             extra_options: &[
                 // disable spectre/meltdown mitigations
                 ("CONFIG_PAGE_TABLE_ISOLATION", false),
