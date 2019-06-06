@@ -223,18 +223,32 @@ where
                 KernelPkgType::Rpm,
             )?;
 
+            // Get name of RPM by looking for most recent file.
+            let kernel_rpm = ushell
+                .run(
+                    cmd!(
+                        "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
+                        user_home
+                    )
+                    .use_bash(),
+                )?
+                .stdout;
+            let kernel_rpm = kernel_rpm.trim();
+
+            ushell.run(
+                cmd!(
+                    "sudo rpm -ivh --force {}/rpmbuild/RPMS/x86_64/{}",
+                    user_home,
+                    kernel_rpm
+                )
+                .use_bash(),
+            )?;
+
             // Build cpupower
             ushell.run(
                 cmd!("make")
                     .cwd(&format!("{}/tools/power/cpupower/", kernel_path))
                     .dry_run(dry_run),
-            )?;
-
-            // install linux-dev
-            ushell.run(
-                cmd!("sudo yum -y install `ls -t1 | head -n2 | sort`")
-                    .use_bash()
-                    .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
             )?;
 
             // disable Intel EPT if needed
@@ -504,20 +518,33 @@ where
         KernelPkgType::Rpm,
     )?;
 
+    // Get name of RPM by looking for most recent file.
+    let kernel_rpm = ushell
+        .run(
+            cmd!(
+                "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
+                user_home
+            )
+            .use_bash(),
+        )?
+        .stdout;
+    let kernel_rpm = kernel_rpm.trim();
+
     ushell.run(
         cmd!(
-            "cp `ls -t1 | head -n2 | sort` {}/{}/",
+            "cp {}/rpmbuild/RPMS/x86_64/{} {}/{}/",
+            user_home,
+            kernel_rpm,
             user_home,
             HOSTNAME_SHARED_DIR
         )
-        .use_bash()
-        .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
+        .use_bash(),
     )?;
 
     vrshell.run(cmd!(
-        "rpm -ivh --force {}/`ls -t1 {} | grep rpm | head -n2 | tail -n1 | sort`",
+        "rpm -ivh --force {}/{}",
         crate::common::exp00000::VAGRANT_SHARED_DIR,
-        crate::common::exp00000::VAGRANT_SHARED_DIR
+        kernel_rpm
     ))?;
 
     ////////////////////////////////////////////////////////////////////////////////

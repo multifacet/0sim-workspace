@@ -61,9 +61,11 @@ where
 
         let kernel_rpm = ushell
             .run(
-                cmd!("ls -t1 | head -n2 | sort | tail -n1")
-                    .use_bash()
-                    .cwd(&format!("{}/rpmbuild/RPMS/x86_64/", user_home)),
+                cmd!(
+                    "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
+                    user_home
+                )
+                .use_bash(),
             )?
             .stdout;
         let kernel_rpm = kernel_rpm.trim();
