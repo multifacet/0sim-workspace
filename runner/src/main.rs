@@ -17,6 +17,7 @@ mod exp00002;
 mod exp00003;
 mod exp00004;
 mod exp00005;
+mod exp00006;
 mod exptmp;
 
 use clap::clap_app;
@@ -204,6 +205,17 @@ fn run() -> Result<(), failure::Error> {
             (@arg CORES: +takes_value {is_usize} -C --cores
              "The number of cores of the VM (defaults to 1)")
         )
+        (@subcommand exp00006 =>
+            (about: "Run experiment 00006. Requires `sudo`.")
+            (@arg HOSTNAME: +required +takes_value
+             "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+            (@arg USERNAME: +required +takes_value
+             "The username on the remote (e.g. markm)")
+            (@arg VMSIZE: +takes_value {is_usize} +required
+             "The number of GBs of the VM")
+            (@arg CORES: +takes_value {is_usize} +required
+             "The number of cores of the VM")
+        )
     }
     .setting(clap::AppSettings::SubcommandRequired)
     .setting(clap::AppSettings::DisableVersion)
@@ -355,6 +367,17 @@ fn run() -> Result<(), failure::Error> {
             let warmup = sub_m.is_present("WARMUP");
 
             exp00005::run(dry_run, &login, vm_size, cores, warmup)
+        }
+        ("exp00006", Some(sub_m)) => {
+            let login = Login {
+                username: Username(sub_m.value_of("USERNAME").unwrap()),
+                hostname: sub_m.value_of("HOSTNAME").unwrap(),
+                host: sub_m.value_of("HOSTNAME").unwrap(),
+            };
+            let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
+            let cores = sub_m.value_of("CORES").unwrap().parse::<usize>().unwrap();
+
+            exp00006::run(dry_run, &login, vm_size, cores)
         }
 
         _ => {
