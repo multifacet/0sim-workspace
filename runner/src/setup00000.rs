@@ -53,6 +53,7 @@ pub fn run<A>(
     swap_devs: Vec<&str>,
     disable_ept: bool,
     setup_hadoop: bool,
+    setup_proxy: Option<&str>,
 ) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
@@ -368,7 +369,7 @@ where
 
     // Start vagrant
     let mut vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
-    let mut vushell = crate::common::exp00000::connect_to_vagrant_user(&login.host)?;
+    let mut vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
 
     // Sometimes on adsl, networking is kind of messed up until a host restart. Check for
     // connectivity, and try restarting.
@@ -378,7 +379,38 @@ where
         spurs::util::reboot(&mut ushell, dry_run)?;
 
         vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
-        vushell = crate::common::exp00000::connect_to_vagrant_user(&login.host)?;
+        vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
+    }
+
+    // If needed, setup the proxy.
+    if let Some(proxy) = setup_proxy {
+        // user
+        vushell
+            .run(cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
+        vushell
+            .run(cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
+        vushell
+            .run(cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
+        vushell
+            .run(cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
+
+        // root
+        vrshell
+            .run(cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
+        vrshell
+            .run(cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
+        vrshell
+            .run(cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
+        vrshell
+            .run(cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
+
+        // proxy
+        vrshell
+            .run(cmd!("echo proxy=https://{} | tee --append /etc/yum.conf", proxy).use_bash())?;
+
+        // need to restart shell to get new env
+        vrshell = crate::common::exp00000::connect_to_vagrant_as_root(&login.host)?;
+        vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
     }
 
     // Install stuff on the VM

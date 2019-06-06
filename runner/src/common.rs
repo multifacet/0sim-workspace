@@ -638,18 +638,24 @@ pub mod exp00000 {
         Ok(())
     }
 
-    pub fn connect_to_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
-        hostname: A,
-    ) -> Result<SshShell, failure::Error> {
-        let (host, _) = spurs::util::get_host_ip(hostname);
-        SshShell::with_default_key("root", (host, VAGRANT_PORT))
-    }
-
     pub fn connect_to_vagrant_user<A: std::net::ToSocketAddrs + std::fmt::Display>(
         hostname: A,
+        user: &str,
     ) -> Result<SshShell, failure::Error> {
         let (host, _) = spurs::util::get_host_ip(hostname);
-        SshShell::with_default_key("vagrant", (host, VAGRANT_PORT))
+        SshShell::with_default_key(user, (host, VAGRANT_PORT))
+    }
+
+    pub fn connect_to_vagrant_as_root<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        hostname: A,
+    ) -> Result<SshShell, failure::Error> {
+        connect_to_vagrant_user(hostname, "root")
+    }
+
+    pub fn connect_to_vagrant_as_user<A: std::net::ToSocketAddrs + std::fmt::Display>(
+        hostname: A,
+    ) -> Result<SshShell, failure::Error> {
+        connect_to_vagrant_user(hostname, "vagrant")
     }
 
     pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
@@ -691,7 +697,7 @@ pub mod exp00000 {
         shell.run(cmd!("vagrant up").no_pty().cwd(vagrant_path))?;
 
         shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
-        let vshell = connect_to_vagrant(hostname)?;
+        let vshell = connect_to_vagrant_as_root(hostname)?;
 
         Ok(vshell)
     }
@@ -1050,10 +1056,10 @@ pub mod exp00000 {
 
 pub mod exp00002 {
     pub use super::exp00000::{
-        connect_and_setup_host_and_vagrant, connect_and_setup_host_only, connect_to_vagrant,
-        gen_vagrantfile, initial_reboot, start_vagrant, turn_off_swapdevs, turn_on_swapdevs,
-        turn_on_zswap, virsh_vcpupin, VAGRANT_CORES, VAGRANT_MEM, VAGRANT_PORT,
-        VAGRANT_RESULTS_DIR,
+        connect_and_setup_host_and_vagrant, connect_and_setup_host_only,
+        connect_to_vagrant_as_root, gen_vagrantfile, initial_reboot, start_vagrant,
+        turn_off_swapdevs, turn_on_swapdevs, turn_on_zswap, virsh_vcpupin, VAGRANT_CORES,
+        VAGRANT_MEM, VAGRANT_PORT, VAGRANT_RESULTS_DIR,
     };
     pub use super::{Login, Username};
 }
