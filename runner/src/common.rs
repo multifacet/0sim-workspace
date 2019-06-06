@@ -221,10 +221,16 @@ where
 
 /// Generate a local version name from the git branch and hash.
 ///
-/// If the branch name is longer than 20 characters, it is truncated.
+/// If the branch name is longer than 15 characters, it is truncated. If the git hash is longer
+/// than 15 characters, it is truncated.
 pub fn gen_local_version(branch: &str, hash: &str) -> String {
-    let split = std::cmp::min(branch.len(), 20);
-    format!("{}-{}", branch.split_at(split).0.replace("_", "-"), hash)
+    let branch_split = std::cmp::min(branch.len(), 15);
+    let hash_split = std::cmp::min(hash.len(), 15);
+    format!(
+        "{}-{}",
+        branch.split_at(branch_split).0.replace("_", "-"),
+        hash.split_at(hash_split).0
+    )
 }
 
 /// Generate a new vagrant domain name and update the Vagrantfile.
