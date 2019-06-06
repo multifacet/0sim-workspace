@@ -72,7 +72,7 @@ where
             )),
             extra_options: CONFIG_SET,
         },
-        Some(&format!("{}-{}", git_branch.replace("_", "-"), git_hash)),
+        Some(&crate::common::gen_local_version(git_branch, git_hash)),
         KernelPkgType::Rpm,
     )?;
 
