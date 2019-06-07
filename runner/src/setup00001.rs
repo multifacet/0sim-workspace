@@ -107,5 +107,11 @@ where
     // update grub to choose this entry (new kernel) by default
     vshell.run(cmd!("sudo grub2-set-default 0"))?;
 
+    // We need to sync and shut down properly to make sure the boot section of the virtual drive is
+    // not corrupted. If it is corrupted, you need to basically recreate the VM :(
+    vshell.run(cmd!("sync"))?;
+    ushell.run(cmd!("sync"))?;
+    vshell.run(cmd!("sudo poweroff"))?;
+
     Ok(())
 }
