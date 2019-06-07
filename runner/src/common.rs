@@ -518,6 +518,9 @@ pub mod exp00000 {
         let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
         ushell.set_dry_run(dry_run);
 
+        let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+        ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
+
         // Reboot the remote to make sure we have a clean slate
         spurs::util::reboot(&mut ushell, dry_run)?;
 
