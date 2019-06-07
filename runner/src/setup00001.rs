@@ -30,6 +30,9 @@ where
 
     ushell.run(cmd!("git checkout {}", git_branch).cwd(kernel_path))?;
 
+    // Make sure we are running the latest version... sigh... made this mistake enough...
+    ushell.run(cmd!("git pull").cwd(kernel_path))?;
+
     const CONFIG_SET: &[(&str, bool)] = &[
         ("CONFIG_ZSWAP", true),
         ("CONFIG_ZPOOL", true),
