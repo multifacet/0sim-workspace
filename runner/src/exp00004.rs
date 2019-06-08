@@ -91,7 +91,11 @@ where
         user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
+    // Collect timers on VM
+    let mut timers = vec![];
+
     let (output_file, params_file) = settings.gen_file_names();
+    let time_file = settings.gen_file_name("time");
     let params = serde_json::to_string(&settings)?;
 
     ushell.run(cmd!(
@@ -138,22 +142,33 @@ where
     // Run memcached. We need to make it take slightly less memory than RAM + swap, or it will OOM.
     ushell.run(cmd!("memcached -m {} -d", size * 1024))?;
 
-    ushell.run(
-        cmd!(
-            "./target/release/memcached_and_capture_thp localhost:11211 {} {} > {}/{}",
-            size,
-            INTERVAL,
-            BARE_METAL_RESULTS_DIR,
-            output_file,
-        )
-        .cwd(zerosim_exp_path)
-        .use_bash()
-        .allow_error(),
-    )?;
+    time!(
+        timers,
+        "Workload",
+        ushell.run(
+            cmd!(
+                "./target/release/memcached_and_capture_thp localhost:11211 {} {} > {}/{}",
+                size,
+                INTERVAL,
+                BARE_METAL_RESULTS_DIR,
+                output_file,
+            )
+            .cwd(zerosim_exp_path)
+            .use_bash()
+            .allow_error(),
+        )?
+    );
 
     ushell.run(cmd!("date"))?;
 
     ushell.run(cmd!("free -h"))?;
+
+    ushell.run(cmd!(
+        "echo -e '{}' > {}/{}",
+        crate::common::timings_str(timers.as_slice()),
+        BARE_METAL_RESULTS_DIR,
+        time_file
+    ))?;
 
     Ok(())
 }

@@ -2,6 +2,7 @@
 //! command line arguments. certain routines require extra arguments.
 
 // Useful common routines
+#[macro_use]
 mod common;
 
 // Setup routines

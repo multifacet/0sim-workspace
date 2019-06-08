@@ -99,8 +99,15 @@ where
     // Turn on SSDSWAP.
     turn_on_ssdswap(&ushell, dry_run)?;
 
+    // Collect timers on VM
+    let mut timers = vec![];
+
     // Start and connect to VM
-    let vshell = start_vagrant(&ushell, &login.host, vm_size, cores)?;
+    let vshell = time!(
+        timers,
+        "Start VM",
+        start_vagrant(&ushell, &login.host, vm_size, cores)?
+    );
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;
@@ -120,10 +127,15 @@ where
 
     // Calibrate
     if calibrate {
-        vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
+        time!(
+            timers,
+            "Calibrate",
+            vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?
+        );
     }
 
     let (output_file, params_file) = settings.gen_file_names();
+    let time_file = settings.gen_file_name("time");
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
@@ -137,47 +149,55 @@ where
     if warmup {
         //const WARM_UP_SIZE: usize = 50; // GB
         const WARM_UP_PATTERN: &str = "-z";
-        vshell.run(
-            cmd!(
-                "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                (size << 30) >> 12,
-                WARM_UP_PATTERN,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash(),
-        )?;
+        time!(
+            timers,
+            "Warmup",
+            vshell.run(
+                cmd!(
+                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                    (size << 30) >> 12,
+                    WARM_UP_PATTERN,
+                )
+                .cwd(zerosim_exp_path)
+                .use_bash(),
+            )?
+        );
     }
 
     // Run memcached or time_touch_mmap
-    if let Some(pattern) = pattern {
-        // Then, run the actual experiment
-        vshell.run(
-            cmd!(
-                "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
-                (size << 30) >> 12,
-                pattern,
-                if prefault { "-p" } else { "" },
-                VAGRANT_RESULTS_DIR,
-                output_file,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash(),
-        )?;
-    } else {
-        vshell.run(cmd!(
-            "taskset -c 0 memcached -M -m {} -d -u vagrant",
-            (size * 1024)
-        ))?;
+    time!(
+        timers,
+        "Workload",
+        if let Some(pattern) = pattern {
+            // Then, run the actual experiment
+            vshell.run(
+                cmd!(
+                    "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
+                    (size << 30) >> 12,
+                    pattern,
+                    if prefault { "-p" } else { "" },
+                    VAGRANT_RESULTS_DIR,
+                    output_file,
+                )
+                .cwd(zerosim_exp_path)
+                .use_bash(),
+            )?;
+        } else {
+            vshell.run(cmd!(
+                "taskset -c 0 memcached -M -m {} -d -u vagrant",
+                (size * 1024)
+            ))?;
 
-        // We want to use rdtsc as the time source, so find the cpu freq:
-        let freq = ushell
-            .run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
-        let freq = freq.stdout.trim();
+            // We want to use rdtsc as the time source, so find the cpu freq:
+            let freq = ushell.run(
+                cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash(),
+            )?;
+            let freq = freq.stdout.trim();
 
-        // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
-        // This gives much simpler performance behaviors. memcached uses a large amount of the memory
-        // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
-        vshell.run(
+            // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
+            // This gives much simpler performance behaviors. memcached uses a large amount of the memory
+            // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
+            vshell.run(
             cmd!(
                 "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 {} --freq {} > {}/{}",
                 size,
@@ -189,9 +209,17 @@ where
             .use_bash()
             .allow_error(),
         )?;
-    }
+        }
+    );
 
     ushell.run(cmd!("date"))?;
+
+    vshell.run(cmd!(
+        "echo -e '{}' > {}/{}",
+        crate::common::timings_str(timers.as_slice()),
+        VAGRANT_RESULTS_DIR,
+        time_file
+    ))?;
 
     Ok(())
 }

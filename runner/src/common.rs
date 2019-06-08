@@ -91,6 +91,26 @@ pub const ZEROSIM_HADOOP_PATH: &str = "zerosim-hadoop";
 /// Path to the `vagrant` subdirectory where `gen_vagrantfile` will do its work.
 pub const VAGRANT_SUBDIRECTORY: &str = "vagrant";
 
+/// Time the given operations and push the time to the given `Vec<(String, Duration)>`.
+macro_rules! time {
+    ($timers:ident, $label:literal, $expr:expr) => {{
+        let start = std::time::Instant::now();
+        let result = $expr;
+        let duration = std::time::Instant::now() - start;
+        $timers.push(($label, duration));
+        result
+    }};
+}
+
+/// Given an array of timings, generate a human-readable string.
+pub fn timings_str(timings: &[(&str, std::time::Duration)]) -> String {
+    let mut s = String::new();
+    for (label, d) in timings.iter() {
+        s.push_str(&format!("{}: {:?}\n", label, d));
+    }
+    s
+}
+
 /// Clone the research-workspace and checkout the given submodules. The given token is used as the
 /// Github personal access token.
 ///

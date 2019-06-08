@@ -96,8 +96,15 @@ where
     // Reboot
     initial_reboot(dry_run, &login)?;
 
+    // Collect timers on VM
+    let mut timers = vec![];
+
     // Connect
-    let (mut ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?;
+    let (mut ushell, vshell) = time!(
+        timers,
+        "Setup host and start VM",
+        connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?
+    );
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;
@@ -117,10 +124,15 @@ where
 
     // Calibrate
     if calibrate {
-        vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
+        time!(
+            timers,
+            "Calibrate",
+            vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?
+        );
     }
 
     let (output_file, params_file) = settings.gen_file_names();
+    let time_file = settings.gen_file_name("time");
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
@@ -164,20 +176,31 @@ where
     // Run memcached. We need to make it take slightly less memory than the VM, or it will OOM.
     vshell.run(cmd!("memcached -m {} -d -u vagrant", size * 1024))?;
 
-    vshell.run(
-        cmd!(
-            "./target/release/memcached_and_capture_thp localhost:11211 {} {} > {}/{}",
-            size,
-            INTERVAL,
-            VAGRANT_RESULTS_DIR,
-            output_file,
-        )
-        .cwd(zerosim_exp_path)
-        .use_bash()
-        .allow_error(),
-    )?;
+    time!(
+        timers,
+        "Workload",
+        vshell.run(
+            cmd!(
+                "./target/release/memcached_and_capture_thp localhost:11211 {} {} > {}/{}",
+                size,
+                INTERVAL,
+                VAGRANT_RESULTS_DIR,
+                output_file,
+            )
+            .cwd(zerosim_exp_path)
+            .use_bash()
+            .allow_error(),
+        )?
+    );
 
     ushell.run(cmd!("date"))?;
+
+    vshell.run(cmd!(
+        "echo -e '{}' > {}/{}",
+        crate::common::timings_str(timers.as_slice()),
+        VAGRANT_RESULTS_DIR,
+        time_file
+    ))?;
 
     Ok(())
 }

@@ -94,8 +94,15 @@ where
     // Turn on SSDSWAP.
     turn_on_ssdswap(&ushell, dry_run)?;
 
+    // Collect timers on VM
+    let mut timers = vec![];
+
     // Start and connect to VM
-    let vshell = start_vagrant(&ushell, &login.host, vm_size, cores)?;
+    let vshell = time!(
+        timers,
+        "Start VM",
+        start_vagrant(&ushell, &login.host, vm_size, cores)?
+    );
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;
@@ -119,10 +126,15 @@ where
 
     // Calibrate
     if calibrate {
-        vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
+        time!(
+            timers,
+            "Calibrate",
+            vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?
+        );
     }
 
     let (output_file, params_file) = settings.gen_file_names();
+    let time_file = settings.gen_file_name("time");
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
@@ -135,15 +147,19 @@ where
     // Warm up
     if warmup {
         const WARM_UP_PATTERN: &str = "-z";
-        vshell.run(
-            cmd!(
-                "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                (vm_size << 30) >> 12,
-                WARM_UP_PATTERN,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash(),
-        )?;
+        time!(
+            timers,
+            "Warmup",
+            vshell.run(
+                cmd!(
+                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                    (vm_size << 30) >> 12,
+                    WARM_UP_PATTERN,
+                )
+                .cwd(zerosim_exp_path)
+                .use_bash(),
+            )?
+        );
     }
 
     // Record vmstat on guest
@@ -159,6 +175,9 @@ where
         .use_bash(),
     )?;
 
+    // The workload takes a very long time, so we only use the first 2 hours (of wall-clock time).
+    // We start this thread that collects stats in the background and terminates after the given
+    // amount of time. We spawn the workload, but don't wait for it; rather, we wait for this task.
     let zswapstats_file = settings.gen_file_name("zswapstats");
     let zswapstats_handle = ushell.spawn(
         cmd!(
@@ -172,7 +191,6 @@ where
         .use_bash(),
     )?;
 
-    // The workload takes a very long time, so we only use the first 2 hours (of wall-clock time).
     vshell.spawn(
         cmd!(
             "taskset -c 0 ./bin/cg.E.x > {}/{}",
@@ -182,9 +200,20 @@ where
         .cwd(&format!("{}/NPB3.4/NPB3.4-OMP", zerosim_bmk_path)),
     )?;
 
-    zswapstats_handle.join()?;
+    time!(
+        timers,
+        "Background stats collection",
+        zswapstats_handle.join()?
+    );
 
     ushell.run(cmd!("date"))?;
+
+    vshell.run(cmd!(
+        "echo -e '{}' > {}/{}",
+        crate::common::timings_str(timers.as_slice()),
+        VAGRANT_RESULTS_DIR,
+        time_file
+    ))?;
 
     Ok(())
 }

@@ -153,8 +153,15 @@ where
     // Turn on SSDSWAP.
     turn_on_ssdswap(&ushell, dry_run)?;
 
+    // Collect timers on VM
+    let mut timers = vec![];
+
     // Start and connect to VM
-    let vshell = start_vagrant(&ushell, &login.host, vm_size, cores)?;
+    let vshell = time!(
+        timers,
+        "Start VM",
+        start_vagrant(&ushell, &login.host, vm_size, cores)?
+    );
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;
@@ -176,10 +183,15 @@ where
 
     // Calibrate
     if calibrate {
-        vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
+        time!(
+            timers,
+            "Calibrate",
+            vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?
+        );
     }
 
     let (output_file, params_file) = settings.gen_file_names();
+    let time_file = settings.gen_file_name("time");
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
@@ -198,17 +210,21 @@ where
             //const WARM_UP_SIZE: usize = 50; // GB
             if warmup {
                 const WARM_UP_PATTERN: &str = "-z";
-                vshell.run(
-                    cmd!(
-                        "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                        //(WARM_UP_SIZE << 30) >> 12,
-                        //WARM_UP_PATTERN,
-                        (size << 30) >> 12,
-                        WARM_UP_PATTERN,
-                    )
-                    .cwd(zerosim_exp_path)
-                    .use_bash(),
-                )?;
+                time!(
+                    timers,
+                    "Warmup",
+                    vshell.run(
+                        cmd!(
+                            "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                            //(WARM_UP_SIZE << 30) >> 12,
+                            //WARM_UP_PATTERN,
+                            (size << 30) >> 12,
+                            WARM_UP_PATTERN,
+                        )
+                        .cwd(zerosim_exp_path)
+                        .use_bash(),
+                    )?
+                );
             }
 
             // const PERF_MEASURE_TIME: usize = 960; // seconds
@@ -225,22 +241,26 @@ where
             // ))?;
 
             // Then, run the actual experiment
-            vshell.run(
-                cmd!(
-                    "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
-                    (size << 30) >> 12,
-                    pattern,
-                    if let Some(pf_time) = pf_time {
-                        format!("--pftime {}", pf_time)
-                    } else {
-                        "".into()
-                    },
-                    VAGRANT_RESULTS_DIR,
-                    output_file,
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
-            )?;
+            time!(
+                timers,
+                "Workload",
+                vshell.run(
+                    cmd!(
+                        "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
+                        (size << 30) >> 12,
+                        pattern,
+                        if let Some(pf_time) = pf_time {
+                            format!("--pftime {}", pf_time)
+                        } else {
+                            "".into()
+                        },
+                        VAGRANT_RESULTS_DIR,
+                        output_file,
+                    )
+                    .cwd(zerosim_exp_path)
+                    .use_bash(),
+                )?
+            );
 
             // let _ = spawn_handle0.join()?;
         }
@@ -288,24 +308,28 @@ where
             // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
             // This gives much simpler performance behaviors. memcached uses a large amount of the memory
             // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
-            vshell.run(
-                cmd!(
-                    "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 \
-                     {} --freq {} {} > {}/{}",
-                    size,
-                    freq,
-                    if let Some(pf_time) = pf_time {
-                        format!("--pftime {}", pf_time)
-                    } else {
-                        "".into()
-                    },
-                    VAGRANT_RESULTS_DIR,
-                    output_file,
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash()
-                .allow_error(),
-            )?;
+            time!(
+                timers,
+                "Workload",
+                vshell.run(
+                    cmd!(
+                        "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 \
+                         {} --freq {} {} > {}/{}",
+                        size,
+                        freq,
+                        if let Some(pf_time) = pf_time {
+                            format!("--pftime {}", pf_time)
+                        } else {
+                            "".into()
+                        },
+                        VAGRANT_RESULTS_DIR,
+                        output_file,
+                    )
+                    .cwd(zerosim_exp_path)
+                    .use_bash()
+                    .allow_error(),
+                )?
+            );
 
             // let _ = spawn_handle0.join()?;
             // let _ = spawn_handle1.join()?;
@@ -314,21 +338,23 @@ where
             // Warm up
             if warmup {
                 const WARM_UP_PATTERN: &str = "-z";
-                vshell.run(
-                    cmd!(
-                        "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                        ((vm_size - 2) << 30) >> 12,
-                        WARM_UP_PATTERN,
-                    )
-                    .cwd(zerosim_exp_path)
-                    .use_bash(),
-                )?;
-
-                vshell.run(
-                    cmd!("sudo ./target/release/locality_mem_access -l > /dev/null",)
+                time!(timers, "Warmup", {
+                    vshell.run(
+                        cmd!(
+                            "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                            ((vm_size - 2) << 30) >> 12,
+                            WARM_UP_PATTERN,
+                        )
                         .cwd(zerosim_exp_path)
                         .use_bash(),
-                )?;
+                    )?;
+
+                    vshell.run(
+                        cmd!("sudo ./target/release/locality_mem_access -l > /dev/null",)
+                            .cwd(zerosim_exp_path)
+                            .use_bash(),
+                    )?;
+                });
             }
 
             // const PERF_MEASURE_TIME: usize = 960; // seconds
@@ -365,15 +391,19 @@ where
             // Then, run the actual experiment.
             // 1) Do local accesses
             // 2) Do non-local accesses
-            vshell.run(
-                cmd!(
-                    "time sudo ./target/release/locality_mem_access -l > {}/{}",
-                    VAGRANT_RESULTS_DIR,
-                    output_local
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
-            )?;
+            time!(
+                timers,
+                "Workload 1",
+                vshell.run(
+                    cmd!(
+                        "time sudo ./target/release/locality_mem_access -l > {}/{}",
+                        VAGRANT_RESULTS_DIR,
+                        output_local
+                    )
+                    .cwd(zerosim_exp_path)
+                    .use_bash(),
+                )?
+            );
 
             let debug_end = std::time::Instant::now();
 
@@ -394,15 +424,19 @@ where
                 pf_time.unwrap(),
             ))?;
 
-            vshell.run(
-                cmd!(
-                    "time sudo ./target/release/locality_mem_access -n > {}/{}",
-                    VAGRANT_RESULTS_DIR,
-                    output_nonlocal
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
-            )?;
+            time!(
+                timers,
+                "Workload 2",
+                vshell.run(
+                    cmd!(
+                        "time sudo ./target/release/locality_mem_access -n > {}/{}",
+                        VAGRANT_RESULTS_DIR,
+                        output_nonlocal
+                    )
+                    .cwd(zerosim_exp_path)
+                    .use_bash(),
+                )?
+            );
 
             let debug_end = std::time::Instant::now();
 
@@ -413,6 +447,13 @@ where
     }
 
     ushell.run(cmd!("date"))?;
+
+    vshell.run(cmd!(
+        "echo -e '{}' > {}/{}",
+        crate::common::timings_str(timers.as_slice()),
+        VAGRANT_RESULTS_DIR,
+        time_file
+    ))?;
 
     Ok(())
 }

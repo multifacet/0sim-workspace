@@ -87,8 +87,15 @@ where
     // Reboot
     initial_reboot(dry_run, &login)?;
 
+    // Collect timers on VM
+    let mut timers = vec![];
+
     // Connect
-    let (mut ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?;
+    let (mut ushell, vshell) = time!(
+        timers,
+        "Setup host and start VM",
+        connect_and_setup_host_and_vagrant(dry_run, &login, vm_size, cores)?
+    );
 
     // Environment
     turn_on_zswap(&mut ushell, dry_run)?;
@@ -108,10 +115,15 @@ where
 
     // Calibrate
     if calibrate {
-        vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?;
+        time!(
+            timers,
+            "Calibrate",
+            vshell.run(cmd!("sudo ./target/release/time_calibrate").cwd(zerosim_exp_path))?
+        );
     }
 
     let (output_file, params_file) = settings.gen_file_names();
+    let time_file = settings.gen_file_name("time");
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
@@ -124,30 +136,45 @@ where
     // Warm up
     if warmup {
         const WARM_UP_PATTERN: &str = "-z";
-        vshell.run(
-            cmd!(
-                "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                ((vm_size << 30) >> 12) >> 1,
-                WARM_UP_PATTERN,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash(),
-        )?;
+        time!(
+            timers,
+            "Warmup",
+            vshell.run(
+                cmd!(
+                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
+                    ((vm_size << 30) >> 12) >> 1,
+                    WARM_UP_PATTERN,
+                )
+                .cwd(zerosim_exp_path)
+                .use_bash(),
+            )?
+        );
     }
 
     // Then, run the actual experiment
-    vshell.run(
-        cmd!(
-            "sudo ./target/release/time_loop {} > {}/{}",
-            n,
-            VAGRANT_RESULTS_DIR,
-            output_file,
-        )
-        .cwd(zerosim_exp_path)
-        .use_bash(),
-    )?;
+    time!(
+        timers,
+        "Workload",
+        vshell.run(
+            cmd!(
+                "sudo ./target/release/time_loop {} > {}/{}",
+                n,
+                VAGRANT_RESULTS_DIR,
+                output_file,
+            )
+            .cwd(zerosim_exp_path)
+            .use_bash(),
+        )?
+    );
 
     ushell.run(cmd!("date"))?;
+
+    vshell.run(cmd!(
+        "echo -e '{}' > {}/{}",
+        crate::common::timings_str(timers.as_slice()),
+        VAGRANT_RESULTS_DIR,
+        time_file
+    ))?;
 
     Ok(())
 }
