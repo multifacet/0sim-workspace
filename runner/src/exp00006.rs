@@ -26,19 +26,11 @@ where
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
-        * workload: "memcached_per_page_thp_ops",
-        exp: 00003,
+        * workload: "ktask_boot_mem_init",
+        exp: 00006,
 
         * vm_size: vm_size,
         * cores: cores,
-
-        zswap_max_pool_percent: 50,
-
-        transparent_hugepage_enabled: "always",
-        transparent_hugepage_defrag: "always",
-        transparent_hugepage_khugepaged_defrag: 1,
-        transparent_hugepage_khugepaged_alloc_sleep_ms: 1000,
-        transparent_hugepage_khugepaged_scan_sleep_ms: 1000,
 
         username: login.username.as_str(),
         host: login.hostname,
