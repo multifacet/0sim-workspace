@@ -111,7 +111,8 @@ where
     // not corrupted. If it is corrupted, you need to basically recreate the VM :(
     vshell.run(cmd!("sync"))?;
     ushell.run(cmd!("sync"))?;
-    vshell.run(cmd!("sudo poweroff"))?;
+
+    let _ = vshell.run(cmd!("sudo poweroff"));
 
     Ok(())
 }
