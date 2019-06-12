@@ -130,7 +130,7 @@ where
     let vshell = time!(
         timers,
         "Start VM",
-        start_vagrant(&ushell, &login.host, vm_size, cores)?
+        start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?
     );
 
     // Environment

@@ -93,7 +93,7 @@ where
     let vshell = time!(
         timers,
         "Start VM",
-        start_vagrant(&ushell, &login.host, vm_size, cores)?
+        start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ false)?
     );
 
     let (output_file, params_file) = settings.gen_file_names();

@@ -150,24 +150,8 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
             VAGRANT_CORES
         };
 
-        if disable_tsc {
-            // Disable TSC offsetting so that setup runs faster
-            ushell.run(
-                cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
-                    .use_bash(),
-            )?;
-        }
-
         // Start and connect to VM
-        let _ = start_vagrant(&ushell, &login.host, vm_size, vm_cores)?;
-
-        if disable_tsc {
-            // Enable again
-            ushell.run(
-                cmd!("echo 1 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
-                    .use_bash(),
-            )?;
-        }
+        let _ = start_vagrant(&ushell, &login.host, vm_size, vm_cores, disable_tsc)?;
     }
 
     // Turn on zswap

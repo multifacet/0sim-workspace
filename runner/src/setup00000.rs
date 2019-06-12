@@ -418,7 +418,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         .unwrap();
 
     // Start vagrant
-    let mut vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
+    let mut vrshell =
+        crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1, /* fast */ true)?;
     let mut vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
 
     // Sometimes on adsl, networking is kind of messed up until a host restart. Check for
@@ -428,7 +429,13 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
         spurs::util::reboot(&mut ushell, dry_run)?;
 
-        vrshell = crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1)?;
+        vrshell = crate::common::exp00000::start_vagrant(
+            &ushell,
+            &login.host,
+            20,
+            1,
+            /* fast */ true,
+        )?;
         vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
     }
 

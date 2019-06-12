@@ -547,7 +547,8 @@ pub mod exp00000 {
         Ok(())
     }
 
-    /// Connects to the host and to vagrant. Returns shells for both.
+    /// Connects to the host and to vagrant. Returns shells for both. TSC offsetting is disabled
+    /// during VM startup to speed things up.
     pub fn connect_and_setup_host_and_vagrant<A>(
         dry_run: bool,
         login: &Login<A>,
@@ -558,7 +559,7 @@ pub mod exp00000 {
         A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
     {
         let ushell = connect_and_setup_host_only(dry_run, &login)?;
-        let vshell = start_vagrant(&ushell, &login.host, vm_size, cores)?;
+        let vshell = start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?;
 
         Ok((ushell, vshell))
     }
@@ -695,11 +696,14 @@ pub mod exp00000 {
         connect_to_vagrant_user(hostname, "vagrant")
     }
 
+    /// Start the VM with the given amount of memory and core. If `fast` is `true`, TSC offsetting
+    /// is disabled during the VM boot (and re-enabled afterwards), which is much faster.
     pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         shell: &SshShell,
         hostname: A,
         memgb: usize,
         cores: usize,
+        fast: bool,
     ) -> Result<SshShell, failure::Error> {
         shell.run(cmd!("sudo systemctl stop firewalld"))?;
         shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
@@ -718,6 +722,13 @@ pub mod exp00000 {
 
         let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
+        if fast {
+            shell.run(
+                cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
+                    .use_bash(),
+            )?;
+        }
+
         shell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
 
         // We want to pin the vCPUs as soon as possible because otherwise, they tend to switch
@@ -735,6 +746,13 @@ pub mod exp00000 {
 
         shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
         let vshell = connect_to_vagrant_as_root(hostname)?;
+
+        if fast {
+            shell.run(
+                cmd!("echo 1 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
+                    .use_bash(),
+            )?;
+        }
 
         Ok(vshell)
     }
