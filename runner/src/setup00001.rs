@@ -125,7 +125,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ))?;
 
     // create a swap device if it doesn't exist already
-    const GUEST_SWAP: &str = "swap";
+    const GUEST_SWAP: &str = "/home/vagrant/swap";
     vshell.run(
         cmd!(
             "[ -e {} ] || fallocate -z -l {} {}",
