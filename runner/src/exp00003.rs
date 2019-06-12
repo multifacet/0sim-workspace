@@ -47,8 +47,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) The number of cores of the VM (defaults to 1)")
         (@arg SIZE: -s --size +required +takes_value {is_usize}
          "(Optional) The number of GBs of the workload (e.g. 500). Defaults to VMSIZE + 10")
-        (@arg CONTINUAL: --continual_compaction
-         "(Optional) Enables continual compaction via spurious failures")
+        (@arg CONTINUAL: --continual_compaction +takes_value {is_usize}
+         "(Optional) Enables continual compaction via spurious failures of the given mode")
     }
 }
 
@@ -78,7 +78,9 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         VAGRANT_CORES
     };
 
-    let continual_compaction = sub_m.is_present("CONTINUAL");
+    let continual_compaction = sub_m
+        .value_of("CONTINUAL")
+        .map(|value| value.parse::<usize>().unwrap());
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
@@ -140,7 +142,7 @@ where
         settings.get::<usize>("transparent_hugepage_khugepaged_alloc_sleep_ms");
     let transparent_hugepage_khugepaged_scan_sleep_ms =
         settings.get::<usize>("transparent_hugepage_khugepaged_scan_sleep_ms");
-    let continual_compaction = settings.get::<bool>("continual_compaction");
+    let continual_compaction = settings.get::<Option<usize>>("continual_compaction");
 
     // Reboot
     initial_reboot(dry_run, &login)?;
@@ -231,6 +233,13 @@ where
 
     vshell.run(cmd!("memcached -m {} -d -u vagrant", size * 1024))?;
 
+    // Turn on/off spurious failures
+    if let Some(mode) = continual_compaction {
+        vshell.run(cmd!("echo {} > sudo tee /proc/compact_spurious_fail", mode))?;
+    } else {
+        vshell.run(cmd!("echo 0 > sudo tee /proc/compact_spurious_fail"))?;
+    }
+
     time!(
         timers,
         "Workload",
@@ -241,7 +250,7 @@ where
                 INTERVAL,
                 VAGRANT_RESULTS_DIR,
                 memcached_timing_file,
-                if continual_compaction {
+                if continual_compaction.is_some() {
                     "--continual_compaction"
                 } else {
                     ""
