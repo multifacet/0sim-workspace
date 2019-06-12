@@ -136,6 +136,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         .use_bash(),
     )?;
     vshell.run(cmd!("mkswap {}", GUEST_SWAP))?;
+    vshell.run(cmd!("sudo chmod 0600 {}", GUEST_SWAP))?;
+    vshell.run(cmd!("sudo chown root:root {}", GUEST_SWAP))?;
     crate::common::set_remote_research_setting(&ushell, "guest_swap", GUEST_SWAP)?;
 
     // update grub to choose this entry (new kernel) by default
