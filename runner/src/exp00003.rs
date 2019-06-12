@@ -66,7 +66,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     {
         size
     } else {
-        vm_size + GUEST_SWAP_GBS
+        // Just a bit smaller so we don't OOM
+        vm_size + GUEST_SWAP_GBS - 1
     };
 
     let cores = if let Some(cores) = sub_m
