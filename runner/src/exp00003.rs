@@ -45,7 +45,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The number of GBs of the VM (e.g. 500)")
         (@arg CORES: -C --cores +takes_value {is_usize}
          "(Optional) The number of cores of the VM (defaults to 1)")
-        (@arg SIZE: -s --size +required +takes_value {is_usize}
+        (@arg SIZE: -s --size +takes_value {is_usize}
          "(Optional) The number of GBs of the workload (e.g. 500). Defaults to VMSIZE + 10")
         (@arg CONTINUAL: --continual_compaction +takes_value {is_usize}
          "(Optional) Enables continual compaction via spurious failures of the given mode")
