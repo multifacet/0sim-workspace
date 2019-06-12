@@ -22,6 +22,7 @@ use crate::common::{
     exp00003::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
+use crate::setup00001::GUEST_SWAP_GBS;
 
 /// Interval at which to collect thp stats
 const INTERVAL: usize = 60; // seconds
@@ -40,12 +41,14 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
-        (@arg SIZE: +required +takes_value {is_usize}
-         "The number of GBs of the workload (e.g. 500)")
         (@arg VMSIZE: +required +takes_value {is_usize}
-         "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
-        (@arg CORES: +takes_value {is_usize} -C --cores
-         "The number of cores of the VM (defaults to 1)")
+         "The number of GBs of the VM (e.g. 500)")
+        (@arg CORES: -C --cores +takes_value {is_usize}
+         "(Optional) The number of cores of the VM (defaults to 1)")
+        (@arg SIZE: -s --size +required +takes_value {is_usize}
+         "(Optional) The number of GBs of the workload (e.g. 500). Defaults to VMSIZE + 10")
+        (@arg CONTINUAL: --continual_compaction
+         "(Optional) Enables continual compaction via spurious failures")
     }
 }
 
@@ -55,17 +58,27 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
-    let size = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
     let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
-    let cores = sub_m
-        .value_of("CORES")
-        .map(|value| value.parse::<usize>().unwrap());
 
-    let cores = if let Some(cores) = cores {
+    let size = if let Some(size) = sub_m
+        .value_of("SIZE")
+        .map(|value| value.parse::<usize>().unwrap())
+    {
+        size
+    } else {
+        vm_size + GUEST_SWAP_GBS
+    };
+
+    let cores = if let Some(cores) = sub_m
+        .value_of("CORES")
+        .map(|value| value.parse::<usize>().unwrap())
+    {
         cores
     } else {
         VAGRANT_CORES
     };
+
+    let continual_compaction = sub_m.is_present("CONTINUAL");
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
@@ -74,6 +87,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 
     let settings = settings! {
         * workload: "memcached_per_page_thp_ops",
+        * continual_compaction: continual_compaction,
         exp: 00003,
 
         * size: size,
@@ -126,6 +140,7 @@ where
         settings.get::<usize>("transparent_hugepage_khugepaged_alloc_sleep_ms");
     let transparent_hugepage_khugepaged_scan_sleep_ms =
         settings.get::<usize>("transparent_hugepage_khugepaged_scan_sleep_ms");
+    let continual_compaction = settings.get::<bool>("continual_compaction");
 
     // Reboot
     initial_reboot(dry_run, &login)?;
@@ -151,6 +166,12 @@ where
         .use_bash(),
     )?;
 
+    // Mount guest swap space
+    let research_settings = crate::common::get_remote_research_settings(&ushell)?;
+    let guest_swap: &str =
+        crate::common::get_remote_research_setting(&research_settings, "guest_swap")?.unwrap();
+    vshell.run(cmd!("sudo swapon {}", guest_swap))?;
+
     let zerosim_exp_path = &format!(
         "/home/vagrant/{}/{}",
         RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
@@ -167,6 +188,7 @@ where
 
     let (output_file, params_file) = settings.gen_file_names();
     let time_file = settings.gen_file_name("time");
+    let memcached_timing_file = settings.gen_file_name("memcached_latency");
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
@@ -207,7 +229,6 @@ where
              transparent_hugepage_khugepaged_scan_sleep_ms).use_bash(),
     )?;
 
-    // Run memcached. We need to make it take slightly less memory than the VM, or it will OOM.
     vshell.run(cmd!("memcached -m {} -d -u vagrant", size * 1024))?;
 
     time!(
@@ -215,9 +236,16 @@ where
         "Workload",
         vshell.run(
             cmd!(
-                "./target/release/memcached_and_capture_thp localhost:11211 {} {} > {}/{}",
+                "./target/release/memcached_and_capture_thp localhost:11211 {} {} {}/{} {} > {}/{}",
                 size,
                 INTERVAL,
+                VAGRANT_RESULTS_DIR,
+                memcached_timing_file,
+                if continual_compaction {
+                    "--continual_compaction"
+                } else {
+                    ""
+                },
                 VAGRANT_RESULTS_DIR,
                 output_file,
             )

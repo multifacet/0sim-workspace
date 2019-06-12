@@ -12,6 +12,8 @@ use crate::common::{
     KernelPkgType, KernelSrc, Login, Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE,
 };
 
+pub const GUEST_SWAP_GBS: usize = 10;
+
 pub fn cli_options() -> clap::App<'static, 'static> {
     clap_app! { setup00001 =>
         (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
@@ -121,6 +123,20 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         "sudo rpm -ivh --force /vagrant/vm_shared/{}",
         kernel_rpm
     ))?;
+
+    // create a swap device if it doesn't exist already
+    const GUEST_SWAP: &str = "swap";
+    vshell.run(
+        cmd!(
+            "[ -e {} ] || fallocate -z -l {} {}",
+            GUEST_SWAP,
+            GUEST_SWAP_GBS << 30, /* GB */
+            GUEST_SWAP
+        )
+        .use_bash(),
+    )?;
+    vshell.run(cmd!("mkswap {}", GUEST_SWAP))?;
+    crate::common::set_remote_research_setting(&ushell, "guest_swap", GUEST_SWAP)?;
 
     // update grub to choose this entry (new kernel) by default
     vshell.run(cmd!("sudo grub2-set-default 0"))?;
