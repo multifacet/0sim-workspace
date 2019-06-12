@@ -17,7 +17,7 @@ use crate::common::{
         initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, setup_swapping,
         start_vagrant, turn_on_ssdswap, turn_on_zswap, VAGRANT_CORES, VAGRANT_MEM,
     },
-    Login, Username,
+    Login, Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 
 pub fn cli_options() -> clap::App<'static, 'static> {
@@ -57,6 +57,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) Turn on zswap with the given `max_pool_percent`")
         (@arg DISABLE_EPT: --disable_ept
          "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
+        (@arg UPDATE_EXP: --update_exp
+         "(Optional) if present, git pull 0sim-experiments and rebuild.")
     }
 }
 
@@ -86,6 +88,7 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
         .value_of("ZSWAP")
         .map(|value| value.parse::<usize>().unwrap());
     let disable_ept = sub_m.is_present("DISABLE_EPT");
+    let update_exp = sub_m.is_present("UPDATE_EXP");
 
     // Reboot
     if reboot {
@@ -93,6 +96,12 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
     }
 
     let mut ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
+
+    let user_home = crate::common::get_user_home_dir(&ushell)?;
+    let zerosim_exp_path_host = &format!(
+        "{}/{}/{}",
+        user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    );
 
     // Set up swap
     if swap {
@@ -172,6 +181,13 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
             )
             .use_bash(),
         )?;
+    }
+
+    // Update 0sim-experiments
+    if update_exp {
+        ushell.run(cmd!("git checkout master").cwd(zerosim_exp_path_host))?;
+        ushell.run(cmd!("git pull").cwd(zerosim_exp_path_host))?;
+        ushell.run(cmd!("~/.cargo/bin/cargo build --release").cwd(zerosim_exp_path_host))?;
     }
 
     Ok(())
