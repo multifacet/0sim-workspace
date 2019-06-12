@@ -236,9 +236,9 @@ where
 
     // Turn on/off spurious failures
     if let Some(mode) = continual_compaction {
-        vshell.run(cmd!("echo {} > sudo tee /proc/compact_spurious_fail", mode))?;
+        vshell.run(cmd!("echo {} | sudo tee /proc/compact_spurious_fail", mode))?;
     } else {
-        vshell.run(cmd!("echo 0 > sudo tee /proc/compact_spurious_fail"))?;
+        vshell.run(cmd!("echo 0 | sudo tee /proc/compact_spurious_fail"))?;
     }
 
     time!(
