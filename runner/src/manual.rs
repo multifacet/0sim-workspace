@@ -5,7 +5,7 @@
 //!
 //! NOTE: This should not be used for real experiments. Just for testing and prototyping.
 
-use clap::ArgMatches;
+use clap::{clap_app, ArgMatches};
 
 use spurs::{
     cmd,
@@ -19,6 +19,46 @@ use crate::common::{
     },
     Login, Username,
 };
+
+pub fn cli_options() -> clap::App<'static, 'static> {
+    fn is_usize(s: String) -> Result<(), String> {
+        s.as_str()
+            .parse::<usize>()
+            .map(|_| ())
+            .map_err(|e| format!("{:?}", e))
+    }
+
+    clap_app! { manual =>
+        (about: "Perform some (non-strict) subset of the setup for an experiment. Requires `sudo`.")
+        (@arg HOSTNAME: +required +takes_value
+         "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+        (@arg USERNAME: +required +takes_value
+         "The username on the remote (e.g. markm)")
+        (@arg REBOOT: --reboot
+         "(Optional) If present, reboots the host machine.")
+        (@arg SWAP: --setup_swap
+         "(Optional) If present, setup swapping")
+        (@arg PERF: --perfgov
+         "(Optional) If present, set the scaling governor to \"performance\"")
+        (@arg PRINTK: --printk +takes_value {is_usize}
+         "(Optional) If present, set the printk logging level for dmesg. \
+          0 = high-priority only. 7 = everything.")
+        (@arg SSDSWAP: --ssdswap
+         "(Optional) If present, turn on ssdswap.")
+        (@arg VM: --vm
+         "(Optional) Start the vagrant VM. Use other flags to set VM memory and vCPUS.")
+        (@arg VMSIZE: --vm_size +takes_value {is_usize}
+         "(Only valid with --vm) The number of GBs of the VM (defaults to 1024) (e.g. 500)")
+        (@arg VMCORES: --vm_cores +takes_value {is_usize}
+         "(Only valid with --vm) The number of cores of the VM (defaults to 1)")
+        (@arg DISABLETSC: --disable_tsc
+         "(Only valid with --vm) Disable TSC offsetting during boot to speed it up.")
+        (@arg ZSWAP: --zswap +takes_value {is_usize}
+         "(Optional) Turn on zswap with the given `max_pool_percent`")
+        (@arg DISABLE_EPT: --disable_ept
+         "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
+    }
+}
 
 pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
     // Read all flags/options

@@ -3,17 +3,35 @@
 //!
 //! Requires `setup00000`.
 
+use clap::clap_app;
+
 use spurs::{cmd, ssh::Execute};
 
 use crate::common::{
     get_user_home_dir, setup00000::HOSTNAME_SHARED_DIR, KernelBaseConfigSource, KernelConfig,
-    KernelPkgType, KernelSrc, Login, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE,
+    KernelPkgType, KernelSrc, Login, Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE,
 };
 
-pub fn run<A>(dry_run: bool, login: &Login<A>, git_branch: &str) -> Result<(), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
-{
+pub fn cli_options() -> clap::App<'static, 'static> {
+    clap_app! { setup00001 =>
+        (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
+        (@arg HOSTNAME: +required +takes_value
+         "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+        (@arg USERNAME: +required +takes_value
+         "The username on the remote (e.g. markm)")
+        (@arg GIT_BRANCH: +required +takes_value
+         "The git branch to compile the kernel from (e.g. markm_ztier)")
+    }
+}
+
+pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+    let login = Login {
+        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        hostname: sub_m.value_of("HOSTNAME").unwrap(),
+        host: sub_m.value_of("HOSTNAME").unwrap(),
+    };
+    let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
+
     // Connect to the remote.
     let (ushell, vshell) =
         crate::common::exp00000::connect_and_setup_host_and_vagrant(dry_run, &login, 20, 1)?;

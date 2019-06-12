@@ -3,6 +3,8 @@
 //!
 //! Requires `setup00000`.
 
+use clap::clap_app;
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
@@ -10,18 +12,32 @@ use spurs::{
 
 use crate::common::{
     get_user_home_dir, KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login,
-    RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
+    Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
 };
 
-pub fn run<A>(
-    dry_run: bool,
-    login: &Login<A>,
-    git_branch: Option<&str>,
-    token: &str,
-) -> Result<(), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
-{
+pub fn cli_options() -> clap::App<'static, 'static> {
+    clap_app! { setup00002 =>
+        (about: "Sets up the given _centos_ machine for use exp00004. Requires `sudo`.")
+        (@arg HOSTNAME: +required +takes_value
+         "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+        (@arg USERNAME: +required +takes_value
+         "The username on the remote (e.g. markm)")
+        (@arg TOKEN: +required +takes_value
+         "This is the Github personal token for cloning the repo.")
+        (@arg GIT_BRANCH: +takes_value -g --git_branch
+         "(Optional) The git branch to compile the kernel from (e.g. markm_ztier)")
+    }
+}
+
+pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+    let login = Login {
+        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        hostname: sub_m.value_of("HOSTNAME").unwrap(),
+        host: sub_m.value_of("HOSTNAME").unwrap(),
+    };
+    let git_branch = sub_m.value_of("GIT_BRANCH");
+    let token = sub_m.value_of("TOKEN").unwrap();
+
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
     ushell.set_dry_run(dry_run);

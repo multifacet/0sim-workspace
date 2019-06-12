@@ -2,6 +2,8 @@
 //!
 //! Requires `setup00000`.
 
+use clap::clap_app;
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
@@ -13,17 +15,46 @@ use crate::common::{
 };
 use crate::settings;
 
-pub fn run<A>(
-    dry_run: bool,
-    login: &Login<A>,
-    n: usize,
-    vm_size: Option<usize>, // GB
-    cores: Option<usize>,
-    warmup: bool,
-) -> Result<(), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
-{
+pub fn cli_options() -> clap::App<'static, 'static> {
+    fn is_usize(s: String) -> Result<(), String> {
+        s.as_str()
+            .parse::<usize>()
+            .map(|_| ())
+            .map_err(|e| format!("{:?}", e))
+    }
+
+    clap_app! { exp00002 =>
+        (about: "Run experiment 00002. Requires `sudo`.")
+        (@arg HOSTNAME: +required +takes_value
+         "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+        (@arg USERNAME: +required +takes_value
+         "The username on the remote (e.g. markm)")
+        (@arg N: +required +takes_value {is_usize}
+         "The number of iterations of the workload (e.g. 50000000)")
+        (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
+         "The number of GBs of the VM (defaults to 1024)")
+        (@arg CORES: +takes_value {is_usize} -C --cores
+         "The number of cores of the VM (defaults to 1)")
+        (@arg WARMUP: -w --warmup
+         "Pass this flag to warmup the VM before running the main workload.")
+    }
+}
+
+pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+    let login = Login {
+        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        hostname: sub_m.value_of("HOSTNAME").unwrap(),
+        host: sub_m.value_of("HOSTNAME").unwrap(),
+    };
+    let n = sub_m.value_of("N").unwrap().parse::<usize>().unwrap();
+    let vm_size = sub_m
+        .value_of("VMSIZE")
+        .map(|value| value.parse::<usize>().unwrap());
+    let cores = sub_m
+        .value_of("CORES")
+        .map(|value| value.parse::<usize>().unwrap());
+    let warmup = sub_m.is_present("WARMUP");
+
     let vm_size = if let Some(vm_size) = vm_size {
         vm_size
     } else {
@@ -63,7 +94,7 @@ where
         remote_research_settings: remote_research_settings,
     };
 
-    run_inner(dry_run, login, settings)
+    run_inner(dry_run, &login, settings)
 }
 
 /// Run the experiment using the settings passed. Note that because the only thing we are passed

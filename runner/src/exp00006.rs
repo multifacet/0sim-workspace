@@ -2,6 +2,8 @@
 //!
 //! Requires `setup00000` followed by `setup00001` with the `markm_instrument_ktask` kernel.
 
+use clap::clap_app;
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
@@ -11,15 +13,36 @@ use spurs::{
 use crate::common::{exp00003::*, output::OutputManager};
 use crate::settings;
 
-pub fn run<A>(
-    dry_run: bool,
-    login: &Login<A>,
-    vm_size: usize, // GB
-    cores: usize,
-) -> Result<(), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
-{
+pub fn cli_options() -> clap::App<'static, 'static> {
+    fn is_usize(s: String) -> Result<(), String> {
+        s.as_str()
+            .parse::<usize>()
+            .map(|_| ())
+            .map_err(|e| format!("{:?}", e))
+    }
+
+    clap_app! { exp00006 =>
+        (about: "Run experiment 00006. Requires `sudo`.")
+        (@arg HOSTNAME: +required +takes_value
+         "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+        (@arg USERNAME: +required +takes_value
+         "The username on the remote (e.g. markm)")
+        (@arg VMSIZE: +takes_value {is_usize} +required
+         "The number of GBs of the VM")
+        (@arg CORES: +takes_value {is_usize} +required
+         "The number of cores of the VM")
+    }
+}
+
+pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+    let login = Login {
+        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        hostname: sub_m.value_of("HOSTNAME").unwrap(),
+        host: sub_m.value_of("HOSTNAME").unwrap(),
+    };
+    let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
+    let cores = sub_m.value_of("CORES").unwrap().parse::<usize>().unwrap();
+
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
@@ -41,7 +64,7 @@ where
         remote_research_settings: remote_research_settings,
     };
 
-    run_inner(dry_run, login, settings)
+    run_inner(dry_run, &login, settings)
 }
 
 /// Run the experiment using the settings passed. Note that because the only thing we are passed

@@ -1,7 +1,16 @@
-//! Run a memcached workload on the remote test machine designed to induce THP compaction
-//! remotely. Measure the number of per-page operations done and undone.
+//! Run a memcached workload on the remote host (in simulation) in the presence of aggressive
+//! kernel memory compaction.
+//!
+//! This workload has two alternative modes:
+//! 1) Enable THP compaction and set kcompactd to run aggressively.
+//! 2) Induce continual compaction by causing spurious failures in the compaction algo.
+//!
+//! Run a memcached workload on the remote test machine designed to induce THP compaction remotely.
+//! Measure the latency of the workload and the number of per-page operations done and undone.
 //!
 //! Requires `setup00000` followed by `setup00001`.
+
+use clap::clap_app;
 
 use spurs::{
     cmd,
@@ -17,16 +26,41 @@ use crate::settings;
 /// Interval at which to collect thp stats
 const INTERVAL: usize = 60; // seconds
 
-pub fn run<A>(
-    dry_run: bool,
-    login: &Login<A>,
-    size: usize,    // GB
-    vm_size: usize, // GB
-    cores: Option<usize>,
-) -> Result<(), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
-{
+pub fn cli_options() -> clap::App<'static, 'static> {
+    fn is_usize(s: String) -> Result<(), String> {
+        s.as_str()
+            .parse::<usize>()
+            .map(|_| ())
+            .map_err(|e| format!("{:?}", e))
+    }
+
+    clap_app! { exp00003 =>
+        (about: "Run experiment 00003. Requires `sudo`.")
+        (@arg HOSTNAME: +required +takes_value
+         "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+        (@arg USERNAME: +required +takes_value
+         "The username on the remote (e.g. markm)")
+        (@arg SIZE: +required +takes_value {is_usize}
+         "The number of GBs of the workload (e.g. 500)")
+        (@arg VMSIZE: +required +takes_value {is_usize}
+         "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
+        (@arg CORES: +takes_value {is_usize} -C --cores
+         "The number of cores of the VM (defaults to 1)")
+    }
+}
+
+pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+    let login = Login {
+        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        hostname: sub_m.value_of("HOSTNAME").unwrap(),
+        host: sub_m.value_of("HOSTNAME").unwrap(),
+    };
+    let size = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
+    let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
+    let cores = sub_m
+        .value_of("CORES")
+        .map(|value| value.parse::<usize>().unwrap());
+
     let cores = if let Some(cores) = cores {
         cores
     } else {
@@ -65,7 +99,7 @@ where
         remote_research_settings: remote_research_settings,
     };
 
-    run_inner(dry_run, login, settings)
+    run_inner(dry_run, &login, settings)
 }
 
 /// Run the experiment using the settings passed. Note that because the only thing we are passed

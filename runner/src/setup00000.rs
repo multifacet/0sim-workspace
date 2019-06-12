@@ -5,6 +5,8 @@
 
 use std::process::Command;
 
+use clap::clap_app;
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
@@ -13,7 +15,7 @@ use spurs::{
 use crate::common::{
     get_user_home_dir,
     setup00000::{HOSTNAME_SHARED_DIR, HOSTNAME_SHARED_RESULTS_DIR},
-    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction,
+    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction, Username,
     RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
     ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
     ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
@@ -42,22 +44,56 @@ const KERNEL_RECENT_TARBALL_NAME: &str = "linux-5.1.4.tar.xz";
 /// Location of `.ssh` directory on UW CS AFS so we can install it on experimental machines.
 const SSH_LOCATION: &str = "/u/m/a/markm/.ssh";
 
-pub fn run<A>(
-    dry_run: bool,
-    login: &Login<A>,
-    device: Option<&str>,
-    mapper_device: Option<&str>,
-    git_branch: Option<&str>,
-    only_vm: bool,
-    token: &str,
-    swap_devs: Vec<&str>,
-    disable_ept: bool,
-    setup_hadoop: bool,
-    setup_proxy: Option<&str>,
-) -> Result<(), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
-{
+pub fn cli_options() -> clap::App<'static, 'static> {
+    clap_app! { setup00000 =>
+        (about: "Sets up the given _centos_ test machine for use with vagrant. Requires `sudo`.")
+        (@arg HOSTNAME: +required +takes_value
+         "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
+        (@arg USERNAME: +required +takes_value
+         "The username on the remote (e.g. markm)")
+        (@arg TOKEN: +required +takes_value
+         "This is the Github personal token for cloning the repo.")
+        (@arg DEVICE: +takes_value -d --device
+         "(Optional) the device to format and use as a home directory (e.g. -d /dev/sda)")
+        (@arg MAPPER_DEVICE: +takes_value -m --mapper_device
+         "(Optional) the device to use with device mapper as a thinly-provisioned swap space (e.g. -d /dev/sda)")
+        (@arg GIT_BRANCH: +takes_value -g --git_branch
+         "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
+        (@arg ONLY_VM: -v --only_vm
+         "(Optional) only setup the VM")
+        (@arg SWAP_DEV: -s --swap +takes_value ...
+         "(Optional) specify which devices to use as swap devices. By default all \
+          unpartitioned, unmounted devices are used.")
+        (@arg DISABLE_EPT: --disable_ept
+         "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
+        (@arg HADOOP: --hadoop
+         "(Optional) set up hadoop stack on VM.")
+        (@arg PROXY: -p --proxy +takes_value
+         "(Optional) set up the VM to use the given proxy. Leave off the protocol (e.g. squid.cs.wisc.edu:3128)")
+    }
+}
+
+pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+    let login = Login {
+        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        hostname: sub_m.value_of("HOSTNAME").unwrap(),
+        host: sub_m.value_of("HOSTNAME").unwrap(),
+    };
+    let device = sub_m.value_of("DEVICE");
+    let mapper_device = sub_m.value_of("MAPPER_DEVICE");
+    let git_branch = sub_m.value_of("GIT_BRANCH");
+    let only_vm = sub_m.is_present("ONLY_VM");
+    let token = sub_m.value_of("TOKEN").unwrap();
+    let swap_devs = sub_m
+        .values_of("SWAP_DEV")
+        .map(|i| i.collect())
+        .unwrap_or_else(|| vec![]);
+    let disable_ept = sub_m.is_present("DISABLE_EPT");
+    let setup_hadoop = sub_m.is_present("HADOOP");
+    let setup_proxy = sub_m.value_of("PROXY");
+
+    assert!(mapper_device.is_none() || swap_devs.is_empty());
+
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
     ushell.set_dry_run(dry_run);
