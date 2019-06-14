@@ -10,3 +10,6 @@
 [submodule "bmks/zerosim-hadoop/HiBench"]
 	path = bmks/zerosim-hadoop/HiBench
 	url = https://github.com/Intel-bigdata/HiBench.git
+[submodule "numactl"]
+	path = bmks/numactl
+	url = ../numactl
