@@ -63,7 +63,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
         (@arg INTERVAL: +required +takes_value {is_usize}
-         "The interval at which to collect stats")
+         "The interval at which to collect stats (seconds)")
         (@group WORKLOAD =>
             (@attributes +required)
             (@arg memcached: -m "Run the memcached workload")
