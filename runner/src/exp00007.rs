@@ -164,7 +164,7 @@ fn run_inner<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
 {
-    let workload = Workload::from_str(&settings.get::<&str>("workload")[15..]);
+    let workload = Workload::from_str(&settings.get::<&str>("workload")[14..]);
     let interval = settings.get::<usize>("stats_interval");
     let vm_size = settings.get::<usize>("vm_size");
     let cores = settings.get::<usize>("cores");
