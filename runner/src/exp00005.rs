@@ -1,4 +1,4 @@
-//! Run the NAS CG class E workload on the remote test machine.
+//! Run the NAS CG class E workload on the remote test machine in simulation.
 //!
 //! Requires `setup00000`.
 
