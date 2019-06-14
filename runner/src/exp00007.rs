@@ -252,8 +252,11 @@ where
     // Record buddyinfo on the guest until signalled to stop.
     let buddyinfo_handle = vshell.spawn(
         cmd!(
-            "while [ ! -e /tmp/exp-stop ] ; do \
-             cat /proc/buddyinfo >> {}/{} ; sleep {} ; done",
+            "rm /tmp/exp-stop ; \
+             while [ ! -e /tmp/exp-stop ] ; do \
+             cat /proc/buddyinfo | tee -a {}/{} ; \
+             sleep {} ; \
+             done",
             VAGRANT_RESULTS_DIR,
             output_file,
             interval
