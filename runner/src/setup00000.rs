@@ -480,6 +480,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         "libcgroup-tools",
         "java-1.8.0-openjdk",
         "maven",
+        "numactl", // for memhog
     ]))?;
 
     vrshell.run(

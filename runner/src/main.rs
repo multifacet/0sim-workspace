@@ -19,6 +19,7 @@ mod exp00003;
 mod exp00004;
 mod exp00005;
 mod exp00006;
+mod exp00007;
 mod exptmp;
 
 fn run() -> Result<(), failure::Error> {
@@ -44,6 +45,7 @@ fn run() -> Result<(), failure::Error> {
         .subcommand(exp00004::cli_options())
         .subcommand(exp00005::cli_options())
         .subcommand(exp00006::cli_options())
+        .subcommand(exp00007::cli_options())
         .setting(clap::AppSettings::SubcommandRequired)
         .setting(clap::AppSettings::DisableVersion)
         .get_matches();
@@ -62,6 +64,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00004", Some(sub_m)) => exp00004::run(dry_run, sub_m),
         ("exp00005", Some(sub_m)) => exp00005::run(dry_run, sub_m),
         ("exp00006", Some(sub_m)) => exp00006::run(dry_run, sub_m),
+        ("exp00007", Some(sub_m)) => exp00007::run(dry_run, sub_m),
 
         _ => {
             unreachable!();
