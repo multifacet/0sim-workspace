@@ -72,7 +72,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         )
         (@arg WARMUP: -w --warmup
          "Pass this flag to warmup the VM before running the main workload.")
-        (@arg VMSIZE: +takes_value {is_usize}
+        (@arg VMSIZE: +takes_value {is_usize} --vm_size
          "The number of GBs of the VM (defaults to 2048)")
         (@arg CORES: +takes_value {is_usize} -C --cores
          "The number of cores of the VM (defaults to 1)")
