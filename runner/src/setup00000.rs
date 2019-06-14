@@ -592,6 +592,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         kernel_rpm
     ))?;
 
+    vrshell.run(cmd!("sudo grub2-set-default 0"))?;
+
     ////////////////////////////////////////////////////////////////////////////////
     // Install benchmarks.
     ////////////////////////////////////////////////////////////////////////////////
@@ -686,12 +688,10 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     }
 
     // memhog
-    ushell.run(
-        cmd!("(source /opt/rh/devtoolset-7/enable ; make )").cwd(&format!(
-            "{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMHOG_SUBMODULE
-        )),
-    )?;
+    vushell.run(cmd!("make").cwd(&format!(
+        "{}/{}",
+        RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMHOG_SUBMODULE
+    )))?;
 
     // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing
     // kernel command line and replace it with the same + `tsc=reliable`.
