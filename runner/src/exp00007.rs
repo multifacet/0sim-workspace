@@ -296,11 +296,12 @@ where
         }
 
         Workload::Memhog => {
-            time!(
-                timers,
-                "Workload",
-                vshell.run(cmd!("memhog -r{} {}g > /dev/null", MEMHOG_R, vm_size,))?
-            );
+            time!(timers, "Workload", {
+                // Repeat workload multiple times
+                for _ in 0..MEMHOG_R {
+                    vshell.run(cmd!("memhog -r1 {}g > /dev/null", vm_size))?;
+                }
+            });
         }
     }
 
