@@ -2,8 +2,10 @@
 
 - `runner/` is a self-contained program that is capable of setting up any
   experiment for the project and running it.
-    - For more info on usage: `cd runner; cargo run -- help`.
-    - The code itself is also pretty well-documented IMHO.
+    - For more info on usage:
+        - `cd runner; cargo run -- help`.
+        - There is a `README.md`
+        - The code itself is also pretty well-documented IMHO.
 - `bmks/` contains files needed for some benchmarks (e.g. NAS).
 - `vagrant/` contains the `Vagrantfile` used for the VMs in the experiments.
 - `0sim` is a git submodule to the repo with the kernel/simulator code.
