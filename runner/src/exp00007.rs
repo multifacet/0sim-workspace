@@ -250,16 +250,28 @@ where
     }
 
     // Record buddyinfo on the guest until signalled to stop.
-    let buddyinfo_handle = vshell.spawn(
+    vshell.run(cmd!("rm -f /tmp/exp-stop"))?;
+
+    let vshell2 = crate::common::exp00000::connect_to_vagrant_as_root(login.hostname)?;
+    let buddyinfo_handle = vshell2.spawn(
         cmd!(
-            "rm /tmp/exp-stop ; \
-             while [ ! -e /tmp/exp-stop ] ; do \
+            "while [ ! -e /tmp/exp-stop ] ; do \
              cat /proc/buddyinfo | tee -a {}/{} ; \
              sleep {} ; \
-             done",
+             done ; echo done measuring",
             VAGRANT_RESULTS_DIR,
             output_file,
             interval
+        )
+        .use_bash(),
+    )?;
+
+    // Wait to make sure the collection of stats has started
+    vshell.run(
+        cmd!(
+            "while [ ! -e {}/{} ] ; do sleep 1 ; done",
+            VAGRANT_RESULTS_DIR,
+            output_file,
         )
         .use_bash(),
     )?;
