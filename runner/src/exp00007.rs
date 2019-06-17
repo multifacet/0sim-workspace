@@ -1,4 +1,6 @@
-//! Run a workload in simulation and collect stats on fragmentation via `/proc/buddyinfo`.
+//! Run a workload in simulation and collect stats on fragmentation via `/proc/buddyinfo`. The
+//! workload is made to consume all of the guest memory (which is less than the amount given to
+//! QEMU/KVM because of VM overhead).
 //!
 //! Requires `setup00000`.
 
@@ -184,6 +186,9 @@ where
     // Collect timers on VM
     let mut timers = vec![];
 
+    // Environment
+    turn_on_zswap(&mut ushell, dry_run)?;
+
     // Start and connect to VM
     let vshell = time!(
         timers,
@@ -191,8 +196,11 @@ where
         start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?
     );
 
-    // Environment
-    turn_on_zswap(&mut ushell, dry_run)?;
+    // Get the amount of memory the guest thinks it has.
+    let size = vshell
+        .run(cmd!("grep MemAvailable /proc/meminfo | awk '{{print $2}}'").use_bash())?
+        .stdout;
+    let size = size.trim().parse::<usize>().unwrap();
 
     ushell.run(
         cmd!(
@@ -222,6 +230,7 @@ where
 
     let (output_file, params_file) = settings.gen_file_names();
     let time_file = settings.gen_file_name("time");
+    let guest_mem_file = settings.gen_file_name("guest_mem");
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
@@ -229,6 +238,12 @@ where
         escape_for_bash(&params),
         VAGRANT_RESULTS_DIR,
         params_file
+    ))?;
+
+    vshell.run(cmd!(
+        "cat /proc/meminfo > {}/{}",
+        VAGRANT_RESULTS_DIR,
+        guest_mem_file
     ))?;
 
     // Warm up
@@ -240,7 +255,7 @@ where
             vshell.run(
                 cmd!(
                     "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                    (vm_size << 30) >> 12,
+                    size >> 12,
                     WARM_UP_PATTERN,
                 )
                 .cwd(zerosim_exp_path)
@@ -280,7 +295,7 @@ where
     match workload {
         Workload::Memcached => {
             // Start server
-            vshell.run(cmd!("memcached -m {} -d -u vagrant", vm_size * 1024))?;
+            vshell.run(cmd!("memcached -m {} -d -u vagrant", size >> 10))?;
 
             // Start workload
             time!(
@@ -289,7 +304,7 @@ where
                 vshell.run(
                     cmd!(
                         "./target/release/memcached_gen_data localhost:11211 {} > /dev/null",
-                        vm_size,
+                        size >> 20,
                     )
                     .cwd(zerosim_exp_path)
                 )?
@@ -311,7 +326,7 @@ where
             time!(timers, "Workload", {
                 // Repeat workload multiple times
                 for _ in 0..MEMHOG_R {
-                    vshell.run(cmd!("memhog -r1 {}g > /dev/null", vm_size))?;
+                    vshell.run(cmd!("memhog -r1 {}k > /dev/null", size))?;
                 }
             });
         }
