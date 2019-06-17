@@ -97,7 +97,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     }
 
     // Install stuff
-    ushell.run(spurs::centos::yum_install(&[
+    ushell.run(spurs_util::centos::yum_install(&[
         "vim",
         "git",
         "memcached",

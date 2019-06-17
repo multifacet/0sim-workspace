@@ -408,7 +408,7 @@ where
 
             let trace_output_local = settings.gen_file_name("tracelocal");
             let trace_output_nonlocal = settings.gen_file_name("tracenonlocal");
-            let spawn_handle0 = ushell.spawn(cmd!(
+            let (_shell, spawn_handle0) = ushell.spawn(cmd!(
                 "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
                 RESEARCH_WORKSPACE_PATH,
                 ZEROSIM_TRACE_SUBMODULE,
@@ -447,7 +447,7 @@ where
 
             let debug_start = std::time::Instant::now();
 
-            let spawn_handle0 = ushell.spawn(cmd!(
+            let (_shell, spawn_handle0) = ushell.spawn(cmd!(
                 "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
                 RESEARCH_WORKSPACE_PATH,
                 ZEROSIM_TRACE_SUBMODULE,

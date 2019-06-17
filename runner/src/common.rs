@@ -761,7 +761,7 @@ pub mod exp00000 {
     }
 
     pub fn turn_off_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
-        let devs = spurs::util::get_mounted_devs(shell, dry_run)?;
+        let devs = spurs_util::util::get_mounted_devs(shell, dry_run)?;
 
         // Turn off all swap devs
         for (dev, mount) in devs {
@@ -778,11 +778,14 @@ pub mod exp00000 {
         let mut swapdevs = vec![];
 
         // Find out what swap devs are there
-        let devs = spurs::util::get_unpartitioned_devs(shell, dry_run)?;
+        let devs = spurs_util::util::get_unpartitioned_devs(shell, dry_run)?;
 
         // Get the size of each one
-        let sizes =
-            spurs::util::get_dev_sizes(shell, devs.iter().map(String::as_str).collect(), dry_run)?;
+        let sizes = spurs_util::util::get_dev_sizes(
+            shell,
+            devs.iter().map(String::as_str).collect(),
+            dry_run,
+        )?;
 
         // Turn on the SSDs as swap devs
         for (dev, size) in devs.iter().zip(sizes.iter()) {

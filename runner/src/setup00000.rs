@@ -117,7 +117,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 
         // Install a bunch of stuff
         ushell.run(cmd!("sudo yum group install -y 'Development Tools'"))?;
-        ushell.run(spurs::centos::yum_install(&[
+        ushell.run(spurs_util::centos::yum_install(&[
             "bc",
             "openssl-devel",
             "libvirt",
@@ -143,9 +143,9 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             "pixman-devel",
             "zlib-devel",
         ]))?;
-        ushell.run(spurs::centos::yum_install(&["devtoolset-7"]))?;
+        ushell.run(spurs_util::centos::yum_install(&["devtoolset-7"]))?;
 
-        ushell.run(spurs::util::add_to_group("libvirt"))?;
+        ushell.run(spurs_util::util::add_to_group("libvirt"))?;
 
         let installed = ushell
             .run(cmd!("yum list installed vagrant | grep -q vagrant"))
@@ -172,9 +172,9 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             // - format the device and create a partition
             // - mkfs on the partition
             // - copy data to new partition and mount as home dir
-            ushell.run(spurs::util::write_gpt(device))?;
-            ushell.run(spurs::util::create_partition(device))?;
-            spurs::util::format_partition_as_ext4(
+            ushell.run(spurs_util::util::write_gpt(device))?;
+            ushell.run(spurs_util::util::create_partition(device))?;
+            spurs_util::util::format_partition_as_ext4(
                 &ushell,
                 dry_run,
                 &format!("{}1", device), // assume it is the first device partition
@@ -199,7 +199,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
             crate::common::set_remote_research_setting(&ushell, "dm-data", mapper_device)?;
         } else if swap_devs.is_empty() {
-            let unpartitioned = spurs::util::get_unpartitioned_devs(&ushell, dry_run)?;
+            let unpartitioned = spurs_util::util::get_unpartitioned_devs(&ushell, dry_run)?;
             for dev in unpartitioned.iter() {
                 ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
             }
@@ -472,7 +472,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     }
 
     // Install stuff on the VM
-    vrshell.run(spurs::centos::yum_install(&[
+    vrshell.run(spurs_util::centos::yum_install(&[
         "vim",
         "git",
         "memcached",

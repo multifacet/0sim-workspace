@@ -253,7 +253,7 @@ where
     vshell.run(cmd!("rm -f /tmp/exp-stop"))?;
 
     let vshell2 = crate::common::exp00000::connect_to_vagrant_as_root(login.hostname)?;
-    let buddyinfo_handle = vshell2.spawn(
+    let (_shell, buddyinfo_handle) = vshell2.spawn(
         cmd!(
             "while [ ! -e /tmp/exp-stop ] ; do \
              cat /proc/buddyinfo | tee -a {}/{} ; \
