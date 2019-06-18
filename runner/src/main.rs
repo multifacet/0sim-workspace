@@ -13,6 +13,8 @@ mod setup00002;
 mod manual;
 
 // Experiment routines
+mod exptmp;
+
 mod exp00000;
 mod exp00002;
 mod exp00003;
@@ -20,7 +22,7 @@ mod exp00004;
 mod exp00005;
 mod exp00006;
 mod exp00007;
-mod exptmp;
+mod exp00008;
 
 fn run() -> Result<(), failure::Error> {
     let matches = clap::App::new("runner")
@@ -46,6 +48,7 @@ fn run() -> Result<(), failure::Error> {
         .subcommand(exp00005::cli_options())
         .subcommand(exp00006::cli_options())
         .subcommand(exp00007::cli_options())
+        .subcommand(exp00008::cli_options())
         .setting(clap::AppSettings::SubcommandRequired)
         .setting(clap::AppSettings::DisableVersion)
         .get_matches();
@@ -56,8 +59,11 @@ fn run() -> Result<(), failure::Error> {
         ("setup00000", Some(sub_m)) => setup00000::run(dry_run, sub_m),
         ("setup00001", Some(sub_m)) => setup00001::run(dry_run, sub_m),
         ("setup00002", Some(sub_m)) => setup00002::run(dry_run, sub_m),
+
         ("manual", Some(sub_m)) => manual::run(dry_run, sub_m),
+
         ("exptmp", Some(sub_m)) => exptmp::run(dry_run, sub_m),
+
         ("exp00000", Some(sub_m)) => exp00000::run(dry_run, sub_m),
         ("exp00002", Some(sub_m)) => exp00002::run(dry_run, sub_m),
         ("exp00003", Some(sub_m)) => exp00003::run(dry_run, sub_m),
@@ -65,6 +71,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00005", Some(sub_m)) => exp00005::run(dry_run, sub_m),
         ("exp00006", Some(sub_m)) => exp00006::run(dry_run, sub_m),
         ("exp00007", Some(sub_m)) => exp00007::run(dry_run, sub_m),
+        ("exp00008", Some(sub_m)) => exp00008::run(dry_run, sub_m),
 
         _ => {
             unreachable!();
