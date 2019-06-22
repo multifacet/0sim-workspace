@@ -5,6 +5,9 @@
 #[macro_use]
 mod common;
 
+// Automates starting common workloads.
+mod workloads;
+
 // Setup routines
 mod setup00000;
 mod setup00001;
