@@ -16,6 +16,7 @@ use crate::common::{
     ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
+use crate::workloads::{run_memcached_gen_data, run_memhog, run_nas_cg, MemhogOptions, NasClass};
 
 /// The amount of time (in hours) to let the NAS CG workload run.
 const NAS_CG_HOURS: u64 = 6;
@@ -209,13 +210,15 @@ where
         .use_bash(),
     )?;
 
-    let zerosim_exp_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    let zerosim_exp_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
     );
-    let zerosim_bmk_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+    let zerosim_bmk_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_BENCHMARKS_DIR
     );
 
     // Calibrate
@@ -233,16 +236,14 @@ where
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
-        "echo '{}' > {}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        VAGRANT_RESULTS_DIR,
-        params_file
+        dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
     vshell.run(cmd!(
-        "cat /proc/meminfo > {}/{}",
-        VAGRANT_RESULTS_DIR,
-        guest_mem_file
+        "cat /proc/meminfo > {}",
+        dir!(VAGRANT_RESULTS_DIR, guest_mem_file)
     ))?;
 
     // Warm up
@@ -270,11 +271,10 @@ where
     let (_shell, buddyinfo_handle) = vshell2.spawn(
         cmd!(
             "while [ ! -e /tmp/exp-stop ] ; do \
-             cat /proc/swap_instrumentation | tee -a {}/{} ; \
+             cat /proc/swap_instrumentation | tee -a {} ; \
              sleep {} ; \
              done ; echo done measuring",
-            VAGRANT_RESULTS_DIR,
-            output_file,
+            dir!(VAGRANT_RESULTS_DIR, output_file.as_str()),
             interval
         )
         .use_bash(),
@@ -283,38 +283,42 @@ where
     // Wait to make sure the collection of stats has started
     vshell.run(
         cmd!(
-            "while [ ! -e {}/{} ] ; do sleep 1 ; done",
-            VAGRANT_RESULTS_DIR,
-            output_file,
+            "while [ ! -e {} ] ; do sleep 1 ; done",
+            dir!(VAGRANT_RESULTS_DIR, output_file.as_str()),
         )
         .use_bash(),
     )?;
 
+    let freq = crate::common::get_cpu_freq(&ushell)?;
+
     // Run the actual workload
     match workload {
         Workload::Memcached => {
-            // Start server
-            vshell.run(cmd!("memcached -m {} -d -u vagrant", size >> 10))?;
-
             // Start workload
             time!(
                 timers,
-                "Workload",
-                vshell.run(
-                    cmd!(
-                        "./target/release/memcached_gen_data localhost:11211 {} > /dev/null",
-                        size >> 20,
-                    )
-                    .cwd(zerosim_exp_path)
+                "Start and Workload",
+                run_memcached_gen_data(
+                    &vshell,
+                    "vagrant",
+                    zerosim_exp_path,
+                    size >> 10,
+                    size >> 20,
+                    Some(freq),
+                    /* allow_oom */ false,
+                    /* pf_time */ None,
+                    None,
                 )?
             );
         }
 
         Workload::Cg => {
             time!(timers, "Workload", {
-                let _ = vshell.spawn(
-                    cmd!("./bin/cg.E.x > {}/{}", VAGRANT_RESULTS_DIR, output_file)
-                        .cwd(&format!("{}/NPB3.4/NPB3.4-OMP", zerosim_bmk_path)),
+                let _ = run_nas_cg(
+                    &vshell,
+                    zerosim_bmk_path,
+                    NasClass::E,
+                    Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                 )?;
 
                 std::thread::sleep(std::time::Duration::from_secs(3600 * NAS_CG_HOURS));
@@ -322,12 +326,11 @@ where
         }
 
         Workload::Memhog => {
-            time!(timers, "Workload", {
-                // Repeat workload multiple times
-                for _ in 0..MEMHOG_R {
-                    vshell.run(cmd!("memhog -r1 {}k > /dev/null", size))?;
-                }
-            });
+            time!(
+                timers,
+                "Workload",
+                run_memhog(&vshell, MEMHOG_R, size, MemhogOptions::empty())?
+            );
         }
     }
 
@@ -341,10 +344,9 @@ where
     ushell.run(cmd!("date"))?;
 
     vshell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        VAGRANT_RESULTS_DIR,
-        time_file
+        dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())

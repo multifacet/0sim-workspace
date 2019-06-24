@@ -17,6 +17,7 @@ use crate::common::{
     ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
+use crate::workloads::run_memcached_and_capture_thp;
 
 const BARE_METAL_RESULTS_DIR: &str = "vm_shared/results/";
 
@@ -107,9 +108,10 @@ where
     let ushell = connect_and_setup_host_only(dry_run, &login)?;
 
     let user_home = &get_user_home_dir(&ushell)?;
-    let zerosim_exp_path = &format!(
-        "{}/{}/{}",
-        user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    let zerosim_exp_path = &dir!(
+        user_home.as_str(),
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
     // Collect timers on VM
@@ -120,63 +122,38 @@ where
     let params = serde_json::to_string(&settings)?;
 
     ushell.run(cmd!(
-        "echo '{}' > {}/{}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        user_home,
-        BARE_METAL_RESULTS_DIR,
-        params_file
+        dir!(user_home.as_str(), BARE_METAL_RESULTS_DIR, params_file)
     ))?;
 
     ushell.run(cmd!("sudo swapon /dev/sda3"))?;
 
     // Turn on compaction and force it to happen
-    ushell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/enabled",
-            transparent_hugepage_enabled
-        )
-        .use_bash(),
-    )?;
-    ushell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/defrag",
-            transparent_hugepage_defrag
-        )
-        .use_bash(),
-    )?;
-    ushell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/defrag",
-            transparent_hugepage_khugepaged_defrag
-        )
-        .use_bash(),
-    )?;
-    ushell.run(
-        cmd!("echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/alloc_sleep_millisecs",
-             transparent_hugepage_khugepaged_alloc_sleep_ms).use_bash(),
-    )?;
-    ushell.run(
-        cmd!("echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs",
-             transparent_hugepage_khugepaged_scan_sleep_ms).use_bash(),
+    crate::common::turn_on_thp(
+        &ushell,
+        transparent_hugepage_enabled,
+        transparent_hugepage_defrag,
+        transparent_hugepage_khugepaged_defrag,
+        transparent_hugepage_khugepaged_alloc_sleep_ms,
+        transparent_hugepage_khugepaged_scan_sleep_ms,
     )?;
 
-    // Run memcached. We need to make it take slightly less memory than RAM + swap, or it will OOM.
-    ushell.run(cmd!("memcached -m {} -d", size * 1024))?;
-
+    // Run workload
     time!(
         timers,
-        "Workload",
-        ushell.run(
-            cmd!(
-                "./target/release/memcached_and_capture_thp localhost:11211 {} {} > {}/{}",
-                size,
-                INTERVAL,
-                BARE_METAL_RESULTS_DIR,
-                output_file,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash()
-            .allow_error(),
+        "Setup and Workload",
+        run_memcached_and_capture_thp(
+            &ushell,
+            login.username.as_str(),
+            zerosim_exp_path,
+            size << 10,
+            size,
+            INTERVAL,
+            /* allow_oom */ true,
+            /* continual_compaction */ None,
+            /* timing_file */ None,
+            &dir!(BARE_METAL_RESULTS_DIR, output_file),
         )?
     );
 
@@ -185,10 +162,9 @@ where
     ushell.run(cmd!("free -h"))?;
 
     ushell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        BARE_METAL_RESULTS_DIR,
-        time_file
+        dir!(BARE_METAL_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())

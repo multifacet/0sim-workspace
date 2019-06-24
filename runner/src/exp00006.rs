@@ -101,25 +101,22 @@ where
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
-        "echo '{}' > {}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        VAGRANT_RESULTS_DIR,
-        params_file
+        dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
     vshell.run(cmd!(
-        "cat /proc/ktask_instrumentation > {}/{}",
-        VAGRANT_RESULTS_DIR,
-        output_file
+        "cat /proc/ktask_instrumentation > {}",
+        dir!(VAGRANT_RESULTS_DIR, output_file)
     ))?;
 
     ushell.run(cmd!("date"))?;
 
     vshell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        VAGRANT_RESULTS_DIR,
-        time_file
+        dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())

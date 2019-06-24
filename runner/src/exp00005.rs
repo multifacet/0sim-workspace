@@ -1,4 +1,5 @@
-//! Run the NAS CG class E workload on the remote test machine in simulation.
+//! Run the NAS CG class E workload on the remote test machine in simulation and collect
+//! compressibility stats and `/proc/vmstat` on guest during it.
 //!
 //! Requires `setup00000`.
 
@@ -15,6 +16,7 @@ use crate::common::{
     RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
+use crate::workloads::{run_nas_cg, run_time_mmap_touch, NasClass, TimeMmapTouchPattern};
 
 const NAS_CG_TIME: usize = 7200; // seconds
 
@@ -144,13 +146,15 @@ where
         .use_bash(),
     )?;
 
-    let zerosim_exp_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    let zerosim_exp_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
     );
-    let zerosim_bmk_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+    let zerosim_bmk_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_BENCHMARKS_DIR
     );
 
     // Calibrate
@@ -167,26 +171,25 @@ where
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
-        "echo '{}' > {}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        VAGRANT_RESULTS_DIR,
-        params_file
+        dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
     // Warm up
     if warmup {
-        const WARM_UP_PATTERN: &str = "-z";
+        const WARM_UP_PATTERN: TimeMmapTouchPattern = TimeMmapTouchPattern::Zeros;
         time!(
             timers,
             "Warmup",
-            vshell.run(
-                cmd!(
-                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                    (vm_size << 30) >> 12,
-                    WARM_UP_PATTERN,
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
+            run_time_mmap_touch(
+                &vshell,
+                zerosim_exp_path,
+                (vm_size << 30) >> 12,
+                WARM_UP_PATTERN,
+                /* prefault */ false,
+                /* pf_time */ None,
+                None
             )?
         );
     }
@@ -196,10 +199,9 @@ where
     let (_shell, _vmstats_handle) = vshell.spawn(
         cmd!(
             "for (( c=1 ; c<={} ; c++ )) ; do \
-             cat /proc/vmstat >> {}/{} ; sleep 1 ; done",
+             cat /proc/vmstat >> {} ; sleep 1 ; done",
             NAS_CG_TIME,
-            VAGRANT_RESULTS_DIR,
-            vmstat_file
+            dir!(VAGRANT_RESULTS_DIR, vmstat_file)
         )
         .use_bash(),
     )?;
@@ -212,21 +214,18 @@ where
         cmd!(
             "for (( c=1 ; c<={} ; c++ )) ; do \
              sudo tail `sudo find  /sys/kernel/debug/zswap/ -type f`\
-             >> {}/{} ; sleep 1 ; done",
+             >> {} ; sleep 1 ; done",
             NAS_CG_TIME,
-            HOSTNAME_SHARED_RESULTS_DIR,
-            zswapstats_file
+            dir!(HOSTNAME_SHARED_RESULTS_DIR, zswapstats_file)
         )
         .use_bash(),
     )?;
 
-    let _ = vshell.spawn(
-        cmd!(
-            "taskset -c 0 ./bin/cg.E.x > {}/{}",
-            VAGRANT_RESULTS_DIR,
-            output_file
-        )
-        .cwd(&format!("{}/NPB3.4/NPB3.4-OMP", zerosim_bmk_path)),
+    let _ = run_nas_cg(
+        &vshell,
+        zerosim_bmk_path,
+        NasClass::E,
+        Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
     )?;
 
     time!(
@@ -238,10 +237,9 @@ where
     ushell.run(cmd!("date"))?;
 
     vshell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        VAGRANT_RESULTS_DIR,
-        time_file
+        dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())

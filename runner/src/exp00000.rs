@@ -11,10 +11,11 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::*, output::OutputManager, Username, RESEARCH_WORKSPACE_PATH,
+    exp00000::*, get_cpu_freq, output::OutputManager, Username, RESEARCH_WORKSPACE_PATH,
     ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
+use crate::workloads::{run_memcached_gen_data, run_time_mmap_touch, TimeMmapTouchPattern};
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {
@@ -61,9 +62,9 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         None
     } else {
         Some(if sub_m.is_present("zeros") {
-            "-z"
+            TimeMmapTouchPattern::Zeros
         } else {
-            "-c"
+            TimeMmapTouchPattern::Counter
         })
     };
     let vm_size = sub_m
@@ -133,7 +134,7 @@ where
     let vm_size = settings.get::<usize>("vm_size");
     let size = settings.get::<usize>("size");
     let cores = settings.get::<usize>("cores");
-    let pattern = settings.get::<Option<&str>>("pattern");
+    let pattern = settings.get::<Option<TimeMmapTouchPattern>>("pattern");
     let warmup = settings.get::<bool>("warmup");
     let prefault = settings.get::<bool>("prefault");
     let calibrate = settings.get::<bool>("calibrated");
@@ -169,9 +170,10 @@ where
         .use_bash(),
     )?;
 
-    let zerosim_exp_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    let zerosim_exp_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
     // Calibrate
@@ -188,86 +190,72 @@ where
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
-        "echo '{}' > {}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        VAGRANT_RESULTS_DIR,
-        params_file
+        dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
     // Warm up
     if warmup {
         //const WARM_UP_SIZE: usize = 50; // GB
-        const WARM_UP_PATTERN: &str = "-z";
+        const WARM_UP_PATTERN: TimeMmapTouchPattern = TimeMmapTouchPattern::Zeros;
         time!(
             timers,
             "Warmup",
-            vshell.run(
-                cmd!(
-                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                    (size << 30) >> 12,
-                    WARM_UP_PATTERN,
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
+            run_time_mmap_touch(
+                &vshell,
+                zerosim_exp_path,
+                (size << 30) >> 12,
+                WARM_UP_PATTERN,
+                /* prefault */ false,
+                /* pf_time */ None,
+                None
             )?
         );
     }
 
+    // We want to use rdtsc as the time source, so find the cpu freq:
+    let freq = get_cpu_freq(&ushell)?;
+
     // Run memcached or time_touch_mmap
-    time!(
-        timers,
-        "Workload",
-        if let Some(pattern) = pattern {
-            // Then, run the actual experiment
-            vshell.run(
-                cmd!(
-                    "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
-                    (size << 30) >> 12,
-                    pattern,
-                    if prefault { "-p" } else { "" },
-                    VAGRANT_RESULTS_DIR,
-                    output_file,
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
-            )?;
-        } else {
-            vshell.run(cmd!(
-                "taskset -c 0 memcached -M -m {} -d -u vagrant",
-                (size * 1024)
-            ))?;
-
-            // We want to use rdtsc as the time source, so find the cpu freq:
-            let freq = ushell.run(
-                cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash(),
-            )?;
-            let freq = freq.stdout.trim();
-
-            // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
-            // This gives much simpler performance behaviors. memcached uses a large amount of the memory
-            // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
-            vshell.run(
-            cmd!(
-                "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 {} --freq {} > {}/{}",
+    if let Some(pattern) = pattern {
+        time!(
+            timers,
+            "Workload",
+            run_time_mmap_touch(
+                &vshell,
+                zerosim_exp_path,
+                (size << 30) >> 12,
+                pattern,
+                prefault,
+                /* pf_time */ None,
+                Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+            )?
+        );
+    } else {
+        time!(
+            timers,
+            "Workload",
+            run_memcached_gen_data(
+                &vshell,
+                "vagrant",
+                zerosim_exp_path,
+                size << 10,
                 size,
-                freq,
-                VAGRANT_RESULTS_DIR,
-                output_file,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash()
-            .allow_error(),
-        )?;
-        }
-    );
+                Some(freq),
+                /* allow_oom */ true,
+                /* pf_time */ None,
+                Some(&dir!(VAGRANT_RESULTS_DIR, output_file))
+            )?
+        );
+    }
 
     ushell.run(cmd!("date"))?;
 
     vshell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        VAGRANT_RESULTS_DIR,
-        time_file
+        dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())

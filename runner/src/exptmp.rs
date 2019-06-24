@@ -16,6 +16,10 @@ use crate::common::{
     RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
 };
 use crate::settings;
+use crate::workloads::{
+    run_locality_mem_access, run_memcached_gen_data, run_time_mmap_touch, LocalityMemAccessMode,
+    TimeMmapTouchPattern,
+};
 
 #[derive(Copy, Clone, Debug)]
 enum Workload {
@@ -34,11 +38,11 @@ impl Workload {
         }
     }
 
-    pub fn from_str(s: &str, pat: Option<&str>) -> Self {
+    pub fn from_str(s: &str, pat: Option<TimeMmapTouchPattern>) -> Self {
         match (s, pat) {
             ("memcached_gen_data", None) => Workload::Memcached,
-            ("time_mmap_touch", Some("-z")) => Workload::Zeros,
-            ("time_mmap_touch", Some("-c")) => Workload::Counter,
+            ("time_mmap_touch", Some(TimeMmapTouchPattern::Zeros)) => Workload::Zeros,
+            ("time_mmap_touch", Some(TimeMmapTouchPattern::Counter)) => Workload::Counter,
             ("locality_mem_access", None) => Workload::Locality,
             _ => panic!("unknown workload: {:?} {:?}", s, pat),
         }
@@ -133,8 +137,8 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
         * size: size,
         pattern: match workload {
             Workload::Memcached | Workload::Locality => None,
-            Workload::Zeros => Some("-z"),
-            Workload::Counter => Some("-c"),
+            Workload::Zeros => Some(TimeMmapTouchPattern::Zeros),
+            Workload::Counter => Some(TimeMmapTouchPattern::Counter),
         },
         calibrated: false,
         warmup: warmup,
@@ -171,7 +175,7 @@ where
     let vm_size = settings.get::<usize>("vm_size");
     let size = settings.get::<usize>("size");
     let cores = settings.get::<usize>("cores");
-    let pattern = settings.get::<Option<&str>>("pattern");
+    let pattern = settings.get::<Option<TimeMmapTouchPattern>>("pattern");
     let workload = Workload::from_str(settings.get::<&str>("workload"), pattern);
     let warmup = settings.get::<bool>("warmup");
     let calibrate = settings.get::<bool>("calibrated");
@@ -208,12 +212,13 @@ where
         .use_bash(),
     )?;
 
-    let zerosim_exp_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    let zerosim_exp_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
-    // let zerosim_path_host = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
+    // let zerosim_path_host = &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
 
     // Calibrate
     if calibrate {
@@ -229,48 +234,47 @@ where
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
-        "echo '{}' > {}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        VAGRANT_RESULTS_DIR,
-        params_file
+        dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
+
+    // Warm up
+    //const WARM_UP_SIZE: usize = 50; // GB
+    if warmup {
+        const WARM_UP_PATTERN: TimeMmapTouchPattern = TimeMmapTouchPattern::Zeros;
+        time!(
+            timers,
+            "Warmup",
+            run_time_mmap_touch(
+                &vshell,
+                zerosim_exp_path,
+                (size << 30) >> 12,
+                WARM_UP_PATTERN,
+                /* prefault */ false,
+                /* pf_time */ None,
+                None
+            )?
+        );
+    }
+
+    // We want to use rdtsc as the time source, so find the cpu freq:
+    let freq = crate::common::get_cpu_freq(&ushell)?;
 
     // Run the workload
     match workload {
         Workload::Zeros | Workload::Counter => {
             let pattern = pattern.unwrap();
 
-            // Warm up
-            //const WARM_UP_SIZE: usize = 50; // GB
-            if warmup {
-                const WARM_UP_PATTERN: &str = "-z";
-                time!(
-                    timers,
-                    "Warmup",
-                    vshell.run(
-                        cmd!(
-                            "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                            //(WARM_UP_SIZE << 30) >> 12,
-                            //WARM_UP_PATTERN,
-                            (size << 30) >> 12,
-                            WARM_UP_PATTERN,
-                        )
-                        .cwd(zerosim_exp_path)
-                        .use_bash(),
-                    )?
-                );
-            }
-
             // const PERF_MEASURE_TIME: usize = 960; // seconds
-
             // let perf_output_early = settings.gen_file_name("perfdata0");
             // let spawn_handle0 = ushell.spawn(cmd!(
             //     "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
             //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {} sleep {}",
             //     zerosim_path_host,
-            //     HOSTNAME_SHARED_RESULTS_DIR,
-            //     perf_output_early,
+            //     dir!(HOSTNAME_SHARED_RESULTS_DIR,
+            //     perf_output_early),
             //     PERF_MEASURE_TIME,
             // ))?;
 
@@ -278,38 +282,20 @@ where
             time!(
                 timers,
                 "Workload",
-                vshell.run(
-                    cmd!(
-                        "time sudo ./target/release/time_mmap_touch {} {} {} > {}/{}",
-                        (size << 30) >> 12,
-                        pattern,
-                        if let Some(pf_time) = pf_time {
-                            format!("--pftime {}", pf_time)
-                        } else {
-                            "".into()
-                        },
-                        VAGRANT_RESULTS_DIR,
-                        output_file,
-                    )
-                    .cwd(zerosim_exp_path)
-                    .use_bash(),
+                run_time_mmap_touch(
+                    &vshell,
+                    zerosim_exp_path,
+                    (size << 30) >> 12,
+                    pattern,
+                    /* prefault */ false,
+                    /* pftime */ pf_time,
+                    Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                 )?
             );
 
             // let _ = spawn_handle0.join()?;
         }
         Workload::Memcached => {
-            vshell.run(cmd!(
-                "taskset -c 0 memcached -M -m {} -d -u vagrant",
-                (size * 1024)
-            ))?;
-
-            // We want to use rdtsc as the time source, so find the cpu freq:
-            let freq = ushell.run(
-                cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash(),
-            )?;
-            let freq = freq.stdout.trim();
-
             // // Measure host stats with perf while the workload is running. We measure at the beginning
             // // of the workload and later in the workload after the "cliff".
             // const PERF_MEASURE_TIME: usize = 50; // seconds
@@ -321,47 +307,37 @@ where
             // let spawn_handle0 = ushell.spawn(cmd!(
             //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 \
             //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {} sleep {}",
             //     zerosim_path_host,
-            //     HOSTNAME_SHARED_RESULTS_DIR,
-            //     perf_output_early,
+            //     dir!(HOSTNAME_SHARED_RESULTS_DIR,
+            //     perf_output_early),
             //     PERF_MEASURE_TIME,
             // ))?;
 
             // let spawn_handle1 = ushell.spawn(cmd!(
             //     "sudo taskset -c 2 {}/tools/perf/perf stat -C 0 -I 1000 -D {} \
             //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {} sleep {}",
             //     zerosim_path_host,
             //     PERF_LATE_DELAY_MS,
-            //     HOSTNAME_SHARED_RESULTS_DIR,
-            //     perf_output_late,
+            //     dir!(HOSTNAME_SHARED_RESULTS_DIR,
+            //     perf_output_late),
             //     PERF_MEASURE_TIME,
             // ))?;
 
-            // We allow errors because the memcached -M flag errors on OOM rather than doing an insert.
-            // This gives much simpler performance behaviors. memcached uses a large amount of the memory
-            // you give it for bookkeeping, rather than user data, so OOM will almost certainly happen.
             time!(
                 timers,
-                "Workload",
-                vshell.run(
-                    cmd!(
-                        "taskset -c 0 ./target/release/memcached_gen_data localhost:11211 \
-                         {} --freq {} {} > {}/{}",
-                        size,
-                        freq,
-                        if let Some(pf_time) = pf_time {
-                            format!("--pftime {}", pf_time)
-                        } else {
-                            "".into()
-                        },
-                        VAGRANT_RESULTS_DIR,
-                        output_file,
-                    )
-                    .cwd(zerosim_exp_path)
-                    .use_bash()
-                    .allow_error(),
+                "Start and Workload",
+                run_memcached_gen_data(
+                    &vshell,
+                    "vagrant",
+                    zerosim_exp_path,
+                    size << 10,
+                    size,
+                    Some(freq),
+                    /* allow_oom */ true,
+                    pf_time,
+                    Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                 )?
             );
 
@@ -369,53 +345,27 @@ where
             // let _ = spawn_handle1.join()?;
         }
         Workload::Locality => {
-            // Warm up
-            if warmup {
-                const WARM_UP_PATTERN: &str = "-z";
-                time!(timers, "Warmup", {
-                    vshell.run(
-                        cmd!(
-                            "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                            ((vm_size - 2) << 30) >> 12,
-                            WARM_UP_PATTERN,
-                        )
-                        .cwd(zerosim_exp_path)
-                        .use_bash(),
-                    )?;
-
-                    vshell.run(
-                        cmd!("sudo ./target/release/locality_mem_access -l > /dev/null",)
-                            .cwd(zerosim_exp_path)
-                            .use_bash(),
-                    )?;
-                });
-            }
-
             // const PERF_MEASURE_TIME: usize = 960; // seconds
 
             // let perf_output_early = settings.gen_file_name("perfdata0");
             // let spawn_handle0 = ushell.spawn(cmd!(
             //     "sudo taskset -c 3 {}/tools/perf/perf stat -C 0 -I 1000 \
             //      -e 'cycles,cache-misses,dTLB-load-misses,dTLB-store-misses,\
-            //      page-faults,context-switches,vmscan:*,kvm:*' -o {}/{} sleep {}",
+            //      page-faults,context-switches,vmscan:*,kvm:*' -o {} sleep {}",
             //     zerosim_path_host,
-            //     HOSTNAME_SHARED_RESULTS_DIR,
-            //     perf_output_early,
+            //     dir!(HOSTNAME_SHARED_RESULTS_DIR,
+            //     perf_output_early),
             //     PERF_MEASURE_TIME,
             // ))?;
-
-            let debug_start = std::time::Instant::now();
 
             let trace_output_local = settings.gen_file_name("tracelocal");
             let trace_output_nonlocal = settings.gen_file_name("tracenonlocal");
             let (_shell, spawn_handle0) = ushell.spawn(cmd!(
-                "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
-                RESEARCH_WORKSPACE_PATH,
-                ZEROSIM_TRACE_SUBMODULE,
+                "sudo taskset -c 3 {}/target/release/zerosim-trace trace {} {} {} -t {}",
+                dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE),
                 500,    // interval
                 100000, // buffer size
-                HOSTNAME_SHARED_RESULTS_DIR,
-                trace_output_local,
+                dir!(HOSTNAME_SHARED_RESULTS_DIR, trace_output_local),
                 pf_time.unwrap(),
             ))?;
 
@@ -428,53 +378,35 @@ where
             time!(
                 timers,
                 "Workload 1",
-                vshell.run(
-                    cmd!(
-                        "time sudo ./target/release/locality_mem_access -l > {}/{}",
-                        VAGRANT_RESULTS_DIR,
-                        output_local
-                    )
-                    .cwd(zerosim_exp_path)
-                    .use_bash(),
+                run_locality_mem_access(
+                    &vshell,
+                    zerosim_exp_path,
+                    LocalityMemAccessMode::Local,
+                    &dir!(VAGRANT_RESULTS_DIR, output_local)
                 )?
             );
 
-            let debug_end = std::time::Instant::now();
-
-            println!("elapsed: {:?}", debug_end - debug_start);
-
             let _ = spawn_handle0.join()?;
 
-            let debug_start = std::time::Instant::now();
-
             let (_shell, spawn_handle0) = ushell.spawn(cmd!(
-                "sudo taskset -c 3 {}/{}/target/release/zerosim-trace trace {} {} {}/{} -t {}",
-                RESEARCH_WORKSPACE_PATH,
-                ZEROSIM_TRACE_SUBMODULE,
+                "sudo taskset -c 3 {}/target/release/zerosim-trace trace {} {} {} -t {}",
+                dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE),
                 500,    // interval
                 100000, // buffer size
-                HOSTNAME_SHARED_RESULTS_DIR,
-                trace_output_nonlocal,
+                dir!(HOSTNAME_SHARED_RESULTS_DIR, trace_output_nonlocal),
                 pf_time.unwrap(),
             ))?;
 
             time!(
                 timers,
                 "Workload 2",
-                vshell.run(
-                    cmd!(
-                        "time sudo ./target/release/locality_mem_access -n > {}/{}",
-                        VAGRANT_RESULTS_DIR,
-                        output_nonlocal
-                    )
-                    .cwd(zerosim_exp_path)
-                    .use_bash(),
+                run_locality_mem_access(
+                    &vshell,
+                    zerosim_exp_path,
+                    LocalityMemAccessMode::Random,
+                    &dir!(VAGRANT_RESULTS_DIR, output_nonlocal)
                 )?
             );
-
-            let debug_end = std::time::Instant::now();
-
-            println!("elapsed: {:?}", debug_end - debug_start);
 
             let _ = spawn_handle0.join()?;
         }
@@ -483,10 +415,9 @@ where
     ushell.run(cmd!("date"))?;
 
     vshell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        VAGRANT_RESULTS_DIR,
-        time_file
+        dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())

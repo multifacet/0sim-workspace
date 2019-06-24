@@ -105,6 +105,20 @@ macro_rules! time {
     }};
 }
 
+/// Given an ordered list of path components, combine them into a path string.
+macro_rules! dir {
+    ($first:expr $(, $part:expr)*) => {{
+        let mut path = String::from($first);
+
+        $(
+            path.push('/');
+            path.extend(String::from($part).chars());
+        )+
+
+        path
+    }}
+}
+
 /// Given an array of timings, generate a human-readable string.
 pub fn timings_str(timings: &[(&str, std::time::Duration)]) -> String {
     let mut s = String::new();
@@ -273,6 +287,57 @@ pub fn get_num_cores(shell: &SshShell) -> Result<usize, failure::Error> {
     let nprocess = nprocess.parse::<usize>()?;
 
     Ok(nprocess)
+}
+
+/// Get the max CPU frequency of the remote in MHz.
+///
+/// NOTE: this is not necessarily the current CPU freq. You need to set the scaling governor.
+pub fn get_cpu_freq(shell: &SshShell) -> Result<usize, failure::Error> {
+    let freq =
+        shell.run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
+    Ok(freq.stdout.trim().parse::<usize>().unwrap())
+}
+
+/// Turn on THP on the remote using the given settings. Requires `sudo`.
+pub fn turn_on_thp(
+    shell: &SshShell,
+    transparent_hugepage_enabled: &str,
+    transparent_hugepage_defrag: &str,
+    transparent_hugepage_khugepaged_defrag: usize,
+    transparent_hugepage_khugepaged_alloc_sleep_ms: usize,
+    transparent_hugepage_khugepaged_scan_sleep_ms: usize,
+) -> Result<(), failure::Error> {
+    shell.run(
+        cmd!(
+            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/enabled",
+            transparent_hugepage_enabled
+        )
+        .use_bash(),
+    )?;
+    shell.run(
+        cmd!(
+            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/defrag",
+            transparent_hugepage_defrag
+        )
+        .use_bash(),
+    )?;
+    shell.run(
+        cmd!(
+            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/defrag",
+            transparent_hugepage_khugepaged_defrag
+        )
+        .use_bash(),
+    )?;
+    shell.run(
+        cmd!("echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/alloc_sleep_millisecs",
+             transparent_hugepage_khugepaged_alloc_sleep_ms).use_bash(),
+    )?;
+    shell.run(
+        cmd!("echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs",
+             transparent_hugepage_khugepaged_scan_sleep_ms).use_bash(),
+    )?;
+
+    Ok(())
 }
 
 /// What type of package to produce from the kernel build?

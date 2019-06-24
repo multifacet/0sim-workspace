@@ -14,6 +14,7 @@ use crate::common::{
     exp00002::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
 };
 use crate::settings;
+use crate::workloads::{run_time_loop, run_time_mmap_touch, TimeMmapTouchPattern};
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {
@@ -139,9 +140,10 @@ where
         .use_bash(),
     )?;
 
-    let zerosim_exp_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    let zerosim_exp_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
     // Calibrate
@@ -158,26 +160,25 @@ where
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
-        "echo '{}' > {}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        VAGRANT_RESULTS_DIR,
-        params_file
+        dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
     // Warm up
     if warmup {
-        const WARM_UP_PATTERN: &str = "-z";
+        const WARM_UP_PATTERN: TimeMmapTouchPattern = TimeMmapTouchPattern::Zeros;
         time!(
             timers,
             "Warmup",
-            vshell.run(
-                cmd!(
-                    "sudo ./target/release/time_mmap_touch {} {} > /dev/null",
-                    ((vm_size << 30) >> 12) >> 1,
-                    WARM_UP_PATTERN,
-                )
-                .cwd(zerosim_exp_path)
-                .use_bash(),
+            run_time_mmap_touch(
+                &vshell,
+                zerosim_exp_path,
+                ((vm_size << 30) >> 12) >> 1,
+                WARM_UP_PATTERN,
+                /* prefault */ false,
+                /* pf_time */ None,
+                None
             )?
         );
     }
@@ -186,25 +187,20 @@ where
     time!(
         timers,
         "Workload",
-        vshell.run(
-            cmd!(
-                "sudo ./target/release/time_loop {} > {}/{}",
-                n,
-                VAGRANT_RESULTS_DIR,
-                output_file,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash(),
+        run_time_loop(
+            &vshell,
+            zerosim_exp_path,
+            n,
+            &dir!(VAGRANT_RESULTS_DIR, output_file)
         )?
     );
 
     ushell.run(cmd!("date"))?;
 
     vshell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        VAGRANT_RESULTS_DIR,
-        time_file
+        dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())

@@ -23,6 +23,7 @@ use crate::common::{
 };
 use crate::settings;
 use crate::setup00001::GUEST_SWAP_GBS;
+use crate::workloads::run_memcached_and_capture_thp;
 
 /// Interval at which to collect thp stats
 const INTERVAL: usize = 60; // seconds
@@ -175,9 +176,10 @@ where
         crate::common::get_remote_research_setting(&research_settings, "guest_swap")?.unwrap();
     vshell.run(cmd!("sudo swapon {}", guest_swap))?;
 
-    let zerosim_exp_path = &format!(
-        "/home/vagrant/{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+    let zerosim_exp_path = &dir!(
+        "/home/vagrant",
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
     // Calibrate
@@ -195,83 +197,44 @@ where
     let params = serde_json::to_string(&settings)?;
 
     vshell.run(cmd!(
-        "echo '{}' > {}/{}",
+        "echo '{}' > {}",
         escape_for_bash(&params),
-        VAGRANT_RESULTS_DIR,
-        params_file
+        dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
     // Turn on compaction and force it too happen
-    vshell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/enabled",
-            transparent_hugepage_enabled
-        )
-        .use_bash(),
+    crate::common::turn_on_thp(
+        &vshell,
+        transparent_hugepage_enabled,
+        transparent_hugepage_defrag,
+        transparent_hugepage_khugepaged_defrag,
+        transparent_hugepage_khugepaged_alloc_sleep_ms,
+        transparent_hugepage_khugepaged_scan_sleep_ms,
     )?;
-    vshell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/defrag",
-            transparent_hugepage_defrag
-        )
-        .use_bash(),
-    )?;
-    vshell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/defrag",
-            transparent_hugepage_khugepaged_defrag
-        )
-        .use_bash(),
-    )?;
-    vshell.run(
-        cmd!("echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/alloc_sleep_millisecs",
-             transparent_hugepage_khugepaged_alloc_sleep_ms).use_bash(),
-    )?;
-    vshell.run(
-        cmd!("echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs",
-             transparent_hugepage_khugepaged_scan_sleep_ms).use_bash(),
-    )?;
-
-    vshell.run(cmd!("memcached -m {} -d -u vagrant", size * 1024))?;
-
-    // Turn on/off spurious failures
-    if let Some(mode) = continual_compaction {
-        vshell.run(cmd!("echo {} | sudo tee /proc/compact_spurious_fail", mode))?;
-    } else {
-        vshell.run(cmd!("echo 0 | sudo tee /proc/compact_spurious_fail"))?;
-    }
 
     time!(
         timers,
-        "Workload",
-        vshell.run(
-            cmd!(
-                "./target/release/memcached_and_capture_thp localhost:11211 {} {} {}/{} {} > {}/{}",
-                size,
-                INTERVAL,
-                VAGRANT_RESULTS_DIR,
-                memcached_timing_file,
-                if continual_compaction.is_some() {
-                    "--continual_compaction"
-                } else {
-                    ""
-                },
-                VAGRANT_RESULTS_DIR,
-                output_file,
-            )
-            .cwd(zerosim_exp_path)
-            .use_bash()
-            .allow_error(),
+        "Start and Workload",
+        run_memcached_and_capture_thp(
+            &vshell,
+            "vagrant",
+            zerosim_exp_path,
+            size << 10,
+            size,
+            INTERVAL,
+            /* allow_oom */ false,
+            continual_compaction,
+            Some(&dir!(VAGRANT_RESULTS_DIR, memcached_timing_file)),
+            &dir!(VAGRANT_RESULTS_DIR, output_file)
         )?
     );
 
     ushell.run(cmd!("date"))?;
 
     vshell.run(cmd!(
-        "echo -e '{}' > {}/{}",
+        "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        VAGRANT_RESULTS_DIR,
-        time_file
+        dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
     Ok(())
