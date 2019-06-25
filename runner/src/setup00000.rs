@@ -472,6 +472,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     }
 
     // Install stuff on the VM
+    vrshell.run(spurs_util::centos::yum_install(&["epel-release"]))?;
     vrshell.run(spurs_util::centos::yum_install(&[
         "vim",
         "git",
@@ -482,6 +483,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         "java-1.8.0-openjdk",
         "maven",
         "numactl", // for memhog
+        "redis",
     ]))?;
 
     vrshell.run(
