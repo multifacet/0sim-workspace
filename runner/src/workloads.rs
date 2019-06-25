@@ -316,3 +316,85 @@ pub fn run_locality_mem_access(
 
     Ok(())
 }
+
+/// Spawn a `redis` server in a new shell with the given amount of memory and set some important
+/// config settings. Usually this is called indirectly through one of the other workload routines.
+///
+/// The redis server is listening at port 7777.
+///
+/// The caller should ensure that any previous RDB is deleted.
+///
+/// Returns the spawned shell.
+pub fn start_redis(
+    shell: &SshShell,
+    size_mb: usize,
+) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+    // Start the redis server
+    let handle = shell.spawn(cmd!("redis-server --port 7777 --loglevel warning"))?;
+
+    // Wait for server to start
+    loop {
+        let res = shell.run(cmd!("redis-cli -p 7777 INFO"));
+        if res.is_ok() {
+            break;
+        }
+    }
+
+    // Settings
+    // - maxmemory amount + evict random keys when full
+    // - save snapshots every 60 seconds if >= 1 key changed to the file /tmp/dump.rdb
+    shell.run(cmd!(
+        "redis-cli -p 7777 CONFIG SET maxmemory-policy allkeys-random"
+    ))?;
+    shell.run(cmd!("redis-cli -p 7777 CONFIG SET maxmemory {}mb", size_mb))?;
+
+    shell.run(cmd!("redis-cli -p 7777 CONFIG SET dir /tmp/"))?;
+    shell.run(cmd!("redis-cli -p 7777 CONFIG SET dbfilename dump.rdb"))?;
+    shell.run(cmd!("redis-cli -p 7777 CONFIG SET save \"60 1\""))?;
+
+    Ok(handle)
+}
+
+/// Run the `redis_gen_data` workload.
+///
+/// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
+/// - `server_size_mb` is the size of `redis` server in MB.
+/// - `wk_size_gb` is the size of the workload in GB.
+/// - `freq` is the CPU frequency. If passed, the workload will use rdtsc for timing.
+/// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
+/// - `output_file` is the file to which the workload will write its output. If `None`, then
+///   `/dev/null` is used.
+pub fn run_redis_gen_data(
+    shell: &SshShell,
+    exp_dir: &str,
+    server_size_mb: usize,
+    wk_size_gb: usize,
+    freq: Option<usize>,
+    pf_time: Option<u64>,
+    output_file: Option<&str>,
+) -> Result<(), failure::Error> {
+    // Start server
+    start_redis(&shell, server_size_mb)?;
+
+    // Run workload
+    shell.run(
+        cmd!(
+            "./target/release/redis_gen_data localhost:7777 {} {} {} > {}",
+            wk_size_gb,
+            if let Some(freq) = freq {
+                format!("--freq {}", freq)
+            } else {
+                "".into()
+            },
+            if let Some(pf_time) = pf_time {
+                format!("--pftime {}", pf_time)
+            } else {
+                "".into()
+            },
+            output_file.unwrap_or("/dev/null")
+        )
+        .cwd(exp_dir),
+    )?;
+
+    Ok(())
+}
