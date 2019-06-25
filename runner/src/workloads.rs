@@ -253,7 +253,7 @@ pub fn run_memhog(
                 ""
             },
             if opts.contains(MemhogOptions::DATA_OBLIV) {
-                unimplemented!()
+                "-o"
             } else {
                 ""
             },
