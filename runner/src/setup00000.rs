@@ -164,7 +164,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         }
 
         // Need a new shell so that we get the new user group
-        let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
+        ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
         ushell.set_dry_run(dry_run);
 
         if let Some(device) = device {
