@@ -131,6 +131,8 @@ pub fn timings_str(timings: &[(&str, std::time::Duration)]) -> String {
 /// Clone the research-workspace and checkout the given submodules. The given token is used as the
 /// Github personal access token.
 ///
+/// If the repository is already cloned, nothing is done.
+///
 /// Returns the git hash of the cloned repo.
 ///
 /// *NOTE*: This function intentionally does not take the repo URL. It should always be the above.
@@ -139,6 +141,12 @@ pub fn clone_research_workspace(
     token: &str,
     submodules: &[&str],
 ) -> Result<String, failure::Error> {
+    // Check if the repo is already cloned.
+    match research_workspace_git_hash(&ushell) {
+        Ok(hash) => return Ok(hash),
+        Err(..) => {}
+    }
+
     // Clone the repo.
     let repo = GitHubRepo::Https {
         repo: RESEARCH_WORKSPACE_REPO.into(),
