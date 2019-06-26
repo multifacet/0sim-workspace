@@ -240,9 +240,10 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
                 ZEROSIM_METIS_SUBMODULE,
             ];
 
-            let kernel_path = format!(
-                "{}/{}/{}",
-                user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
+            let kernel_path = dir!(
+                user_home.as_str(),
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_KERNEL_SUBMODULE
             );
 
             let git_hash = crate::common::clone_research_workspace(&ushell, token, SUBMODULES)?;
@@ -387,7 +388,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
 
     // Create the VM and add our ssh key to it.
-    let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+    let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
     ushell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
     crate::common::gen_new_vagrantdomain(&ushell)?;
@@ -397,7 +398,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
     ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
 
-    let key = std::fs::read_to_string(format!("{}/{}", SSH_LOCATION, "id_rsa.pub"))?;
+    let key = std::fs::read_to_string(dir!(SSH_LOCATION, "id_rsa.pub"))?;
     let key = key.trim();
     ushell.run(
         cmd!(
@@ -413,7 +414,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let _ = Command::new("ssh-keygen")
         .args(&[
             "-f",
-            &format!("{}/{}", SSH_LOCATION, "known_hosts"),
+            &dir!(SSH_LOCATION, "known_hosts"),
             "-R",
             &format!("[{}]:{}", host, crate::common::exp00000::VAGRANT_PORT),
         ])
@@ -517,10 +518,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ushell.run(
         cmd!("$HOME/.cargo/bin/cargo build --release")
             .use_bash()
-            .cwd(format!(
-                "{}/{}",
-                RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE
-            )),
+            .cwd(dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE)),
     )?;
 
     // We share the research-workspace with the VM via a vagrant shared directory (NFS) so that
@@ -550,8 +548,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
         },
         KernelConfig {
-            base_config: KernelBaseConfigSource::Path(format!(
-                "{}/{}",
+            base_config: KernelBaseConfigSource::Path(dir!(
                 HOSTNAME_SHARED_DIR,
                 guest_config_base_name.to_str().unwrap()
             )),
@@ -581,19 +578,17 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 
     ushell.run(
         cmd!(
-            "cp {}/rpmbuild/RPMS/x86_64/{} {}/{}/",
+            "cp {}/rpmbuild/RPMS/x86_64/{} {}/",
             user_home,
             kernel_rpm,
-            user_home,
-            HOSTNAME_SHARED_DIR
+            dir!(user_home.as_str(), HOSTNAME_SHARED_DIR)
         )
         .use_bash(),
     )?;
 
     vrshell.run(cmd!(
-        "rpm -ivh --force {}/{}",
-        crate::common::exp00000::VAGRANT_SHARED_DIR,
-        kernel_rpm
+        "rpm -ivh --force {}",
+        dir!(crate::common::exp00000::VAGRANT_SHARED_DIR, kernel_rpm)
     ))?;
 
     vrshell.run(cmd!("sudo grub2-set-default 0"))?;
@@ -604,21 +599,23 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 
     // 0sim-experiments
     vushell.run(
-        cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&format!(
-            "/home/vagrant/{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE
+        cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&dir!(
+            "/home/vagrant",
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_EXPERIMENTS_SUBMODULE
         )),
     )?;
 
     // NAS 3.4
-    ushell.run(cmd!("tar xvf NPB3.4.tar.gz").cwd(&format!(
-        "{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
-    )))?;
     ushell.run(
-        cmd!("cp config/NAS.samples/make.def_gcc config/make.def").cwd(&format!(
-            "{}/{}/NPB3.4/NPB3.4-OMP",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+        cmd!("tar xvf NPB3.4.tar.gz").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR)),
+    )?;
+    ushell.run(
+        cmd!("cp config/NAS.samples/make.def_gcc config/make.def").cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            "NPB3.4",
+            "NPB3.4-OMP"
         )),
     )?;
     ushell.run(
@@ -626,15 +623,19 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             "sed -i 's/^FFLAGS.*$/FFLAGS  = -O3 -fopenmp \
              -m64 -fdefault-integer-8/' config/make.def"
         )
-        .cwd(&format!(
-            "{}/{}/NPB3.4/NPB3.4-OMP",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+        .cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            "NPB3.4",
+            "NPB3.4-OMP"
         )),
     )?;
     ushell.run(
-        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )").cwd(&format!(
-            "{}/{}/NPB3.4/NPB3.4-OMP",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR
+        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )").cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            "NPB3.4",
+            "NPB3.4-OMP"
         )),
     )?;
 
@@ -644,40 +645,46 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         vushell.run(cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"))?;
 
         vushell.run(cmd!(
-            "echo 'source {}/{}/{}/hadoop_env.sh' >> ~/.bashrc",
+            "echo 'source {}/hadoop_env.sh' >> ~/.bashrc",
+            dir!(
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_BENCHMARKS_DIR,
+                ZEROSIM_HADOOP_PATH
+            )
+        ))?;
+
+        ushell.run(cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL).cwd(&dir!(
             RESEARCH_WORKSPACE_PATH,
             ZEROSIM_BENCHMARKS_DIR,
             ZEROSIM_HADOOP_PATH
-        ))?;
-
-        ushell.run(
-            cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL).cwd(&format!(
-                "{}/{}/{}",
-                RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
-            )),
-        )?;
-        ushell.run(cmd!("tar xvzf {}", HADOOP_TARBALL_NAME).cwd(&format!(
-            "{}/{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
         )))?;
-        ushell.run(cmd!("tar xvzf {}", SPARK_TARBALL_NAME).cwd(&format!(
-            "{}/{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        ushell.run(cmd!("tar xvzf {}", HADOOP_TARBALL_NAME).cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            ZEROSIM_HADOOP_PATH
+        )))?;
+        ushell.run(cmd!("tar xvzf {}", SPARK_TARBALL_NAME).cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            ZEROSIM_HADOOP_PATH
         )))?;
 
         ushell.run(
-            cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME).cwd(&format!(
-                "{}/{}/{}",
-                RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+            cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME).cwd(&dir!(
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_BENCHMARKS_DIR,
+                ZEROSIM_HADOOP_PATH
             )),
         )?;
-        ushell.run(cmd!("cp spark-conf/* {}/conf/", SPARK_HOME).cwd(&format!(
-            "{}/{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        ushell.run(cmd!("cp spark-conf/* {}/conf/", SPARK_HOME).cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            ZEROSIM_HADOOP_PATH
         )))?;
-        ushell.run(cmd!("cp hibench-conf/* HiBench/conf/").cwd(&format!(
-            "{}/{}/{}",
-            RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+        ushell.run(cmd!("cp hibench-conf/* HiBench/conf/").cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            ZEROSIM_HADOOP_PATH
         )))?;
 
         vushell.run(
