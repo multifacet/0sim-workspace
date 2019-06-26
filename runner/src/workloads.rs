@@ -343,14 +343,14 @@ pub fn start_redis(
     // Settings
     // - maxmemory amount + evict random keys when full
     // - save snapshots every 60 seconds if >= 1 key changed to the file /tmp/dump.rdb
-    shell.run(cmd!(
-        "redis-cli -p 7777 CONFIG SET maxmemory-policy allkeys-random"
-    ))?;
-    shell.run(cmd!("redis-cli -p 7777 CONFIG SET maxmemory {}mb", size_mb))?;
+    with_shell! { shell =>
+        cmd!("redis-cli -p 7777 CONFIG SET maxmemory-policy allkeys-random"),
+        cmd!("redis-cli -p 7777 CONFIG SET maxmemory {}mb", size_mb),
 
-    shell.run(cmd!("redis-cli -p 7777 CONFIG SET dir /tmp/"))?;
-    shell.run(cmd!("redis-cli -p 7777 CONFIG SET dbfilename dump.rdb"))?;
-    shell.run(cmd!("redis-cli -p 7777 CONFIG SET save \"60 1\""))?;
+        cmd!("redis-cli -p 7777 CONFIG SET dir /tmp/"),
+        cmd!("redis-cli -p 7777 CONFIG SET dbfilename dump.rdb"),
+        cmd!("redis-cli -p 7777 CONFIG SET save \"60 1\""),
+    }
 
     Ok(handle)
 }
