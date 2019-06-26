@@ -86,7 +86,7 @@ pub const ZEROSIM_HIBENCH_SUBMODULE: &str = "bmks/zerosim-hadoop/HiBench";
 pub const ZEROSIM_MEMHOG_SUBMODULE: &str = "bmks/numactl";
 
 /// Path to the metis submodule.
-pub const ZEROSIM_METIS_SUBMODULE: &str = "bmks/metis";
+pub const ZEROSIM_METIS_SUBMODULE: &str = "bmks/Metis";
 
 /// Path to benchmarks directory.
 pub const ZEROSIM_BENCHMARKS_DIR: &str = "bmks";
