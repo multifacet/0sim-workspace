@@ -399,11 +399,16 @@ pub fn run_redis_gen_data(
     Ok(())
 }
 
-/// Run the metis kmeans workload with the given parameters.
+/// Run the metis matrix multiply workload with the given matrix dimensions (square matrix). This
+/// workload takes a really long time, so we start it in a spawned shell and return the join handle
+/// rather than waiting for the workload to return.
 ///
-/// This workload takes a really long time, so we start it in a spawned shell and return the join
-/// handle rather than waiting for the workload to return.
-pub fn run_metis_kmeans() -> Result<(SshShell, SshSpawnHandle), failure::Error> {
-    // TODO
-    unimplemented!()
+/// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
+/// - `dim` is the dimension of the matrix (one side), which is assumed to be square.
+pub fn run_metis_matrix_mult(
+    shell: &SshShell,
+    bmk_dir: &str,
+    dim: usize,
+) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+    shell.spawn(cmd!("./obj/matrix_mult -q -l {}", dim).cwd(bmk_dir))
 }
