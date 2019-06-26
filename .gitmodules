@@ -12,7 +12,7 @@
 	url = https://github.com/Intel-bigdata/HiBench.git
 [submodule "numactl"]
 	path = bmks/numactl
-	url = ../numactl
+	url = ../numactl.git
 [submodule "bmks/Metis"]
 	path = bmks/Metis
-	url = ../Metis
+	url = ../Metis.git
