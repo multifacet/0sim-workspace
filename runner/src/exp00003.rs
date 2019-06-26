@@ -18,12 +18,16 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{
-    exp00003::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+use crate::{
+    common::{
+        exp_0sim::*,
+        output::OutputManager,
+        paths::{setup00000::*, *},
+    },
+    settings,
+    setup00001::GUEST_SWAP_GBS,
+    workloads::run_memcached_and_capture_thp,
 };
-use crate::settings;
-use crate::setup00001::GUEST_SWAP_GBS;
-use crate::workloads::run_memcached_and_capture_thp;
 
 /// Interval at which to collect thp stats
 const INTERVAL: usize = 60; // seconds

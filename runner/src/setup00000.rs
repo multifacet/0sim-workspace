@@ -13,13 +13,10 @@ use spurs::{
 };
 
 use crate::common::{
+    exp_0sim::*,
     get_user_home_dir,
-    setup00000::{HOSTNAME_SHARED_DIR, HOSTNAME_SHARED_RESULTS_DIR},
+    paths::{setup00000::*, *},
     KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction, Username,
-    RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
-    ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
-    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_MEMHOG_SUBMODULE, ZEROSIM_METIS_SUBMODULE,
-    ZEROSIM_SWAPNIL_PATH, ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -200,7 +197,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             // create a 1GB zeroed file to be mounted as a loopback device for use as metadata dev for thin pool
             ushell.run(cmd!("sudo fallocate -z -l 1073741824 {}", DM_META_FILE))?;
 
-            crate::common::exp00000::create_thin_swap(&ushell, DM_META_FILE, mapper_device)?;
+            create_thin_swap(&ushell, DM_META_FILE, mapper_device)?;
 
             // Save so that we can mount on reboot.
             crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
@@ -406,7 +403,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ushell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
     crate::common::gen_new_vagrantdomain(&ushell)?;
 
-    crate::common::exp00000::gen_vagrantfile(&ushell, 20, 1)?;
+    gen_vagrantfile(&ushell, 20, 1)?;
 
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
     ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
@@ -429,15 +426,14 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             "-f",
             &dir!(SSH_LOCATION, "known_hosts"),
             "-R",
-            &format!("[{}]:{}", host, crate::common::exp00000::VAGRANT_PORT),
+            &format!("[{}]:{}", host, VAGRANT_PORT),
         ])
         .status()
         .unwrap();
 
     // Start vagrant
-    let mut vrshell =
-        crate::common::exp00000::start_vagrant(&ushell, &login.host, 20, 1, /* fast */ true)?;
-    let mut vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
+    let mut vrshell = start_vagrant(&ushell, &login.host, 20, 1, /* fast */ true)?;
+    let mut vushell = connect_to_vagrant_as_user(&login.host)?;
 
     // Sometimes on adsl, networking is kind of messed up until a host restart. Check for
     // connectivity, and try restarting.
@@ -446,14 +442,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
         spurs::util::reboot(&mut ushell, dry_run)?;
 
-        vrshell = crate::common::exp00000::start_vagrant(
-            &ushell,
-            &login.host,
-            20,
-            1,
-            /* fast */ true,
-        )?;
-        vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
+        vrshell = start_vagrant(&ushell, &login.host, 20, 1, /* fast */ true)?;
+        vushell = connect_to_vagrant_as_user(&login.host)?;
     }
 
     // If needed, setup the proxy.
@@ -479,8 +469,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             .run(cmd!("echo proxy=https://{} | tee --append /etc/yum.conf", proxy).use_bash())?;
 
         // need to restart shell to get new env
-        vrshell = crate::common::exp00000::connect_to_vagrant_as_root(&login.host)?;
-        vushell = crate::common::exp00000::connect_to_vagrant_as_user(&login.host)?;
+        vrshell = connect_to_vagrant_as_root(&login.host)?;
+        vushell = connect_to_vagrant_as_user(&login.host)?;
     }
 
     // Install stuff on the VM
@@ -541,11 +531,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
         .stdout;
     let guest_config = guest_config.trim().into();
-    vushell.run(cmd!(
-        "cp {} {}",
-        guest_config,
-        crate::common::exp00000::VAGRANT_SHARED_DIR
-    ))?;
+    vushell.run(cmd!("cp {} {}", guest_config, VAGRANT_SHARED_DIR))?;
 
     let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
 
@@ -597,7 +583,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 
     vrshell.run(cmd!(
         "rpm -ivh --force {}",
-        dir!(crate::common::exp00000::VAGRANT_SHARED_DIR, kernel_rpm)
+        dir!(VAGRANT_SHARED_DIR, kernel_rpm)
     ))?;
 
     vrshell.run(cmd!("sudo grub2-set-default 0"))?;

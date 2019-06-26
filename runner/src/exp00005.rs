@@ -11,12 +11,15 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{
-    exp00000::*, output::OutputManager, setup00000::HOSTNAME_SHARED_RESULTS_DIR,
-    RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_EXPERIMENTS_SUBMODULE,
+use crate::{
+    common::{
+        exp_0sim::*,
+        output::OutputManager,
+        paths::{setup00000::*, *},
+    },
+    settings,
+    workloads::{run_nas_cg, run_time_mmap_touch, NasClass, TimeMmapTouchPattern},
 };
-use crate::settings;
-use crate::workloads::{run_nas_cg, run_time_mmap_touch, NasClass, TimeMmapTouchPattern};
 
 const NAS_CG_TIME: usize = 7200; // seconds
 

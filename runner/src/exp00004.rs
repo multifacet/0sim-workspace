@@ -12,12 +12,11 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{
-    exp00004::*, get_user_home_dir, output::OutputManager, RESEARCH_WORKSPACE_PATH,
-    ZEROSIM_EXPERIMENTS_SUBMODULE,
+use crate::{
+    common::{exp_0sim::*, get_user_home_dir, output::OutputManager, paths::*},
+    settings,
+    workloads::run_memcached_and_capture_thp,
 };
-use crate::settings;
-use crate::workloads::run_memcached_and_capture_thp;
 
 const BARE_METAL_RESULTS_DIR: &str = "vm_shared/results/";
 

@@ -11,12 +11,15 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{
-    exp00000::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR,
-    ZEROSIM_EXPERIMENTS_SUBMODULE,
+use crate::{
+    common::{
+        exp_0sim::*,
+        output::OutputManager,
+        paths::{setup00000::*, *},
+    },
+    settings,
+    workloads::{run_memcached_gen_data, run_memhog, run_nas_cg, MemhogOptions, NasClass},
 };
-use crate::settings;
-use crate::workloads::{run_memcached_gen_data, run_memhog, run_nas_cg, MemhogOptions, NasClass};
 
 /// The amount of time (in hours) to let the NAS CG workload run.
 const NAS_CG_HOURS: u64 = 6;
@@ -267,7 +270,7 @@ where
     // Record buddyinfo on the guest until signalled to stop.
     vshell.run(cmd!("rm -f /tmp/exp-stop"))?;
 
-    let vshell2 = crate::common::exp00000::connect_to_vagrant_as_root(login.hostname)?;
+    let vshell2 = connect_to_vagrant_as_root(login.hostname)?;
     let (_shell, buddyinfo_handle) = vshell2.spawn(
         cmd!(
             "while [ ! -e /tmp/exp-stop ] ; do \

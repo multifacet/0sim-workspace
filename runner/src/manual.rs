@@ -13,11 +13,12 @@ use spurs::{
 };
 
 use crate::common::{
-    exp00000::{
+    exp_0sim::{
         initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, setup_swapping,
         start_vagrant, turn_on_ssdswap, turn_on_zswap, VAGRANT_CORES, VAGRANT_MEM,
     },
-    Login, Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+    paths::*,
+    Login, Username,
 };
 
 pub fn cli_options() -> clap::App<'static, 'static> {

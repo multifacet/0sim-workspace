@@ -11,14 +11,17 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{
-    exp00000::*, output::OutputManager, setup00000::HOSTNAME_SHARED_RESULTS_DIR,
-    RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
-};
-use crate::settings;
-use crate::workloads::{
-    run_locality_mem_access, run_memcached_gen_data, run_time_mmap_touch, LocalityMemAccessMode,
-    TimeMmapTouchPattern,
+use crate::{
+    common::{
+        exp_0sim::*,
+        output::OutputManager,
+        paths::{setup00000::*, *},
+    },
+    settings,
+    workloads::{
+        run_locality_mem_access, run_memcached_gen_data, run_time_mmap_touch,
+        LocalityMemAccessMode, TimeMmapTouchPattern,
+    },
 };
 
 #[derive(Copy, Clone, Debug)]

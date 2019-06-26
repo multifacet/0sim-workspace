@@ -8,8 +8,10 @@ use clap::clap_app;
 use spurs::{cmd, ssh::Execute};
 
 use crate::common::{
-    get_user_home_dir, setup00000::HOSTNAME_SHARED_DIR, KernelBaseConfigSource, KernelConfig,
-    KernelPkgType, KernelSrc, Login, Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE,
+    exp_0sim::*,
+    get_user_home_dir,
+    paths::{setup00000::*, *},
+    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, Username,
 };
 
 pub const GUEST_SWAP_GBS: usize = 10;
@@ -35,8 +37,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
 
     // Connect to the remote.
-    let (ushell, vshell) =
-        crate::common::exp00000::connect_and_setup_host_and_vagrant(dry_run, &login, 20, 1)?;
+    let (ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, 20, 1)?;
 
     // Install the instrumented kernel on the guest.
     //
@@ -72,11 +73,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
         .stdout;
     let guest_config = guest_config.trim().into();
-    vshell.run(cmd!(
-        "cp {} {}",
-        guest_config,
-        crate::common::exp00000::VAGRANT_SHARED_DIR
-    ))?;
+    vshell.run(cmd!("cp {} {}", guest_config, VAGRANT_SHARED_DIR))?;
 
     let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
 

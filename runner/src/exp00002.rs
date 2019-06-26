@@ -10,11 +10,15 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{
-    exp00002::*, output::OutputManager, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE,
+use crate::{
+    common::{
+        exp_0sim::*,
+        output::OutputManager,
+        paths::{setup00000::*, *},
+    },
+    settings,
+    workloads::{run_time_loop, run_time_mmap_touch, TimeMmapTouchPattern},
 };
-use crate::settings;
-use crate::workloads::{run_time_loop, run_time_mmap_touch, TimeMmapTouchPattern};
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {

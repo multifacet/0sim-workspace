@@ -17,6 +17,8 @@ use spurs::{
     ssh::{Execute, SshShell},
 };
 
+use paths::*;
+
 #[derive(Copy, Clone, Debug)]
 pub struct Username<'u>(pub &'u str);
 
@@ -65,40 +67,55 @@ pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
 /// The github repo URL for the research workspace.
 pub const RESEARCH_WORKSPACE_REPO: &str = "github.com/mark-i-m/research-workspace";
 
-/// The path at which `clone_research_workspace` clones the workspace.
-pub const RESEARCH_WORKSPACE_PATH: &str = "research-workspace";
+/// Common paths.
+pub mod paths {
+    /// The path at which `clone_research_workspace` clones the workspace.
+    pub const RESEARCH_WORKSPACE_PATH: &str = "research-workspace";
 
-// Path to certain submodules
+    /// Path to the 0sim submodule.
+    pub const ZEROSIM_KERNEL_SUBMODULE: &str = "0sim";
 
-/// Path to the 0sim submodule.
-pub const ZEROSIM_KERNEL_SUBMODULE: &str = "0sim";
+    /// Path to the 0sim-experiments submodule.
+    pub const ZEROSIM_EXPERIMENTS_SUBMODULE: &str = "0sim-experiments";
 
-/// Path to the 0sim-experiments submodule.
-pub const ZEROSIM_EXPERIMENTS_SUBMODULE: &str = "0sim-experiments";
+    /// Path to the 0sim-trace submodule.
+    pub const ZEROSIM_TRACE_SUBMODULE: &str = "0sim-trace";
 
-/// Path to the 0sim-trace submodule.
-pub const ZEROSIM_TRACE_SUBMODULE: &str = "0sim-trace";
+    /// Path to the HiBench submodule.
+    pub const ZEROSIM_HIBENCH_SUBMODULE: &str = "bmks/zerosim-hadoop/HiBench";
 
-/// Path to the HiBench submodule.
-pub const ZEROSIM_HIBENCH_SUBMODULE: &str = "bmks/zerosim-hadoop/HiBench";
+    /// Path to the memhog (numactl) submodule.
+    pub const ZEROSIM_MEMHOG_SUBMODULE: &str = "bmks/numactl";
 
-/// Path to the memhog (numactl) submodule.
-pub const ZEROSIM_MEMHOG_SUBMODULE: &str = "bmks/numactl";
+    /// Path to the metis submodule.
+    pub const ZEROSIM_METIS_SUBMODULE: &str = "bmks/Metis";
 
-/// Path to the metis submodule.
-pub const ZEROSIM_METIS_SUBMODULE: &str = "bmks/Metis";
+    /// Path to benchmarks directory.
+    pub const ZEROSIM_BENCHMARKS_DIR: &str = "bmks";
 
-/// Path to benchmarks directory.
-pub const ZEROSIM_BENCHMARKS_DIR: &str = "bmks";
+    /// Path to Hadoop benchmark stuff within the benchmarks dir.
+    pub const ZEROSIM_HADOOP_PATH: &str = "zerosim-hadoop";
 
-/// Path to Hadoop benchmark stuff within the benchmarks dir.
-pub const ZEROSIM_HADOOP_PATH: &str = "zerosim-hadoop";
+    /// Path to Swapnil's scripts within the benchmarks dir.
+    pub const ZEROSIM_SWAPNIL_PATH: &str = "swapnil_scripts";
 
-/// Path to Swapnil's scripts within the benchmarks dir.
-pub const ZEROSIM_SWAPNIL_PATH: &str = "swapnil_scripts";
+    /// Path to the `vagrant` subdirectory where `gen_vagrantfile` will do its work.
+    pub const VAGRANT_SUBDIRECTORY: &str = "vagrant";
 
-/// Path to the `vagrant` subdirectory where `gen_vagrantfile` will do its work.
-pub const VAGRANT_SUBDIRECTORY: &str = "vagrant";
+    pub mod setup00000 {
+        /// The shared directory on the host.
+        pub const HOSTNAME_SHARED_DIR: &str = "vm_shared/";
+
+        /// The shared directory for results on the host.
+        pub const HOSTNAME_SHARED_RESULTS_DIR: &str = "vm_shared/results/";
+
+        /// The shared directory on the guest.
+        pub const VAGRANT_SHARED_DIR: &str = "/vagrant/vm_shared/";
+
+        /// The shared directory for results on the guest.
+        pub const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
+    }
+}
 
 /// Time the given operations and push the time to the given `Vec<(String, Duration)>`.
 macro_rules! time {
@@ -594,12 +611,8 @@ pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failu
     Ok(shell.run(cmd!("systemctl status {}", service)).is_ok())
 }
 
-pub mod setup00000 {
-    pub const HOSTNAME_SHARED_DIR: &str = "vm_shared/";
-    pub const HOSTNAME_SHARED_RESULTS_DIR: &str = "vm_shared/results/";
-}
-
-pub mod exp00000 {
+/// Routines used for 0sim-related experiments
+pub mod exp_0sim {
     use std::collections::HashMap;
 
     use spurs::{
@@ -607,9 +620,9 @@ pub mod exp00000 {
         ssh::{Execute, SshShell},
     };
 
-    pub use super::{
-        Login, Username, RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_KERNEL_SUBMODULE,
-    };
+    use super::paths::*;
+
+    pub use super::{Login, Username};
 
     /// The port that vagrant VMs forward from.
     pub const VAGRANT_PORT: u16 = 5555;
@@ -619,12 +632,6 @@ pub mod exp00000 {
 
     /// The default number of cores of the VM.
     pub const VAGRANT_CORES: usize = 1;
-
-    /// The shared directory for results.
-    pub const VAGRANT_SHARED_DIR: &str = "/vagrant/vm_shared/";
-
-    /// The shared directory for results.
-    pub const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
 
     /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
     pub fn initial_reboot<A>(dry_run: bool, login: &Login<A>) -> Result<(), failure::Error>
@@ -1200,22 +1207,4 @@ pub mod exp00000 {
         )?;
         Ok(())
     }
-}
-
-pub mod exp00002 {
-    pub use super::exp00000::{
-        connect_and_setup_host_and_vagrant, connect_and_setup_host_only,
-        connect_to_vagrant_as_root, gen_vagrantfile, initial_reboot, start_vagrant,
-        turn_off_swapdevs, turn_on_swapdevs, turn_on_zswap, virsh_vcpupin, VAGRANT_CORES,
-        VAGRANT_MEM, VAGRANT_PORT, VAGRANT_RESULTS_DIR,
-    };
-    pub use super::{Login, Username};
-}
-
-pub mod exp00003 {
-    pub use super::exp00000::*;
-}
-
-pub mod exp00004 {
-    pub use super::exp00003::*;
 }

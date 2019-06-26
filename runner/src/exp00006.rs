@@ -10,8 +10,10 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{exp00003::*, output::OutputManager};
-use crate::settings;
+use crate::{
+    common::{exp_0sim::*, output::OutputManager, paths::setup00000::*},
+    settings,
+};
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {

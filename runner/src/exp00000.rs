@@ -10,12 +10,17 @@ use spurs::{
     util::escape_for_bash,
 };
 
-use crate::common::{
-    exp00000::*, get_cpu_freq, output::OutputManager, Username, RESEARCH_WORKSPACE_PATH,
-    ZEROSIM_EXPERIMENTS_SUBMODULE,
+use crate::{
+    common::{
+        exp_0sim::*,
+        get_cpu_freq,
+        output::OutputManager,
+        paths::{setup00000::*, *},
+        Username,
+    },
+    settings,
+    workloads::{run_memcached_gen_data, run_time_mmap_touch, TimeMmapTouchPattern},
 };
-use crate::settings;
-use crate::workloads::{run_memcached_gen_data, run_time_mmap_touch, TimeMmapTouchPattern};
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {

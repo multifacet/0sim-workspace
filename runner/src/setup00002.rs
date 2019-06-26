@@ -11,8 +11,8 @@ use spurs::{
 };
 
 use crate::common::{
-    get_user_home_dir, KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login,
-    Username, RESEARCH_WORKSPACE_PATH, ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_KERNEL_SUBMODULE,
+    get_user_home_dir, paths::*, KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc,
+    Login, Username,
 };
 
 pub fn cli_options() -> clap::App<'static, 'static> {
