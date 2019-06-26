@@ -13,6 +13,3 @@
 [submodule "numactl"]
 	path = bmks/numactl
 	url = ../numactl
-[submodule "bmks/Metis"]
-	path = bmks/Metis
-	url = ../Metis
