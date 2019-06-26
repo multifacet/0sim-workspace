@@ -19,7 +19,7 @@ use crate::common::{
     RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
     ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
     ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_MEMHOG_SUBMODULE, ZEROSIM_METIS_SUBMODULE,
-    ZEROSIM_TRACE_SUBMODULE,
+    ZEROSIM_SWAPNIL_PATH, ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -678,6 +678,13 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         cmd!("./configure"),
         cmd!("make"),
     }
+
+    // Eager paging scripts/programs
+    ushell.run(cmd!("make").cwd(&dir!(
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_BENCHMARKS_DIR,
+        ZEROSIM_SWAPNIL_PATH
+    )))?;
 
     // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing
     // kernel command line and replace it with the same + `tsc=reliable`.

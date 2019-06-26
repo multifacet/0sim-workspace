@@ -94,6 +94,9 @@ pub const ZEROSIM_BENCHMARKS_DIR: &str = "bmks";
 /// Path to Hadoop benchmark stuff within the benchmarks dir.
 pub const ZEROSIM_HADOOP_PATH: &str = "zerosim-hadoop";
 
+/// Path to Swapnil's scripts within the benchmarks dir.
+pub const ZEROSIM_SWAPNIL_PATH: &str = "swapnil_scripts";
+
 /// Path to the `vagrant` subdirectory where `gen_vagrantfile` will do its work.
 pub const VAGRANT_SUBDIRECTORY: &str = "vagrant";
 
