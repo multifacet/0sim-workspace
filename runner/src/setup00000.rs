@@ -117,36 +117,39 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         }
 
         // Install a bunch of stuff
-        ushell.run(cmd!("sudo yum group install -y 'Development Tools'"))?;
-        ushell.run(spurs_util::centos::yum_install(&[
-            "bc",
-            "openssl-devel",
-            "libvirt",
-            "libvirt-devel",
-            "virt-manager",
-            "pciutils-devel",
-            "bash-completion",
-            "elfutils-devel",
-            "libunwind-devel",
-            "audit-libs-devel",
-            "slang-devel",
-            "perl-ExtUtils-Embed",
-            "binutils-devel",
-            "xz-devel",
-            "numactl-devel",
-            "lsof",
-            "java-1.8.0-openjdk",
-            "centos-release-scl",
-            "scl-utils",
-            "maven",
-            "glib2-devel",
-            "libfdt-devel",
-            "pixman-devel",
-            "zlib-devel",
-        ]))?;
-        ushell.run(spurs_util::centos::yum_install(&["devtoolset-7"]))?;
+        with_shell! { ushell =>
+            cmd!("sudo yum group install -y 'Development Tools'"),
+            spurs_util::centos::yum_install(&[
+                "bc",
+                "openssl-devel",
+                "libvirt",
+                "libvirt-devel",
+                "virt-manager",
+                "pciutils-devel",
+                "bash-completion",
+                "elfutils-devel",
+                "libunwind-devel",
+                "audit-libs-devel",
+                "slang-devel",
+                "perl-ExtUtils-Embed",
+                "binutils-devel",
+                "xz-devel",
+                "numactl-devel",
+                "lsof",
+                "java-1.8.0-openjdk",
+                "centos-release-scl",
+                "scl-utils",
+                "maven",
+                "glib2-devel",
+                "libfdt-devel",
+                "pixman-devel",
+                "zlib-devel",
+            ]),
+            spurs_util::centos::yum_install(&["devtoolset-7"]),
 
-        ushell.run(spurs_util::util::add_to_group("libvirt"))?;
+            // Add user to libvirt group after installing
+            spurs_util::util::add_to_group("libvirt"),
+        }
 
         let installed = ushell
             .run(cmd!("yum list installed vagrant | grep -q vagrant"))
@@ -314,9 +317,11 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             let qemu_dir = QEMU_TARBALL_NAME.trim_end_matches(".tar.xz");
             let ncores = crate::common::get_num_cores(&ushell)?;
 
-            ushell.run(cmd!("./configure").cwd(qemu_dir))?;
-            ushell.run(cmd!("make -j {}", ncores).cwd(qemu_dir))?;
-            ushell.run(cmd!("sudo make install").cwd(qemu_dir))?;
+            with_shell! { ushell in qemu_dir =>
+                cmd!("./configure"),
+                cmd!("make -j {}", ncores),
+                cmd!("sudo make install"),
+            }
 
             ushell.run(cmd!(
                 "sudo chown qemu:kvm /usr/local/bin/qemu-system-x86_64"
@@ -446,24 +451,20 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     // If needed, setup the proxy.
     if let Some(proxy) = setup_proxy {
         // user
-        vushell
-            .run(cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
-        vushell
-            .run(cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
-        vushell
-            .run(cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
-        vushell
-            .run(cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
+        with_shell! { vushell =>
+            cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+            cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+            cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+            cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+        }
 
         // root
-        vrshell
-            .run(cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
-        vrshell
-            .run(cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash())?;
-        vrshell
-            .run(cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
-        vrshell
-            .run(cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash())?;
+        with_shell! { vrshell =>
+            cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+            cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+            cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+            cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+        }
 
         // proxy
         vrshell
@@ -610,82 +611,44 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ushell.run(
         cmd!("tar xvf NPB3.4.tar.gz").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR)),
     )?;
-    ushell.run(
-        cmd!("cp config/NAS.samples/make.def_gcc config/make.def").cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            "NPB3.4",
-            "NPB3.4-OMP"
-        )),
-    )?;
-    ushell.run(
+
+    with_shell! { ushell
+        in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, "NPB3.4", "NPB3.4-OMP") =>
+
+        cmd!("cp config/NAS.samples/make.def_gcc config/make.def"),
         cmd!(
             "sed -i 's/^FFLAGS.*$/FFLAGS  = -O3 -fopenmp \
              -m64 -fdefault-integer-8/' config/make.def"
-        )
-        .cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            "NPB3.4",
-            "NPB3.4-OMP"
-        )),
-    )?;
-    ushell.run(
-        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )").cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            "NPB3.4",
-            "NPB3.4-OMP"
-        )),
-    )?;
+        ),
+        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )"),
+    }
 
     // Hadoop/spark/hibench
     if setup_hadoop {
-        vushell.run(cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty())?;
-        vushell.run(cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"))?;
+        with_shell! { vushell =>
+            cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty(),
+            cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"),
 
-        vushell.run(cmd!(
-            "echo 'source {}/hadoop_env.sh' >> ~/.bashrc",
-            dir!(
-                RESEARCH_WORKSPACE_PATH,
-                ZEROSIM_BENCHMARKS_DIR,
-                ZEROSIM_HADOOP_PATH
+            cmd!(
+                "echo 'source {}/hadoop_env.sh' >> ~/.bashrc",
+                dir!(
+                    RESEARCH_WORKSPACE_PATH,
+                    ZEROSIM_BENCHMARKS_DIR,
+                    ZEROSIM_HADOOP_PATH
+                )
             )
-        ))?;
+        }
 
-        ushell.run(cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL).cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            ZEROSIM_HADOOP_PATH
-        )))?;
-        ushell.run(cmd!("tar xvzf {}", HADOOP_TARBALL_NAME).cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            ZEROSIM_HADOOP_PATH
-        )))?;
-        ushell.run(cmd!("tar xvzf {}", SPARK_TARBALL_NAME).cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            ZEROSIM_HADOOP_PATH
-        )))?;
+        with_shell! { ushell
+            in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH) =>
 
-        ushell.run(
-            cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME).cwd(&dir!(
-                RESEARCH_WORKSPACE_PATH,
-                ZEROSIM_BENCHMARKS_DIR,
-                ZEROSIM_HADOOP_PATH
-            )),
-        )?;
-        ushell.run(cmd!("cp spark-conf/* {}/conf/", SPARK_HOME).cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            ZEROSIM_HADOOP_PATH
-        )))?;
-        ushell.run(cmd!("cp hibench-conf/* HiBench/conf/").cwd(&dir!(
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_BENCHMARKS_DIR,
-            ZEROSIM_HADOOP_PATH
-        )))?;
+            cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL),
+            cmd!("tar xvzf {}", HADOOP_TARBALL_NAME),
+            cmd!("tar xvzf {}", SPARK_TARBALL_NAME),
+            cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME),
+            cmd!("cp spark-conf/* {}/conf/", SPARK_HOME),
+            cmd!("cp hibench-conf/* HiBench/conf/"),
+        }
 
         vushell.run(
             cmd!("sh -x setup.sh")
@@ -703,9 +666,10 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     vushell.run(cmd!("make").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMHOG_SUBMODULE)))?;
 
     // Metis
-    vushell
-        .run(cmd!("./configure").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_METIS_SUBMODULE)))?;
-    vushell.run(cmd!("make").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_METIS_SUBMODULE)))?;
+    with_shell! { vushell in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_METIS_SUBMODULE) =>
+        cmd!("./configure"),
+        cmd!("make"),
+    }
 
     // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing
     // kernel command line and replace it with the same + `tsc=reliable`.

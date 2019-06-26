@@ -110,7 +110,7 @@ macro_rules! time {
 
 /// Given an ordered list of path components, combine them into a path string.
 macro_rules! dir {
-    ($first:expr $(, $part:expr)*) => {{
+    ($first:expr $(, $part:expr)* $(,)?) => {{
         let mut path = String::from($first);
 
         $(
@@ -119,6 +119,21 @@ macro_rules! dir {
         )+
 
         path
+    }}
+}
+
+/// Run a bunch of commands with the same shell and optionally the same CWD.
+macro_rules! with_shell {
+    ($shell:ident $(in $cwd:expr)? => $($cmd:expr),+ $(,)?) => {{
+        let cmds = vec![$($cmd),+];
+
+        $(
+            let cmds: Vec<_> = cmds.into_iter().map(|cmd| cmd.cwd($cwd)).collect();
+        )?
+
+        for cmd in cmds.into_iter() {
+            $shell.run(cmd)?;
+        }
     }}
 }
 
@@ -1128,12 +1143,12 @@ pub mod exp00000 {
             shell.run(cmd!("grep -oE ':test_vm[0-9a-zA-Z_]+' Vagrantfile").cwd(vagrant_path))?;
         let current_name = current_name.stdout.trim();
 
-        shell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
-        shell.run(cmd!("sed -i 's/:test_vm/{}/' Vagrantfile", current_name).cwd(vagrant_path))?;
-        shell.run(
-            cmd!("sed -i 's/memory = 1023/memory = {}/' Vagrantfile", memgb).cwd(vagrant_path),
-        )?;
-        shell.run(cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores).cwd(vagrant_path))?;
+        with_shell! { shell in vagrant_path =>
+            cmd!("cp Vagrantfile.bk Vagrantfile"),
+            cmd!("sed -i 's/:test_vm/{}/' Vagrantfile", current_name),
+            cmd!("sed -i 's/memory = 1023/memory = {}/' Vagrantfile", memgb),
+            cmd!("sed -i 's/cpus = 1/cpus = {}/' Vagrantfile", cores),
+        }
 
         let user_home = crate::common::get_user_home_dir(shell)?;
         let vagrant_full_path = &format!("{}/{}", user_home, vagrant_path).replace("/", r#"\/"#);
@@ -1146,27 +1161,20 @@ pub mod exp00000 {
         let research_workspace_full_path =
             &format!("{}/{}", user_home, RESEARCH_WORKSPACE_PATH).replace("/", r#"\/"#);
 
-        shell.run(
+        with_shell! { shell in vagrant_path =>
             cmd!(
                 r#"sed -i 's/vagrant_dir = ''/vagrant_dir = "{}"/' Vagrantfile"#,
                 vagrant_full_path
-            )
-            .cwd(vagrant_path),
-        )?;
-        shell.run(
+            ),
             cmd!(
                 r#"sed -i 's/vm_shared_dir = ''/vm_shared_dir = "{}"/' Vagrantfile"#,
                 vm_shared_full_path
-            )
-            .cwd(vagrant_path),
-        )?;
-        shell.run(
+            ),
             cmd!(
                 r#"sed -i 's/research_workspace_dir = ''/research_workspace_dir = "{}"/' Vagrantfile"#,
                 research_workspace_full_path
-            )
-            .cwd(vagrant_path),
-        )?;
+            ),
+        }
 
         // Choose the interface that actually gives network access. We do this by looking for the
         // interface that gives a route 1.1.1.1 (Cloudflare DNS).
