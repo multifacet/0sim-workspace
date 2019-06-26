@@ -82,8 +82,11 @@ pub const ZEROSIM_TRACE_SUBMODULE: &str = "0sim-trace";
 /// Path to the HiBench submodule.
 pub const ZEROSIM_HIBENCH_SUBMODULE: &str = "bmks/zerosim-hadoop/HiBench";
 
-/// Path to the memhog submodule.
+/// Path to the memhog (numactl) submodule.
 pub const ZEROSIM_MEMHOG_SUBMODULE: &str = "bmks/numactl";
+
+/// Path to the metis submodule.
+pub const ZEROSIM_METIS_SUBMODULE: &str = "bmks/metis";
 
 /// Path to benchmarks directory.
 pub const ZEROSIM_BENCHMARKS_DIR: &str = "bmks";

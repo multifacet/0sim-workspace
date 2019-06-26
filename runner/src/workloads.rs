@@ -398,3 +398,12 @@ pub fn run_redis_gen_data(
 
     Ok(())
 }
+
+/// Run the metis kmeans workload with the given parameters.
+///
+/// This workload takes a really long time, so we start it in a spawned shell and return the join
+/// handle rather than waiting for the workload to return.
+pub fn run_metis_kmeans() -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+    // TODO
+    unimplemented!()
+}

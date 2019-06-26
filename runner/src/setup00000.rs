@@ -18,7 +18,8 @@ use crate::common::{
     KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction, Username,
     RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY, ZEROSIM_BENCHMARKS_DIR,
     ZEROSIM_EXPERIMENTS_SUBMODULE, ZEROSIM_HADOOP_PATH, ZEROSIM_HIBENCH_SUBMODULE,
-    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_MEMHOG_SUBMODULE, ZEROSIM_TRACE_SUBMODULE,
+    ZEROSIM_KERNEL_SUBMODULE, ZEROSIM_MEMHOG_SUBMODULE, ZEROSIM_METIS_SUBMODULE,
+    ZEROSIM_TRACE_SUBMODULE,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -236,6 +237,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
                 ZEROSIM_TRACE_SUBMODULE,
                 ZEROSIM_HIBENCH_SUBMODULE,
                 ZEROSIM_MEMHOG_SUBMODULE,
+                ZEROSIM_METIS_SUBMODULE,
             ];
 
             let kernel_path = format!(
@@ -681,19 +683,22 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         vushell.run(
             cmd!("sh -x setup.sh")
                 .use_bash()
-                .cwd(&format!(
-                    "{}/{}/{}",
-                    RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH
+                .cwd(&dir!(
+                    RESEARCH_WORKSPACE_PATH,
+                    ZEROSIM_BENCHMARKS_DIR,
+                    ZEROSIM_HADOOP_PATH
                 ))
                 .use_bash(),
         )?;
     }
 
     // memhog
-    vushell.run(cmd!("make").cwd(&format!(
-        "{}/{}",
-        RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMHOG_SUBMODULE
-    )))?;
+    vushell.run(cmd!("make").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMHOG_SUBMODULE)))?;
+
+    // Metis
+    vushell
+        .run(cmd!("./configure").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_METIS_SUBMODULE)))?;
+    vushell.run(cmd!("make").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_METIS_SUBMODULE)))?;
 
     // Make sure the TSC is marked as a reliable clock source in the guest. We get the existing
     // kernel command line and replace it with the same + `tsc=reliable`.
