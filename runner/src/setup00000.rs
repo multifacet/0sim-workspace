@@ -71,6 +71,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) set up hadoop stack on VM.")
         (@arg PROXY: -p --proxy +takes_value
          "(Optional) set up the VM to use the given proxy. Leave off the protocol (e.g. squid.cs.wisc.edu:3128)")
+        (@arg DESTROY_EXISTING: --DESTROY_EXISTING
+         "(Optional) destroy any existing VM before starting a new VM")
     }
 }
 
@@ -92,6 +94,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let disable_ept = sub_m.is_present("DISABLE_EPT");
     let setup_hadoop = sub_m.is_present("HADOOP");
     let setup_proxy = sub_m.value_of("PROXY");
+    let destroy_existing_vm = sub_m.is_present("DESTROY_EXISTING");
 
     assert!(mapper_device.is_none() || swap_devs.is_empty());
 
@@ -394,6 +397,11 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 
     // Create the VM and add our ssh key to it.
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+
+    if destroy_existing_vm {
+        ushell.run(cmd!("vagrant halt --force").cwd(vagrant_path))?;
+        ushell.run(cmd!("vagrant destroy --force").cwd(vagrant_path))?;
+    }
 
     ushell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
     crate::common::gen_new_vagrantdomain(&ushell)?;
