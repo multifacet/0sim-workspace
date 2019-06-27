@@ -396,8 +396,10 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
     if destroy_existing_vm {
-        ushell.run(cmd!("vagrant halt --force").cwd(vagrant_path))?;
-        ushell.run(cmd!("vagrant destroy --force").cwd(vagrant_path))?;
+        with_shell! { ushell in vagrant_path =>
+            cmd!("vagrant halt --force || [ ! -e Vagrantfile ]").use_bash(),
+            cmd!("vagrant destroy --force || [ ! -e Vagrantfile ]").use_bash(),
+        }
     }
 
     ushell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
