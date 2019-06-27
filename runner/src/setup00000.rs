@@ -448,6 +448,11 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         vushell = connect_to_vagrant_as_user(&login.host)?;
     }
 
+    // Keep tsc offsetting off (it may be turned on by start_vagrant).
+    ushell.run(
+        cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
+    )?;
+
     // If needed, setup the proxy.
     if let Some(proxy) = setup_proxy {
         // user
