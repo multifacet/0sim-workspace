@@ -33,6 +33,10 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The number of GBs of the VM")
         (@arg CORES: +takes_value {is_usize} +required
          "The number of cores of the VM")
+        (@arg KTASK_DIV: +takes_value {is_usize} +required
+         "The scaling factor to pass a boot parameter. The max number of threads \
+          in ktask is set to `CORES / KTASK_DIV`. 4 is the default for \
+          normal ktask.")
     }
 }
 
@@ -44,6 +48,11 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     };
     let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
     let cores = sub_m.value_of("CORES").unwrap().parse::<usize>().unwrap();
+    let ktask_div = sub_m
+        .value_of("KTASK_DIV")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
@@ -56,6 +65,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 
         * vm_size: vm_size,
         * cores: cores,
+
+        * ktask_div: ktask_div,
 
         username: login.username.as_str(),
         host: login.hostname,
@@ -82,12 +93,35 @@ where
 {
     let vm_size = settings.get::<usize>("vm_size");
     let cores = settings.get::<usize>("cores");
-
-    // Reboot
-    initial_reboot(dry_run, &login)?;
+    let ktask_div = settings.get::<usize>("ktask_div");
 
     // Collect timers on VM
     let mut timers = vec![];
+
+    // We first need to set the guest kernel boot param.
+    {
+        let ushell = SshShell::with_default_key(login.username.as_str(), login.hostname)?;
+        let vshell = time!(
+            timers,
+            "Start VM (for boot param setting)",
+            start_vagrant(
+                &ushell,
+                &login.host,
+                /* RAM */ 10,
+                /* cores */ 1,
+                /* fast */ true
+            )?
+        );
+
+        set_kernel_boot_param(
+            &vshell,
+            "ktask_mem_ncores_div",
+            Some(&format!("{}", ktask_div)),
+        )?;
+    }
+
+    // Reboot
+    initial_reboot(dry_run, &login)?;
 
     // Connect
     let ushell = connect_and_setup_host_only(dry_run, &login)?;

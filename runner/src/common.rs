@@ -620,6 +620,8 @@ pub mod exp_0sim {
         ssh::{Execute, SshShell},
     };
 
+    use regex::Regex;
+
     use super::paths::*;
 
     pub use super::{Login, Username};
@@ -1205,6 +1207,51 @@ pub mod exp_0sim {
             )
             .cwd(vagrant_path),
         )?;
+        Ok(())
+    }
+
+    /// Set a command line argument for the kernel. If the argument is already their, it will be
+    /// replaced with the new value. Otherwise, it will be appended to the list of arguments.
+    ///
+    /// Requires `sudo` (obviously).
+    pub fn set_kernel_boot_param(
+        shell: &SshShell,
+        param: &str,
+        value: Option<&str>,
+    ) -> Result<(), failure::Error> {
+        let current_cmd_line = shell
+            .run(
+                cmd!(r#"cat /etc/default/grub | grep -oP 'GRUB_CMDLINE_LINUX="\K.+(?=")'"#)
+                    .use_bash(),
+            )?
+            .stdout;
+        let current_cmd_line = current_cmd_line
+            .trim()
+            .replace("/", r"\/")
+            .replace(r"\", r"\\");
+
+        // Remove parameters from existing command line
+        let stripped_cmd_line = current_cmd_line
+            .split_whitespace()
+            .filter(|p| !p.starts_with(param))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // Add the new params.
+        shell.run(cmd!(
+            "sudo sed -i 's/{}/{} {}/' /etc/default/grub",
+            current_cmd_line,
+            stripped_cmd_line,
+            if let Some(value) = value {
+                format!("{}={}", param, value)
+            } else {
+                param.into()
+            }
+        ))?;
+
+        // Rebuild grub conf
+        shell.run(cmd!("sudo grub2-mkconfig -o /boot/grub2/grub.cfg"))?;
+
         Ok(())
     }
 }
