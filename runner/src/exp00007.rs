@@ -348,7 +348,11 @@ where
                 run_mix(
                     &vshell,
                     zerosim_exp_path,
-                    zerosim_bmk_path,
+                    &dir!(
+                        "/home/vagrant",
+                        RESEARCH_WORKSPACE_PATH,
+                        ZEROSIM_METIS_SUBMODULE
+                    ),
                     freq,
                     size >> 20,
                     MEMHOG_R,

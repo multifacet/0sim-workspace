@@ -432,7 +432,8 @@ pub fn run_metis_matrix_mult(
 /// Run the mix workload which consists of splitting memory between
 ///
 /// - 1 data-obliv memhog process with memory pinning (TODO: term and restart?)
-/// - 1 redis server and client pair
+/// - 1 redis server and client pair. The redis server does snapshots every minute, so the amount
+///   of memory it is given is halved.
 /// - 1 metis instance doing matrix multiplication (TODO: data-obliv?)
 ///
 /// This workload runs until the redis subworkload completes.
@@ -456,7 +457,7 @@ pub fn run_mix(
     let redis_handles = run_redis_gen_data(
         shell,
         exp_dir,
-        (size_gb << 10) / 3,
+        (size_gb << 10) / 3 / 2, // account for snapshots
         (size_gb << 10) / 3,
         Some(freq),
         /* pf_time */ None,
