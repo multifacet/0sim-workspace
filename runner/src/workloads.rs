@@ -325,6 +325,9 @@ pub struct RedisWorkloadHandles {
 /// Spawn a `redis` server in a new shell with the given amount of memory and set some important
 /// config settings. Usually this is called indirectly through one of the other workload routines.
 ///
+/// In order for redis snapshots to work properly, we need to tell the kernel to overcommit memory.
+/// This requires `sudo` access.
+///
 /// The redis server is listening at port 7777.
 ///
 /// The caller should ensure that any previous RDB is deleted.
@@ -334,6 +337,9 @@ pub fn start_redis(
     shell: &SshShell,
     size_mb: usize,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+    // Set overcommit
+    shell.run(cmd!("echo 1 | sudo tee /proc/sys/vm/overcommit_memory"))?;
+
     // Start the redis server
     let handle = shell.spawn(cmd!("redis-server --port 7777 --loglevel warning"))?;
 
@@ -432,8 +438,7 @@ pub fn run_metis_matrix_mult(
 /// Run the mix workload which consists of splitting memory between
 ///
 /// - 1 data-obliv memhog process with memory pinning (TODO: term and restart?)
-/// - 1 redis server and client pair. The redis server does snapshots every minute, so the amount
-///   of memory it is given is halved.
+/// - 1 redis server and client pair. The redis server does snapshots every minute.
 /// - 1 metis instance doing matrix multiplication (TODO: data-obliv?)
 ///
 /// This workload runs until the redis subworkload completes.
@@ -457,7 +462,7 @@ pub fn run_mix(
     let redis_handles = run_redis_gen_data(
         shell,
         exp_dir,
-        (size_gb << 10) / 3 / 2, // account for snapshots
+        (size_gb << 10) / 3,
         (size_gb << 10) / 3,
         Some(freq),
         /* pf_time */ None,
