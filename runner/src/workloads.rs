@@ -436,15 +436,21 @@ pub fn run_metis_matrix_mult(
 /// - 1 metis instance doing matrix multiplication (TODO: data-obliv?)
 ///
 /// Given a requested workload size of `size_gb` GB, each sub-workload gets 1/3 of the space.
+///
+/// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
+/// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
+/// - `freq` is the _host_ CPU frequency in MHz.
+/// - `size_gb` is the total amount of memory of the mix workload in GB.
+/// - `r` is the number of times to call `memhog`, not the value of `-r`. `-r` is always passed
+///   a value of `1`.
 pub fn run_mix(
     shell: &SshShell,
     exp_dir: &str,
     bmk_dir: &str,
+    freq: usize,
     size_gb: usize,
     memhog_r: usize,
 ) -> Result<(), failure::Error> {
-    let freq = crate::common::get_cpu_freq(shell)?;
-
     let _redis_handle = run_redis_gen_data(
         shell,
         exp_dir,

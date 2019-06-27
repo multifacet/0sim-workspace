@@ -349,6 +349,7 @@ where
                     &vshell,
                     zerosim_exp_path,
                     zerosim_bmk_path,
+                    freq,
                     size >> 20,
                     MEMHOG_R,
                 )?
