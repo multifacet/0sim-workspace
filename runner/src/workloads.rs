@@ -435,6 +435,8 @@ pub fn run_metis_matrix_mult(
 /// - 1 redis server and client pair
 /// - 1 metis instance doing matrix multiplication (TODO: data-obliv?)
 ///
+/// This workload runs until the redis subworkload completes.
+///
 /// Given a requested workload size of `size_gb` GB, each sub-workload gets 1/3 of the space.
 ///
 /// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
@@ -451,7 +453,7 @@ pub fn run_mix(
     size_gb: usize,
     memhog_r: usize,
 ) -> Result<(), failure::Error> {
-    let _redis_handle = run_redis_gen_data(
+    let redis_handles = run_redis_gen_data(
         shell,
         exp_dir,
         (size_gb << 10) / 3,
@@ -470,6 +472,9 @@ pub fn run_mix(
         (size_gb << 20) / 3,
         MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
     )?;
+
+    // Wait for redis client to finish
+    redis_handles.client_spawn_handle.join()?;
 
     Ok(())
 }
