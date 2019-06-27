@@ -241,26 +241,24 @@ pub fn run_memhog(
     r: usize,
     size_kb: usize,
     opts: MemhogOptions,
-) -> Result<(), failure::Error> {
-    // Repeat workload multiple times
-    for _ in 0..r {
-        shell.run(cmd!(
-            "memhog -r1 {}k {} {} > /dev/null",
-            size_kb,
-            if opts.contains(MemhogOptions::PIN) {
-                "-p"
-            } else {
-                ""
-            },
-            if opts.contains(MemhogOptions::DATA_OBLIV) {
-                "-o"
-            } else {
-                ""
-            },
-        ))?;
-    }
-
-    Ok(())
+) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+    shell.spawn(cmd!(
+        "for i in `seq {}` ; do \
+         memhog -r1 {}k {} {} > /dev/null ; \
+         done",
+        r,
+        size_kb,
+        if opts.contains(MemhogOptions::PIN) {
+            "-p"
+        } else {
+            ""
+        },
+        if opts.contains(MemhogOptions::DATA_OBLIV) {
+            "-o"
+        } else {
+            ""
+        },
+    ))
 }
 
 /// Run the `time_loop` microbenchmark on the remote.
@@ -315,6 +313,13 @@ pub fn run_locality_mem_access(
     )?;
 
     Ok(())
+}
+
+pub struct RedisWorkloadHandles {
+    pub server_shell: SshShell,
+    pub server_spawn_handle: SshSpawnHandle,
+    pub client_shell: SshShell,
+    pub client_spawn_handle: SshSpawnHandle,
 }
 
 /// Spawn a `redis` server in a new shell with the given amount of memory and set some important
@@ -372,12 +377,12 @@ pub fn run_redis_gen_data(
     freq: Option<usize>,
     pf_time: Option<u64>,
     output_file: Option<&str>,
-) -> Result<(), failure::Error> {
+) -> Result<RedisWorkloadHandles, failure::Error> {
     // Start server
-    start_redis(&shell, server_size_mb)?;
+    let (server_shell, server_spawn_handle) = start_redis(&shell, server_size_mb)?;
 
     // Run workload
-    shell.run(
+    let (client_shell, client_spawn_handle) = shell.spawn(
         cmd!(
             "./target/release/redis_gen_data localhost:7777 {} {} {} > {}",
             wk_size_gb,
@@ -396,12 +401,23 @@ pub fn run_redis_gen_data(
         .cwd(exp_dir),
     )?;
 
-    Ok(())
+    Ok(RedisWorkloadHandles {
+        server_shell,
+        server_spawn_handle,
+        client_shell,
+        client_spawn_handle,
+    })
 }
 
 /// Run the metis matrix multiply workload with the given matrix dimensions (square matrix). This
 /// workload takes a really long time, so we start it in a spawned shell and return the join handle
 /// rather than waiting for the workload to return.
+///
+/// NOTE: The amount of virtual memory used by the workload is
+///
+///     `(dim * dim) * 8 * 2` bytes
+///
+/// so if you want a workload of size `t` GB, use `dim = sqrt(t << 26)`.
 ///
 /// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
 /// - `dim` is the dimension of the matrix (one side), which is assumed to be square.
@@ -411,4 +427,43 @@ pub fn run_metis_matrix_mult(
     dim: usize,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     shell.spawn(cmd!("./obj/matrix_mult -q -l {}", dim).cwd(bmk_dir))
+}
+
+/// Run the mix workload which consists of splitting memory between
+///
+/// - 1 data-obliv memhog process with memory pinning (TODO: term and restart?)
+/// - 1 redis server and client pair
+/// - 1 metis instance doing matrix multiplication (TODO: data-obliv?)
+///
+/// Given a requested workload size of `size_gb` GB, each sub-workload gets 1/3 of the space.
+pub fn run_mix(
+    shell: &SshShell,
+    exp_dir: &str,
+    bmk_dir: &str,
+    size_gb: usize,
+    memhog_r: usize,
+) -> Result<(), failure::Error> {
+    let freq = crate::common::get_cpu_freq(shell)?;
+
+    let _redis_handle = run_redis_gen_data(
+        shell,
+        exp_dir,
+        (size_gb << 10) / 3,
+        (size_gb << 10) / 3,
+        Some(freq),
+        /* pf_time */ None,
+        /* output_file */ None,
+    )?;
+
+    let matrix_dim = ((size_gb << 26) as f64).sqrt() as usize;
+    let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim)?;
+
+    let _memhog_handles = run_memhog(
+        shell,
+        memhog_r,
+        (size_gb << 20) / 3,
+        MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
+    )?;
+
+    Ok(())
 }

@@ -20,7 +20,7 @@ use crate::{
         paths::{setup00000::*, *},
     },
     settings,
-    workloads::{run_memcached_gen_data, run_memhog, run_nas_cg, MemhogOptions, NasClass},
+    workloads::{run_memcached_gen_data, run_memhog, run_mix, run_nas_cg, MemhogOptions, NasClass},
 };
 
 /// The amount of time (in hours) to let the NAS CG workload run.
@@ -34,6 +34,7 @@ enum Workload {
     Memcached,
     Cg,
     Memhog,
+    Mix,
 }
 
 impl Workload {
@@ -42,6 +43,7 @@ impl Workload {
             Workload::Memcached => "memcached_gen_data",
             Workload::Cg => "nas_cg",
             Workload::Memhog => "memhog",
+            Workload::Mix => "mix",
         }
     }
 
@@ -50,6 +52,7 @@ impl Workload {
             "memcached_gen_data" => Workload::Memcached,
             "nas_cg" => Workload::Cg,
             "memhog" => Workload::Memhog,
+            "mix" => Workload::Mix,
             _ => panic!("unknown workload: {:?}", s),
         }
     }
@@ -76,6 +79,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
             (@arg memcached: -m "Run the memcached workload")
             (@arg cg: -c "Run the NAS Parallel Benchmark CG workload")
             (@arg memhog: -h "Run the memhog workload")
+            (@arg mix: -x "Run the mix workload")
         )
         (@arg WARMUP: -w --warmup
          "Pass this flag to warmup the VM before running the main workload.")
@@ -104,6 +108,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         Workload::Cg
     } else if sub_m.is_present("memhog") {
         Workload::Memhog
+    } else if sub_m.is_present("mix") {
+        Workload::Mix
     } else {
         panic!("unknown workload")
     };
@@ -334,6 +340,18 @@ where
         Workload::Memhog => {
             time!(timers, "Workload", {
                 run_memhog(&vshell, MEMHOG_R, size, MemhogOptions::empty())?
+            });
+        }
+
+        Workload::Mix => {
+            time!(timers, "Workload", {
+                run_mix(
+                    &vshell,
+                    zerosim_exp_path,
+                    zerosim_bmk_path,
+                    size >> 20,
+                    MEMHOG_R,
+                )?
             });
         }
     }
