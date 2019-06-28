@@ -70,6 +70,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) set up the VM to use the given proxy. Leave off the protocol (e.g. squid.cs.wisc.edu:3128)")
         (@arg DESTROY_EXISTING: --DESTROY_EXISTING
          "(Optional) destroy any existing VM before starting a new VM")
+        (@arg SKIP_VM_KERNEL: --skip_vm_kerenl
+         "(Optional) don't build a guest kernel")
     }
 }
 
@@ -92,6 +94,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let setup_hadoop = sub_m.is_present("HADOOP");
     let setup_proxy = sub_m.value_of("PROXY");
     let destroy_existing_vm = sub_m.is_present("DESTROY_EXISTING");
+    let skip_vm_kerenl = sub_m.is_present("SKIP_VM_KERNEL");
 
     assert!(mapper_device.is_none() || swap_devs.is_empty());
 
@@ -532,69 +535,71 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     // there is only one version used across both (less versioning to track). Now, just compile the
     // benchmarks and install rust on the host.
 
-    // Install a recent kernel on the guest.
-    //
-    // We will compile on the host and copy the config and the RPM through the shared directory.
-    let guest_config = vushell
-        .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
-        .stdout;
-    let guest_config = guest_config.trim().into();
-    vushell.run(cmd!("cp {} {}", guest_config, VAGRANT_SHARED_DIR))?;
+    if !skip_vm_kerenl {
+        // Install a recent kernel on the guest.
+        //
+        // We will compile on the host and copy the config and the RPM through the shared directory.
+        let guest_config = vushell
+            .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
+            .stdout;
+        let guest_config = guest_config.trim().into();
+        vushell.run(cmd!("cp {} {}", guest_config, VAGRANT_SHARED_DIR))?;
 
-    let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
+        let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
 
-    ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
-    crate::common::build_kernel(
-        dry_run,
-        &ushell,
-        KernelSrc::Tar {
-            tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
-        },
-        KernelConfig {
-            base_config: KernelBaseConfigSource::Path(dir!(
-                HOSTNAME_SHARED_DIR,
-                guest_config_base_name.to_str().unwrap()
-            )),
-            extra_options: &[
-                // disable spectre/meltdown mitigations
-                ("CONFIG_PAGE_TABLE_ISOLATION", false),
-                ("CONFIG_RETPOLINE", false),
-                // for `perf` stack traces
-                ("CONFIG_FRAME_POINTER", true),
-            ],
-        },
-        None,
-        KernelPkgType::Rpm,
-    )?;
+        ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
+        crate::common::build_kernel(
+            dry_run,
+            &ushell,
+            KernelSrc::Tar {
+                tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
+            },
+            KernelConfig {
+                base_config: KernelBaseConfigSource::Path(dir!(
+                    HOSTNAME_SHARED_DIR,
+                    guest_config_base_name.to_str().unwrap()
+                )),
+                extra_options: &[
+                    // disable spectre/meltdown mitigations
+                    ("CONFIG_PAGE_TABLE_ISOLATION", false),
+                    ("CONFIG_RETPOLINE", false),
+                    // for `perf` stack traces
+                    ("CONFIG_FRAME_POINTER", true),
+                ],
+            },
+            None,
+            KernelPkgType::Rpm,
+        )?;
 
-    // Get name of RPM by looking for most recent file.
-    let kernel_rpm = ushell
-        .run(
+        // Get name of RPM by looking for most recent file.
+        let kernel_rpm = ushell
+            .run(
+                cmd!(
+                    "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
+                    user_home
+                )
+                .use_bash(),
+            )?
+            .stdout;
+        let kernel_rpm = kernel_rpm.trim();
+
+        ushell.run(
             cmd!(
-                "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
-                user_home
+                "cp {}/rpmbuild/RPMS/x86_64/{} {}/",
+                user_home,
+                kernel_rpm,
+                dir!(user_home.as_str(), HOSTNAME_SHARED_DIR)
             )
             .use_bash(),
-        )?
-        .stdout;
-    let kernel_rpm = kernel_rpm.trim();
+        )?;
 
-    ushell.run(
-        cmd!(
-            "cp {}/rpmbuild/RPMS/x86_64/{} {}/",
-            user_home,
-            kernel_rpm,
-            dir!(user_home.as_str(), HOSTNAME_SHARED_DIR)
-        )
-        .use_bash(),
-    )?;
+        vrshell.run(cmd!(
+            "rpm -ivh --force {}",
+            dir!(VAGRANT_SHARED_DIR, kernel_rpm)
+        ))?;
 
-    vrshell.run(cmd!(
-        "rpm -ivh --force {}",
-        dir!(VAGRANT_SHARED_DIR, kernel_rpm)
-    ))?;
-
-    vrshell.run(cmd!("sudo grub2-set-default 0"))?;
+        vrshell.run(cmd!("sudo grub2-set-default 0"))?;
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
     // Install benchmarks.
