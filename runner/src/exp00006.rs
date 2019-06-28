@@ -119,7 +119,8 @@ where
             Some(&format!("{}", ktask_div)),
         )?;
 
-        vshell.run(cmd!("sudo poweroff").allow_error())?;
+        // Allow-error doesn't work because there will be a transport error, not a command failure.
+        let _ = vshell.run(cmd!("sudo poweroff"));
     }
 
     // Reboot
