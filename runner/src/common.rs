@@ -620,8 +620,6 @@ pub mod exp_0sim {
         ssh::{Execute, SshShell},
     };
 
-    use regex::Regex;
-
     use super::paths::*;
 
     pub use super::{Login, Username};
