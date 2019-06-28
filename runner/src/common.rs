@@ -1219,6 +1219,9 @@ pub mod exp_0sim {
     /// replaced with the new value. Otherwise, it will be appended to the list of arguments.
     ///
     /// Requires `sudo` (obviously).
+    ///
+    /// It is advised that the caller manually shutdown the guest via `sudo poweorff` to avoid
+    /// corruption of the guest image.
     pub fn set_kernel_boot_param(
         shell: &SshShell,
         param: &str,
@@ -1256,6 +1259,9 @@ pub mod exp_0sim {
 
         // Rebuild grub conf
         shell.run(cmd!("sudo grub2-mkconfig -o /boot/grub2/grub.cfg"))?;
+
+        // Sync to help avoid corruption
+        shell.run(cmd!("sync"))?;
 
         Ok(())
     }

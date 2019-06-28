@@ -118,6 +118,8 @@ where
             "ktask_mem_ncores_div",
             Some(&format!("{}", ktask_div)),
         )?;
+
+        vshell.run(cmd!("sudo poweroff").allow_error())?;
     }
 
     // Reboot
