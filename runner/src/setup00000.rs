@@ -70,7 +70,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) set up the VM to use the given proxy. Leave off the protocol (e.g. squid.cs.wisc.edu:3128)")
         (@arg DESTROY_EXISTING: --DESTROY_EXISTING
          "(Optional) destroy any existing VM before starting a new VM")
-        (@arg SKIP_VM_KERNEL: --skip_vm_kerenl
+        (@arg SKIP_VM_KERNEL: --skip_vm_kernel
          "(Optional) don't build a guest kernel")
     }
 }
