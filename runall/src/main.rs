@@ -135,7 +135,10 @@ fn do_work(
                     let machine_ip = machine.split(":").next().unwrap();
 
                     let scp_result = std::process::Command::new("scp")
-                        .arg(&format!("{}:{}", machine_ip, results_path))
+                        .arg(&format!(
+                            "{}:vm_shared/results/{}",
+                            machine_ip, results_path
+                        ))
                         .arg(host_results_path)
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
