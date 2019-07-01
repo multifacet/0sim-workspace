@@ -1,0 +1,10 @@
+[package]
+name = "runall"
+version = "0.1.0"
+authors = ["Mark Mansi <markm@cs.wisc.edu>"]
+edition = "2018"
+
+[dependencies]
+indicatif = "0.11.0"
+clap = "2.33.0"
+failure = "0.1.5"
