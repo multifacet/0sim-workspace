@@ -9,7 +9,6 @@ use clap::clap_app;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 
 const RUNNER: &str = "/nobackup/research-workspace/runner/";
-const RESULTS_DIR: &str = "/u/m/a/markm/private/large_mem/results/scratch/";
 
 fn main() -> Result<(), failure::Error> {
     let matches = clap_app! { runall =>
@@ -22,16 +21,19 @@ fn main() -> Result<(), failure::Error> {
          "A file with the runner subcommands for all experiments, one per line, \
           using the string `{MACHINE}` for the machine name. HACK: the command \
           should not have whitespace except between arguments.")
+        (@arg RESULTS_PATH: +required +takes_value
+         "The path on this host machine where results should be copied")
     }
     .get_matches();
 
     let machines_file = matches.value_of("MACHINES").unwrap();
     let cmds_file = matches.value_of("EXPERIMENTS").unwrap();
+    let host_results_path = matches.value_of("RESULTS_PATH").unwrap();
 
     let machines = parse_machines(machines_file)?;
     let cmds = parse_cmds(cmds_file)?;
 
-    do_work(machines, cmds)?;
+    do_work(machines, cmds, host_results_path)?;
 
     Ok(())
 }
@@ -50,7 +52,11 @@ fn parse_cmds(cmds_file: &str) -> Result<Vec<String>, failure::Error> {
         .collect())
 }
 
-fn do_work(machines: Vec<String>, cmds: Vec<String>) -> Result<(), failure::Error> {
+fn do_work(
+    machines: Vec<String>,
+    cmds: Vec<String>,
+    host_results_path: &str,
+) -> Result<(), failure::Error> {
     let spinner_style = ProgressStyle::default_spinner().template("{prefix:.bold.dim} {wide_msg}");
     let m = MultiProgress::new();
 
@@ -76,6 +82,7 @@ fn do_work(machines: Vec<String>, cmds: Vec<String>) -> Result<(), failure::Erro
 
         let machines = Arc::clone(&machines);
         let results = Arc::clone(&results);
+        let host_results_path = host_results_path.to_owned();
 
         // Spawn a thread for each command.
         let _ = std::thread::spawn(move || {
@@ -106,7 +113,7 @@ fn do_work(machines: Vec<String>, cmds: Vec<String>) -> Result<(), failure::Erro
 
                     let scp_result = std::process::Command::new("scp")
                         .arg(&format!("{}:{}", machine_ip, results_path))
-                        .arg(&format!("{}", RESULTS_DIR))
+                        .arg(host_results_path)
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .output();
