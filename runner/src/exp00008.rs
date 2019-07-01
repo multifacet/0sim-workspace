@@ -84,7 +84,11 @@ pub fn cli_options() -> clap::App<'static, 'static> {
     }
 }
 
-pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+pub fn run(
+    dry_run: bool,
+    print_results_path: bool,
+    sub_m: &clap::ArgMatches<'_>,
+) -> Result<(), failure::Error> {
     let login = Login {
         username: Username(sub_m.value_of("USERNAME").unwrap()),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
@@ -155,7 +159,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         remote_research_settings: remote_research_settings,
     };
 
-    run_inner(dry_run, &login, settings)
+    run_inner(dry_run, print_results_path, &login, settings)
 }
 
 /// Run the experiment using the settings passed. Note that because the only thing we are passed
@@ -163,6 +167,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
 /// file.
 fn run_inner<A>(
     dry_run: bool,
+    print_results_path: bool,
     login: &Login<A>,
     settings: OutputManager,
 ) -> Result<(), failure::Error>
@@ -351,6 +356,11 @@ where
         crate::common::timings_str(timers.as_slice()),
         dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
+
+    if print_results_path {
+        let glob = settings.gen_file_name("*");
+        println!("RESULTS: {}", glob);
+    }
 
     Ok(())
 }
