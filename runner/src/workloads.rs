@@ -421,9 +421,9 @@ pub fn run_redis_gen_data(
 ///
 /// NOTE: The amount of virtual memory used by the workload is
 ///
-///     `(dim * dim) * 8 * 2` bytes
+///     `(dim * dim) * 4 * 2` bytes
 ///
-/// so if you want a workload of size `t` GB, use `dim = sqrt(t << 26)`.
+/// so if you want a workload of size `t` GB, use `dim = sqrt(t << 27)`.
 ///
 /// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
 /// - `dim` is the dimension of the matrix (one side), which is assumed to be square.
@@ -469,7 +469,7 @@ pub fn run_mix(
         /* output_file */ None,
     )?;
 
-    let matrix_dim = ((size_gb << 26) as f64).sqrt() as usize;
+    let matrix_dim = ((size_gb << 27) as f64).sqrt() as usize;
     let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim)?;
 
     let _memhog_handles = run_memhog(
