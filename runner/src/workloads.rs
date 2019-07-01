@@ -432,7 +432,7 @@ pub fn run_metis_matrix_mult(
     bmk_dir: &str,
     dim: usize,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
-    shell.spawn(cmd!("./obj/matrix_mult -q -l {}", dim).cwd(bmk_dir))
+    shell.spawn(cmd!("./obj/matrix_mult2 -q -l {}", dim).cwd(bmk_dir))
 }
 
 /// Run the mix workload which consists of splitting memory between
