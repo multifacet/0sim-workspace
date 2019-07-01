@@ -23,15 +23,29 @@ fn main() -> Result<(), failure::Error> {
           should not have whitespace except between arguments.")
         (@arg RESULTS_PATH: +required +takes_value
          "The path on this host machine where results should be copied")
+        (@arg EXTRA_ARGS: +takes_value ...
+         "(Optional) KEY=VALUE pairs to be additionally substituted in commands")
     }
     .get_matches();
 
     let machines_file = matches.value_of("MACHINES").unwrap();
     let cmds_file = matches.value_of("EXPERIMENTS").unwrap();
     let host_results_path = matches.value_of("RESULTS_PATH").unwrap();
+    let extra_args = matches
+        .values_of("EXTRA_ARGS")
+        .map(|vs| {
+            vs.map(|v| {
+                let mut parts = v.split("=");
+                let key = parts.next().unwrap();
+                let value = parts.next().unwrap();
+                (key, value)
+            })
+        })
+        .map(Iterator::collect)
+        .unwrap_or_else(|| Vec::new());
 
     let machines = parse_machines(machines_file)?;
-    let cmds = parse_cmds(cmds_file)?;
+    let cmds = parse_cmds(cmds_file, extra_args)?;
 
     do_work(machines, cmds, host_results_path)?;
 
@@ -45,10 +59,19 @@ fn parse_machines(machines_file: &str) -> Result<Vec<String>, failure::Error> {
         .collect())
 }
 
-fn parse_cmds(cmds_file: &str) -> Result<Vec<String>, failure::Error> {
+fn parse_cmds(
+    cmds_file: &str,
+    extra_args: Vec<(&str, &str)>,
+) -> Result<Vec<String>, failure::Error> {
     Ok(std::fs::read_to_string(cmds_file)?
         .lines()
-        .map(str::to_owned)
+        .map(|cmd| {
+            extra_args
+                .iter()
+                .fold(cmd.to_string(), |cmd, &(key, value)| {
+                    cmd.replace(&key, &value)
+                })
+        })
         .collect())
 }
 
