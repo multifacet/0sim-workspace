@@ -69,7 +69,7 @@ fn parse_cmds(
             extra_args
                 .iter()
                 .fold(cmd.to_string(), |cmd, &(key, value)| {
-                    cmd.replace(&key, &value)
+                    cmd.replace(&format!("{{{}}}", key), &value)
                 })
         })
         .collect())
