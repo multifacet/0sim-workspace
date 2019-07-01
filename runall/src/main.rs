@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time;
@@ -69,7 +69,7 @@ fn do_work(machines: Vec<String>, cmds: Vec<String>) -> Result<(), failure::Erro
         // 3) Copy the results to this host.
 
         // Progress spinner
-        let pb = m.add(ProgressBar::new(3));
+        let pb = m.add(ProgressBar::new(1));
         pb.set_style(spinner_style.clone());
         pb.set_prefix(&format!("[{}/{}]", i + 1, ncmds));
         pb.set_message(&format!("[waiting] {}", cmd));
@@ -91,7 +91,6 @@ fn do_work(machines: Vec<String>, cmds: Vec<String>) -> Result<(), failure::Erro
                 std::thread::sleep(time::Duration::from_secs(5));
             }
 
-            pb.inc(1);
             pb.set_message(&format!("[running] {} > {}", machine, cmd));
 
             // Run cmd and get results path
@@ -100,7 +99,6 @@ fn do_work(machines: Vec<String>, cmds: Vec<String>) -> Result<(), failure::Erro
             let results_str = match cmd_results {
                 // Need to copy results
                 Ok(Some(results_path)) => {
-                    pb.inc(1);
                     pb.set_message(&format!("[copying results] {} > {}", machine, cmd));
 
                     // HACK: assume all machine names are in the form HOSTNAME:PORT
@@ -112,8 +110,6 @@ fn do_work(machines: Vec<String>, cmds: Vec<String>) -> Result<(), failure::Erro
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .output();
-
-                    pb.inc(1);
 
                     match scp_result {
                         Ok(..) => pb.finish_with_message(&format!(
@@ -178,7 +174,7 @@ fn run_cmd(machine: &str, cmd: &str) -> Result<Option<String>, failure::Error> {
     let cmd = cmd.replace("{MACHINE}", &machine);
 
     // Open a tmp file for the cmd output
-    let tmp_file = OpenOptions::new()
+    let mut tmp_file = OpenOptions::new()
         .truncate(true)
         .write(true)
         .create(true)
@@ -210,7 +206,6 @@ fn run_cmd(machine: &str, cmd: &str) -> Result<Option<String>, failure::Error> {
         })?;
 
     let reader = BufReader::new(output);
-    let mut writer = BufWriter::new(tmp_file);
 
     let mut results_path = None;
 
@@ -223,7 +218,7 @@ fn run_cmd(machine: &str, cmd: &str) -> Result<Option<String>, failure::Error> {
                 results_path = Some(line[9..].to_string());
             }
 
-            match writeln!(writer, "{}", line) {
+            match writeln!(tmp_file, "{}", line) {
                 Ok(..) => {}
                 Err(e) => {
                     // Ugly but better than nothing...
