@@ -204,23 +204,25 @@ fn run_cmd(machine: &str, cmd: &str) -> Result<Option<String>, failure::Error> {
     let cmd = cmd.replace("{MACHINE}", &machine);
 
     // Open a tmp file for the cmd output
+    let tmp_file_name = format!(
+        "/tmp/{}",
+        cmd.replace(" ", "_")
+            .replace("{", "_")
+            .replace("}", "_")
+            .replace("/", "_")
+    );
     let mut tmp_file = OpenOptions::new()
         .truncate(true)
         .write(true)
         .create(true)
-        .open(&format!(
-            "/tmp/{}",
-            cmd.replace(" ", "_").replace("{", "_").replace("}", "_")
-        ))?;
+        .open(&tmp_file_name)?;
 
+    let stderr_file_name = format!("{}.err", tmp_file_name);
     let stderr_file = OpenOptions::new()
         .truncate(true)
         .write(true)
         .create(true)
-        .open(&format!(
-            "/tmp/{}",
-            cmd.replace(" ", "_").replace("{", "_").replace("}", "_")
-        ))?;
+        .open(&stderr_file_name)?;
 
     // Run the command, piping output to a buf reader.
     let output = std::process::Command::new("cargo")
