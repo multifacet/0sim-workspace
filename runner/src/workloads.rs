@@ -469,7 +469,7 @@ pub fn run_mix(
         /* output_file */ None,
     )?;
 
-    let matrix_dim = ((size_gb << 27) as f64).sqrt() as usize;
+    let matrix_dim = (((size_gb / 3) << 27) as f64).sqrt() as usize;
     let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim)?;
 
     let _memhog_handles = run_memhog(
