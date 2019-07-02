@@ -10,7 +10,7 @@ use spurs::{cmd, ssh::Execute};
 use crate::common::{
     exp_0sim::*,
     get_user_home_dir,
-    paths::{setup00000::*, *},
+    paths::{setup00000::*, setup00001::*, *},
     KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, Username,
 };
 
@@ -122,20 +122,19 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ))?;
 
     // create a swap device if it doesn't exist already
-    const GUEST_SWAP: &str = "/home/vagrant/swap";
-    vshell.run(
+    with_shell! { vshell =>
         cmd!(
             "[ -e {} ] || fallocate -z -l {} {}",
-            GUEST_SWAP,
+            VAGRANT_GUEST_SWAPFILE,
             GUEST_SWAP_GBS << 30, /* GB */
-            GUEST_SWAP
+            VAGRANT_GUEST_SWAPFILE
         )
         .use_bash(),
-    )?;
-    vshell.run(cmd!("mkswap {}", GUEST_SWAP))?;
-    vshell.run(cmd!("sudo chmod 0600 {}", GUEST_SWAP))?;
-    vshell.run(cmd!("sudo chown root:root {}", GUEST_SWAP))?;
-    crate::common::set_remote_research_setting(&ushell, "guest_swap", GUEST_SWAP)?;
+        cmd!("mkswap {}", VAGRANT_GUEST_SWAPFILE),
+        cmd!("sudo chmod 0600 {}", VAGRANT_GUEST_SWAPFILE),
+        cmd!("sudo chown root:root {}", VAGRANT_GUEST_SWAPFILE),
+    }
+    crate::common::set_remote_research_setting(&ushell, "guest_swap", VAGRANT_GUEST_SWAPFILE)?;
 
     // update grub to choose this entry (new kernel) by default
     vshell.run(cmd!("sudo grub2-set-default 0"))?;

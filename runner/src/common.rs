@@ -115,6 +115,11 @@ pub mod paths {
         /// The shared directory for results on the guest.
         pub const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
     }
+
+    pub mod setup00001 {
+        /// The guest swapfile.
+        pub const VAGRANT_GUEST_SWAPFILE: &str = "/home/vagrant/swap";
+    }
 }
 
 /// Time the given operations and push the time to the given `Vec<(String, Duration)>`.

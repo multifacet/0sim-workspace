@@ -15,7 +15,7 @@ use crate::{
     common::{
         exp_0sim::*,
         output::OutputManager,
-        paths::{setup00000::*, *},
+        paths::{setup00000::*, setup00001::*, *},
     },
     settings,
     workloads::{run_memcached_gen_data, run_memhog, run_nas_cg, MemhogOptions, NasClass},
@@ -203,6 +203,9 @@ where
         "Start VM",
         start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?
     );
+
+    // Mount the guest swap file
+    vshell.run(cmd!("sudo swapon {}", VAGRANT_GUEST_SWAPFILE))?;
 
     // Get the amount of memory the guest thinks it has.
     let size = vshell
