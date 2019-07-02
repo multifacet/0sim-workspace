@@ -208,10 +208,22 @@ where
     vshell.run(cmd!("sudo swapon {}", VAGRANT_GUEST_SWAPFILE))?;
 
     // Get the amount of memory the guest thinks it has.
-    let size = vshell
-        .run(cmd!("grep MemAvailable /proc/meminfo | awk '{{print $2}}'").use_bash())?
-        .stdout;
-    let size = size.trim().parse::<usize>().unwrap();
+    let mem_avail = {
+        let mem_avail = vshell
+            .run(cmd!("grep MemAvailable /proc/meminfo | awk '{{print $2}}'").use_bash())?
+            .stdout;
+        mem_avail.trim().parse::<usize>().unwrap()
+    };
+    let swap_avail = {
+        let swap_avail = vshell
+            .run(cmd!("grep SwapFree /proc/meminfo | awk '{{print $2}}'").use_bash())?
+            .stdout;
+        swap_avail.trim().parse::<usize>().unwrap()
+    };
+
+    // Compute a workload size that is large enough to cause reclamation but small enough to not
+    // trigger OOM killer.
+    let size = mem_avail + (8 * swap_avail / 10);
 
     ushell.run(
         cmd!(
@@ -284,9 +296,12 @@ where
             "while [ ! -e /tmp/exp-stop ] ; do \
              cat /proc/swap_instrumentation | tee -a {} ; \
              sleep {} ; \
-             done ; echo done measuring",
+             done ; \
+             cat /proc/swap_instrumentation | tee -a {} ; \
+             echo done measuring",
             dir!(VAGRANT_RESULTS_DIR, output_file.as_str()),
-            interval
+            interval,
+            dir!(VAGRANT_RESULTS_DIR, output_file.as_str()),
         )
         .use_bash(),
     )?;
@@ -348,7 +363,7 @@ where
     vshell.run(cmd!("touch /tmp/exp-stop"))?;
     time!(
         timers,
-        "Waiting for buddyinfo thread to halt",
+        "Waiting for swap_instrumentation thread to halt",
         buddyinfo_handle.join()?
     );
 
