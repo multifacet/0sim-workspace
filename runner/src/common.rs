@@ -983,7 +983,7 @@ pub mod exp_0sim {
             shell.run(cmd!("sudo mkswap /dev/mapper/mythin"))?;
         }
 
-        shell.run(cmd!("sudo swapon /dev/mapper/mythin"))?;
+        shell.run(cmd!("sudo swapon -d /dev/mapper/mythin"))?;
 
         Ok(())
     }
@@ -1041,7 +1041,7 @@ pub mod exp_0sim {
 
         // Turn on swap devs
         for dev in &devs {
-            shell.run(cmd!("sudo swapon /dev/{}", dev))?;
+            shell.run(cmd!("sudo swapon -d /dev/{}", dev))?;
         }
 
         shell.run(cmd!("lsblk"))?;
