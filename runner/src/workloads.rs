@@ -245,7 +245,8 @@ pub fn run_memhog(
     shell.spawn(cmd!(
         "for i in `seq {}` ; do \
          memhog -r1 {}k {} {} > /dev/null ; \
-         done",
+         done; \
+         echo memhog done ;",
         r,
         size_kb,
         if opts.contains(MemhogOptions::PIN) {
@@ -390,7 +391,7 @@ pub fn run_redis_gen_data(
     // Run workload
     let (client_shell, client_spawn_handle) = shell.spawn(
         cmd!(
-            "./target/release/redis_gen_data localhost:7777 {} {} {} > {}",
+            "./target/release/redis_gen_data localhost:7777 {} {} {} > {} ; echo redis_gen_data done",
             wk_size_gb,
             if let Some(freq) = freq {
                 format!("--freq {}", freq)
@@ -432,7 +433,13 @@ pub fn run_metis_matrix_mult(
     bmk_dir: &str,
     dim: usize,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
-    shell.spawn(cmd!("./obj/matrix_mult2 -q -o -l {}", dim).cwd(bmk_dir))
+    shell.spawn(
+        cmd!(
+            "./obj/matrix_mult2 -q -o -l {} ; echo matrix_mult2 done ;",
+            dim
+        )
+        .cwd(bmk_dir),
+    )
 }
 
 /// Run the mix workload which consists of splitting memory between
