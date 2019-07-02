@@ -107,7 +107,7 @@ pub fn run_memcached_gen_data(
 
     // Run workload
     let cmd = cmd!(
-        "./target/release/memcached_gen_data localhost:11211 {} {} {} > {}",
+        "./target/release/memcached_gen_data localhost:11211 {} {} {} | tee {}",
         wk_size_gb,
         if let Some(freq) = freq {
             format!("--freq {}", freq)
@@ -166,7 +166,7 @@ pub fn run_memcached_and_capture_thp(
 
     // Run workload
     let cmd = cmd!(
-        "./target/release/memcached_and_capture_thp localhost:11211 {} {} {} {} > {}",
+        "./target/release/memcached_and_capture_thp localhost:11211 {} {} {} {} | tee {}",
         wk_size_gb,
         interval,
         timing_file.unwrap_or("/dev/null"),
@@ -391,7 +391,7 @@ pub fn run_redis_gen_data(
     // Run workload
     let (client_shell, client_spawn_handle) = shell.spawn(
         cmd!(
-            "./target/release/redis_gen_data localhost:7777 {} {} {} > {} ; echo redis_gen_data done",
+            "./target/release/redis_gen_data localhost:7777 {} {} {} | tee {} ; echo redis_gen_data done",
             wk_size_gb,
             if let Some(freq) = freq {
                 format!("--freq {}", freq)
