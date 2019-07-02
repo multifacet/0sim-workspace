@@ -54,6 +54,13 @@ impl Workload {
 }
 
 pub fn cli_options() -> clap::App<'static, 'static> {
+    fn is_isize(s: String) -> Result<(), String> {
+        s.as_str()
+            .parse::<isize>()
+            .map(|_| ())
+            .map_err(|e| format!("{:?}", e))
+    }
+
     fn is_usize(s: String) -> Result<(), String> {
         s.as_str()
             .parse::<usize>()
@@ -81,6 +88,9 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The number of GBs of the VM (defaults to 2048)")
         (@arg CORES: +takes_value {is_usize} -C --cores
          "The number of cores of the VM (defaults to 1)")
+        (@arg FACTOR: +takes_value {is_isize} -f --factor
+         "The reclaim order extra factor (defaults to 0). Can be positive or negative, \
+         but the absolute value should be less than MAX_ORDER for the guest kernel.")
     }
 }
 
@@ -129,6 +139,15 @@ pub fn run(
         VAGRANT_CORES
     };
 
+    let factor = if let Some(factor) = sub_m
+        .value_of("FACTOR")
+        .map(|value| value.parse::<isize>().unwrap())
+    {
+        factor
+    } else {
+        0
+    };
+
     let warmup = sub_m.is_present("WARMUP");
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
@@ -145,6 +164,8 @@ pub fn run(
 
         * vm_size: vm_size,
         * cores: cores,
+
+        * factor: factor,
 
         stats_interval: interval,
 
@@ -178,6 +199,7 @@ where
     let interval = settings.get::<usize>("stats_interval");
     let vm_size = settings.get::<usize>("vm_size");
     let cores = settings.get::<usize>("cores");
+    let factor = settings.get::<isize>("factor");
     let calibrate = settings.get::<bool>("calibrated");
     let warmup = settings.get::<bool>("warmup");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
@@ -268,6 +290,10 @@ where
         "cat /proc/meminfo > {}",
         dir!(VAGRANT_RESULTS_DIR, guest_mem_file)
     ))?;
+
+    if factor != 0 {
+        vshell.run(cmd!("echo {} | sudo tee /proc/swap_extra_factor", factor))?;
+    }
 
     // Warm up
     if warmup {
