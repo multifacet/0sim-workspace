@@ -444,9 +444,9 @@ pub fn run_metis_matrix_mult(
 
 /// Run the mix workload which consists of splitting memory between
 ///
-/// - 1 data-obliv memhog process with memory pinning (TODO: term and restart?)
+/// - 1 data-obliv memhog process with memory pinning
 /// - 1 redis server and client pair. The redis server does snapshots every minute.
-/// - 1 metis instance doing matrix multiplication (TODO: data-obliv?)
+/// - 1 metis instance doing matrix multiplication
 ///
 /// This workload runs until the redis subworkload completes.
 ///
