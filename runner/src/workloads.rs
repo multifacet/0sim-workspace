@@ -234,20 +234,24 @@ bitflags! {
 /// Run `memhog` on the remote.
 ///
 /// - `r` is the number of times to call `memhog`, not the value of `-r`. `-r` is always passed
-///   a value of `1`.
+///   a value of `1`. If `None`, then run indefinitely.
 /// - `size_kb` is the number of kilobytes to mmap and touch.
 pub fn run_memhog(
     shell: &SshShell,
-    r: usize,
+    r: Option<usize>,
     size_kb: usize,
     opts: MemhogOptions,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     shell.spawn(cmd!(
-        "for i in `seq {}` ; do \
+        "{} ; do \
          memhog -r1 {}k {} {} > /dev/null ; \
          done; \
          echo memhog done ;",
-        r,
+        if let Some(r) = r {
+            format!("for i in `seq {}`", r)
+        } else {
+            format!("while [ true ]")
+        },
         size_kb,
         if opts.contains(MemhogOptions::PIN) {
             "-p"
@@ -444,7 +448,7 @@ pub fn run_metis_matrix_mult(
 
 /// Run the mix workload which consists of splitting memory between
 ///
-/// - 1 data-obliv memhog process with memory pinning
+/// - 1 data-obliv memhog process with memory pinning (running indefinitely)
 /// - 1 redis server and client pair. The redis server does snapshots every minute.
 /// - 1 metis instance doing matrix multiplication
 ///
@@ -456,15 +460,12 @@ pub fn run_metis_matrix_mult(
 /// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
 /// - `freq` is the _host_ CPU frequency in MHz.
 /// - `size_gb` is the total amount of memory of the mix workload in GB.
-/// - `r` is the number of times to call `memhog`, not the value of `-r`. `-r` is always passed
-///   a value of `1`.
 pub fn run_mix(
     shell: &SshShell,
     exp_dir: &str,
     bmk_dir: &str,
     freq: usize,
     size_gb: usize,
-    memhog_r: usize,
 ) -> Result<(), failure::Error> {
     let redis_handles = run_redis_gen_data(
         shell,
@@ -481,7 +482,7 @@ pub fn run_mix(
 
     let _memhog_handles = run_memhog(
         shell,
-        memhog_r,
+        None,
         (size_gb << 20) / 3,
         MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
     )?;

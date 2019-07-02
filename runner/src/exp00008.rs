@@ -381,7 +381,7 @@ where
             time!(
                 timers,
                 "Workload",
-                run_memhog(&vshell, MEMHOG_R, size, MemhogOptions::empty())?
+                run_memhog(&vshell, Some(MEMHOG_R), size, MemhogOptions::empty())?
             );
         }
     }
