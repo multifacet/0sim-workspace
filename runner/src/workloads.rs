@@ -471,7 +471,7 @@ pub fn run_mix(
         shell,
         exp_dir,
         (size_gb << 10) / 3,
-        (size_gb << 10) / 3,
+        size_gb / 3,
         Some(freq),
         /* pf_time */ None,
         /* output_file */ None,
