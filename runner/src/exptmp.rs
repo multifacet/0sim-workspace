@@ -261,7 +261,8 @@ where
                 WARM_UP_PATTERN,
                 /* prefault */ false,
                 /* pf_time */ None,
-                None
+                None,
+                /* eager */ false,
             )?
         );
     }
@@ -298,6 +299,7 @@ where
                     /* prefault */ false,
                     /* pftime */ pf_time,
                     Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                    /* eager */ false,
                 )?
             );
 
@@ -346,6 +348,7 @@ where
                     /* allow_oom */ true,
                     pf_time,
                     Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                    /* eager */ false,
                 )?
             );
 
@@ -390,7 +393,8 @@ where
                     &vshell,
                     zerosim_exp_path,
                     LocalityMemAccessMode::Local,
-                    &dir!(VAGRANT_RESULTS_DIR, output_local)
+                    &dir!(VAGRANT_RESULTS_DIR, output_local),
+                    /* eager */ false,
                 )?
             );
 
@@ -412,7 +416,8 @@ where
                     &vshell,
                     zerosim_exp_path,
                     LocalityMemAccessMode::Random,
-                    &dir!(VAGRANT_RESULTS_DIR, output_nonlocal)
+                    &dir!(VAGRANT_RESULTS_DIR, output_nonlocal),
+                    /* eager */ false,
                 )?
             );
 

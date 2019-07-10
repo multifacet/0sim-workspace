@@ -9,6 +9,23 @@ use spurs::{
     ssh::{Execute, SshShell, SshSpawnHandle},
 };
 
+/// Set the apriori paging process using Swapnil's program. Requires `sudo`.
+///
+/// For example, to cause `ls` to be eagerly paged:
+///
+/// ```rust,ignore
+/// setup_apriori_paging_process(&shell, "ls")?;
+/// ```
+pub fn setup_apriori_paging_process(shell: &SshShell, prog: &str) -> Result<(), failure::Error> {
+    shell.run(cmd!(
+        "{}/{}/apriori_paging_set_process {}",
+        crate::common::paths::RESEARCH_WORKSPACE_PATH,
+        crate::common::paths::ZEROSIM_SWAPNIL_PATH,
+        prog
+    ))?;
+    Ok(())
+}
+
 /// The different patterns supported by the `time_mmap_touch` workload.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TimeMmapTouchPattern {
@@ -25,6 +42,7 @@ pub enum TimeMmapTouchPattern {
 /// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
 /// - `output_file` is the file to which the workload will write its output. If `None`, then
 ///   `/dev/null` is used.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_time_mmap_touch(
     shell: &SshShell,
     exp_dir: &str,
@@ -33,11 +51,16 @@ pub fn run_time_mmap_touch(
     prefault: bool,
     pf_time: Option<u64>,
     output_file: Option<&str>,
+    eager: bool,
 ) -> Result<(), failure::Error> {
     let pattern = match pattern {
         TimeMmapTouchPattern::Counter => "-c",
         TimeMmapTouchPattern::Zeros => "-z",
     };
+
+    if eager {
+        setup_apriori_paging_process(shell, "time_mmap_touch")?;
+    }
 
     shell.run(
         cmd!(
@@ -65,12 +88,19 @@ pub fn run_time_mmap_touch(
 /// `allow_oom` specifies whether memcached is allowed to OOM. This gives much simpler performance
 /// behaviors. memcached uses a large amount of the memory you give it for bookkeeping, rather
 /// than user data, so OOM will almost certainly happen.
+///
+/// `eager` indicates whether the workload should be run with eager paging.
 pub fn start_memcached(
     shell: &SshShell,
     size_mb: usize,
     user: &str,
     allow_oom: bool,
+    eager: bool,
 ) -> Result<(), failure::Error> {
+    if eager {
+        setup_apriori_paging_process(shell, "memcached")?;
+    }
+
     shell.run(cmd!(
         "memcached {} -m {} -d -u {}",
         if allow_oom { "-M" } else { "" },
@@ -91,6 +121,7 @@ pub fn start_memcached(
 /// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
 /// - `output_file` is the file to which the workload will write its output. If `None`, then
 ///   `/dev/null` is used.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_memcached_gen_data(
     shell: &SshShell,
     user: &str,
@@ -101,9 +132,10 @@ pub fn run_memcached_gen_data(
     allow_oom: bool,
     pf_time: Option<u64>,
     output_file: Option<&str>,
+    eager: bool,
 ) -> Result<(), failure::Error> {
     // Start server
-    start_memcached(&shell, server_size_mb, user, allow_oom)?;
+    start_memcached(&shell, server_size_mb, user, allow_oom, eager)?;
 
     // Run workload
     let cmd = cmd!(
@@ -142,6 +174,7 @@ pub fn run_memcached_gen_data(
 /// - `timing_file` is the file to which memcached request latencies will be written. If `None`,
 ///    then `/dev/null` is used.
 /// - `output_file` is the file to which the workload will write its output.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_memcached_and_capture_thp(
     shell: &SshShell,
     user: &str,
@@ -153,9 +186,10 @@ pub fn run_memcached_and_capture_thp(
     continual_compaction: Option<usize>,
     timing_file: Option<&str>,
     output_file: &str,
+    eager: bool,
 ) -> Result<(), failure::Error> {
     // Start server
-    start_memcached(&shell, server_size_mb, user, allow_oom)?;
+    start_memcached(&shell, server_size_mb, user, allow_oom, eager)?;
 
     // Turn on/off spurious failures
     if let Some(mode) = continual_compaction {
@@ -199,15 +233,21 @@ pub enum NasClass {
 /// - `zerosim_bmk_path` is the path to the `bmks` directory of `research-workspace`.
 /// - `output_file` is the file to which the workload will write its output. If `None`, then
 ///   `/dev/null` is used.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_nas_cg(
     shell: &SshShell,
     zerosim_bmk_path: &str,
     class: NasClass,
     output_file: Option<&str>,
+    eager: bool,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     let class = match class {
         NasClass::E => "E",
     };
+
+    if eager {
+        setup_apriori_paging_process(shell, &format!("cg.{}.x", class))?;
+    }
 
     let handle = shell.spawn(
         cmd!(
@@ -236,12 +276,18 @@ bitflags! {
 /// - `r` is the number of times to call `memhog`, not the value of `-r`. `-r` is always passed
 ///   a value of `1`. If `None`, then run indefinitely.
 /// - `size_kb` is the number of kilobytes to mmap and touch.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_memhog(
     shell: &SshShell,
     r: Option<usize>,
     size_kb: usize,
     opts: MemhogOptions,
+    eager: bool,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+    if eager {
+        setup_apriori_paging_process(shell, "memhog")?;
+    }
+
     shell.spawn(cmd!(
         "{} ; do \
          memhog -r1 {}k {} {} > /dev/null ; \
@@ -271,12 +317,18 @@ pub fn run_memhog(
 /// - `exp_dir` is the path of the 0sim-experiments submodule.
 /// - `n` is the number of times to loop.
 /// - `output_file` is the location to put the output.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_time_loop(
     shell: &SshShell,
     exp_dir: &str,
     n: usize,
     output_file: &str,
+    eager: bool,
 ) -> Result<(), failure::Error> {
+    if eager {
+        setup_apriori_paging_process(shell, "time_loop")?;
+    }
+
     shell.run(
         cmd!("sudo ./target/release/time_loop {} > {}", n, output_file)
             .cwd(exp_dir)
@@ -301,11 +353,16 @@ pub fn run_locality_mem_access(
     exp_dir: &str,
     locality: LocalityMemAccessMode,
     output_file: &str,
+    eager: bool,
 ) -> Result<(), failure::Error> {
     let locality = match locality {
         LocalityMemAccessMode::Local => "-l",
         LocalityMemAccessMode::Random => "-n",
     };
+
+    if eager {
+        setup_apriori_paging_process(shell, "locality_mem_access")?;
+    }
 
     shell.run(
         cmd!(
@@ -341,9 +398,14 @@ pub struct RedisWorkloadHandles {
 pub fn start_redis(
     shell: &SshShell,
     size_mb: usize,
+    eager: bool,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     // Set overcommit
     shell.run(cmd!("echo 1 | sudo tee /proc/sys/vm/overcommit_memory"))?;
+
+    if eager {
+        setup_apriori_paging_process(shell, "redis-server")?;
+    }
 
     // Start the redis server
     let handle = shell.spawn(cmd!("redis-server --port 7777 --loglevel warning"))?;
@@ -380,6 +442,7 @@ pub fn start_redis(
 /// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
 /// - `output_file` is the file to which the workload will write its output. If `None`, then
 ///   `/dev/null` is used.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_redis_gen_data(
     shell: &SshShell,
     exp_dir: &str,
@@ -388,9 +451,10 @@ pub fn run_redis_gen_data(
     freq: Option<usize>,
     pf_time: Option<u64>,
     output_file: Option<&str>,
+    eager: bool,
 ) -> Result<RedisWorkloadHandles, failure::Error> {
     // Start server
-    let (server_shell, server_spawn_handle) = start_redis(&shell, server_size_mb)?;
+    let (server_shell, server_spawn_handle) = start_redis(&shell, server_size_mb, eager)?;
 
     // Run workload
     let (client_shell, client_spawn_handle) = shell.spawn(
@@ -432,11 +496,17 @@ pub fn run_redis_gen_data(
 ///
 /// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
 /// - `dim` is the dimension of the matrix (one side), which is assumed to be square.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_metis_matrix_mult(
     shell: &SshShell,
     bmk_dir: &str,
     dim: usize,
+    eager: bool,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+    if eager {
+        setup_apriori_paging_process(shell, "matrix_mult2")?;
+    }
+
     shell.spawn(
         cmd!(
             "./obj/matrix_mult2 -q -o -l {} ; echo matrix_mult2 done ;",
@@ -460,12 +530,14 @@ pub fn run_metis_matrix_mult(
 /// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
 /// - `freq` is the _host_ CPU frequency in MHz.
 /// - `size_gb` is the total amount of memory of the mix workload in GB.
+/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_mix(
     shell: &SshShell,
     exp_dir: &str,
     bmk_dir: &str,
     freq: usize,
     size_gb: usize,
+    eager: bool,
 ) -> Result<(), failure::Error> {
     let redis_handles = run_redis_gen_data(
         shell,
@@ -475,16 +547,18 @@ pub fn run_mix(
         Some(freq),
         /* pf_time */ None,
         /* output_file */ None,
+        eager,
     )?;
 
     let matrix_dim = (((size_gb / 3) << 27) as f64).sqrt() as usize;
-    let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim)?;
+    let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim, eager)?;
 
     let _memhog_handles = run_memhog(
         shell,
         None,
         (size_gb << 20) / 3,
         MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
+        eager,
     )?;
 
     // Wait for redis client to finish

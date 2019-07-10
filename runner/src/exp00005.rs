@@ -197,7 +197,8 @@ where
                 WARM_UP_PATTERN,
                 /* prefault */ false,
                 /* pf_time */ None,
-                None
+                None,
+                /* eager */ false,
             )?
         );
     }
@@ -234,6 +235,7 @@ where
         zerosim_bmk_path,
         NasClass::E,
         Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+        /* eager */ false,
     )?;
 
     time!(

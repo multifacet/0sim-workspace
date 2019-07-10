@@ -187,7 +187,8 @@ where
                 WARM_UP_PATTERN,
                 /* prefault */ false,
                 /* pf_time */ None,
-                None
+                None,
+                /* eager */ false,
             )?
         );
     }
@@ -200,7 +201,8 @@ where
             &vshell,
             zerosim_exp_path,
             n,
-            &dir!(VAGRANT_RESULTS_DIR, output_file)
+            &dir!(VAGRANT_RESULTS_DIR, output_file),
+            /* eager */ false,
         )?
     );
 

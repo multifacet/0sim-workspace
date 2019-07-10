@@ -360,6 +360,7 @@ where
                     /* allow_oom */ false,
                     /* pf_time */ None,
                     None,
+                    /* eager */ false,
                 )?
             );
         }
@@ -371,6 +372,7 @@ where
                     zerosim_bmk_path,
                     NasClass::E,
                     Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                    /* eager */ false,
                 )?;
 
                 std::thread::sleep(std::time::Duration::from_secs(3600 * NAS_CG_HOURS));
@@ -381,7 +383,13 @@ where
             time!(
                 timers,
                 "Workload",
-                run_memhog(&vshell, Some(MEMHOG_R), size, MemhogOptions::empty())?
+                run_memhog(
+                    &vshell,
+                    Some(MEMHOG_R),
+                    size,
+                    MemhogOptions::empty(),
+                    /* eager */ false
+                )?
             );
         }
     }

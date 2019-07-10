@@ -219,7 +219,8 @@ where
                 WARM_UP_PATTERN,
                 /* prefault */ false,
                 /* pf_time */ None,
-                None
+                None,
+                /* eager */ false,
             )?
         );
     }
@@ -240,6 +241,7 @@ where
                 prefault,
                 /* pf_time */ None,
                 Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                /* eager */ false,
             )?
         );
     } else {
@@ -255,7 +257,8 @@ where
                 Some(freq),
                 /* allow_oom */ true,
                 /* pf_time */ None,
-                Some(&dir!(VAGRANT_RESULTS_DIR, output_file))
+                Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                /* eager */ false,
             )?
         );
     }

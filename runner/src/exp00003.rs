@@ -234,7 +234,8 @@ where
             /* allow_oom */ false,
             continual_compaction,
             Some(&dir!(VAGRANT_RESULTS_DIR, memcached_timing_file)),
-            &dir!(VAGRANT_RESULTS_DIR, output_file)
+            &dir!(VAGRANT_RESULTS_DIR, output_file),
+            /* eager */ false,
         )?
     );
 

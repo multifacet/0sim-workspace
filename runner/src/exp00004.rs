@@ -158,6 +158,7 @@ where
             /* continual_compaction */ None,
             /* timing_file */ None,
             &dir!(BARE_METAL_RESULTS_DIR, output_file),
+            /* eager */ false,
         )?
     );
 

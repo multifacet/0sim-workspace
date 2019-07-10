@@ -87,6 +87,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The number of GBs of the VM (defaults to 2048)")
         (@arg CORES: +takes_value {is_usize} -C --cores
          "The number of cores of the VM (defaults to 1)")
+        (@arg EAGER_PAGING: --eager
+         "Run the workload with eager paging")
     }
 }
 
@@ -139,6 +141,8 @@ pub fn run(
 
     let warmup = sub_m.is_present("WARMUP");
 
+    let eager = sub_m.is_present("EAGER_PAGING");
+
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
@@ -149,7 +153,9 @@ pub fn run(
         exp: 00007,
 
         calibrated: false,
-        warmup: warmup,
+        (warmup) warmup: warmup,
+
+        (eager) eager: eager,
 
         * vm_size: vm_size,
         * cores: cores,
@@ -189,6 +195,7 @@ where
     let calibrate = settings.get::<bool>("calibrated");
     let warmup = settings.get::<bool>("warmup");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
+    let eager = settings.get::<bool>("eager");
 
     // Reboot
     initial_reboot(dry_run, &login)?;
@@ -324,7 +331,8 @@ where
                     Some(freq),
                     /* allow_oom */ true,
                     /* pf_time */ None,
-                    None
+                    None,
+                    eager,
                 )?
             );
         }
@@ -336,6 +344,7 @@ where
                     zerosim_bmk_path,
                     NasClass::E,
                     Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                    eager,
                 )?;
 
                 std::thread::sleep(std::time::Duration::from_secs(3600 * NAS_CG_HOURS));
@@ -344,7 +353,7 @@ where
 
         Workload::Memhog => {
             time!(timers, "Workload", {
-                run_memhog(&vshell, Some(MEMHOG_R), size, MemhogOptions::empty())?
+                run_memhog(&vshell, Some(MEMHOG_R), size, MemhogOptions::empty(), eager)?
             });
         }
 
@@ -360,6 +369,7 @@ where
                     ),
                     freq,
                     size >> 20,
+                    eager,
                 )?
             });
         }
