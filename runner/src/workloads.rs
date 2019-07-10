@@ -384,6 +384,13 @@ pub struct RedisWorkloadHandles {
     pub client_spawn_handle: SshSpawnHandle,
 }
 
+impl RedisWorkloadHandles {
+    pub fn wait_for_client(self) -> Result<(), failure::Error> {
+        self.client_spawn_handle.join()?;
+        Ok(())
+    }
+}
+
 /// Spawn a `redis` server in a new shell with the given amount of memory and set some important
 /// config settings. Usually this is called indirectly through one of the other workload routines.
 ///

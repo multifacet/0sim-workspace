@@ -343,6 +343,8 @@ where
                     ((size << 7) as f64).sqrt() as usize,
                     eager,
                 )?
+                .1
+                .join()?
             );
         }
 
@@ -360,6 +362,7 @@ where
                     None,
                     eager,
                 )?
+                .wait_for_client()?
             );
         }
 
@@ -386,6 +389,8 @@ where
                     MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
                     eager,
                 )?
+                .1
+                .join()?
             });
         }
 
