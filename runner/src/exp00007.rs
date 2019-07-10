@@ -6,6 +6,8 @@
 
 use clap::clap_app;
 
+use serde::{Deserialize, Serialize};
+
 use spurs::{
     cmd,
     ssh::{Execute, SshShell},
@@ -29,7 +31,7 @@ const NAS_CG_HOURS: u64 = 6;
 /// The number of iterations for `memhog`.
 const MEMHOG_R: usize = 10;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 enum Workload {
     Memcached,
     Cg,
@@ -149,7 +151,8 @@ pub fn run(
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
-        * workload: format!("fragmentation_{}", workload.to_str()),
+        * workload: "fragmentation",
+        * app: workload,
         exp: 00007,
 
         calibrated: false,
@@ -188,7 +191,7 @@ fn run_inner<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
 {
-    let workload = Workload::from_str(&settings.get::<&str>("workload")[14..]);
+    let workload = settings.get::<Workload>("app");
     let interval = settings.get::<usize>("stats_interval");
     let vm_size = settings.get::<usize>("vm_size");
     let cores = settings.get::<usize>("cores");
