@@ -22,7 +22,10 @@ use crate::{
         paths::{setup00000::*, *},
     },
     settings,
-    workloads::{run_memcached_gen_data, run_memhog, run_mix, run_nas_cg, MemhogOptions, NasClass},
+    workloads::{
+        run_memcached_gen_data, run_memhog, run_metis_matrix_mult, run_mix, run_nas_cg,
+        run_redis_gen_data, MemhogOptions, NasClass,
+    },
 };
 
 /// The amount of time (in hours) to let the NAS CG workload run.
@@ -37,27 +40,8 @@ enum Workload {
     Cg,
     Memhog,
     Mix,
-}
-
-impl Workload {
-    pub fn to_str(&self) -> &str {
-        match self {
-            Workload::Memcached => "memcached_gen_data",
-            Workload::Cg => "nas_cg",
-            Workload::Memhog => "memhog",
-            Workload::Mix => "mix",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "memcached_gen_data" => Workload::Memcached,
-            "nas_cg" => Workload::Cg,
-            "memhog" => Workload::Memhog,
-            "mix" => Workload::Mix,
-            _ => panic!("unknown workload: {:?}", s),
-        }
-    }
+    Redis,
+    MatrixMult2,
 }
 
 pub fn cli_options() -> clap::App<'static, 'static> {
@@ -81,6 +65,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
             (@arg memcached: -m "Run the memcached workload")
             (@arg cg: -c "Run the NAS Parallel Benchmark CG workload")
             (@arg memhog: -h "Run the memhog workload")
+            (@arg redis: -r "Run the redis workload")
+            (@arg matrix: -M "Run the matrix multiplication workload")
             (@arg mix: -x "Run the mix workload")
         )
         (@arg WARMUP: -w --warmup
@@ -118,8 +104,12 @@ pub fn run(
         Workload::Memhog
     } else if sub_m.is_present("mix") {
         Workload::Mix
+    } else if sub_m.is_present("redis") {
+        Workload::Redis
+    } else if sub_m.is_present("matrix") {
+        Workload::MatrixMult2
     } else {
-        panic!("unknown workload")
+        unreachable!();
     };
 
     let vm_size = if let Some(vm_size) = sub_m
@@ -222,7 +212,7 @@ where
         start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?
     );
 
-    // Get the amount of memory the guest thinks it has.
+    // Get the amount of memory the guest thinks it has (in KB).
     let size = vshell
         .run(cmd!("grep MemAvailable /proc/meminfo | awk '{{print $2}}'").use_bash())?
         .stdout;
@@ -321,7 +311,6 @@ where
     // Run the actual workload
     match workload {
         Workload::Memcached => {
-            // Start workload
             time!(
                 timers,
                 "Start and Workload",
@@ -333,6 +322,40 @@ where
                     size >> 20,
                     Some(freq),
                     /* allow_oom */ true,
+                    /* pf_time */ None,
+                    None,
+                    eager,
+                )?
+            );
+        }
+
+        Workload::MatrixMult2 => {
+            time!(
+                timers,
+                "Workload",
+                run_metis_matrix_mult(
+                    &vshell,
+                    &dir!(
+                        "/home/vagrant",
+                        RESEARCH_WORKSPACE_PATH,
+                        ZEROSIM_METIS_SUBMODULE
+                    ),
+                    ((size << 7) as f64).sqrt() as usize,
+                    eager,
+                )?
+            );
+        }
+
+        Workload::Redis => {
+            time!(
+                timers,
+                "Start and Workload",
+                run_redis_gen_data(
+                    &vshell,
+                    zerosim_exp_path,
+                    size >> 10,
+                    size >> 20,
+                    Some(freq),
                     /* pf_time */ None,
                     None,
                     eager,
