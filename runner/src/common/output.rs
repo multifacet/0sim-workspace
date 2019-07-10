@@ -160,12 +160,17 @@ macro_rules! __settings_helper {
         $manager.register(stringify!($name), &$value, true);
         $crate::__settings_helper!($manager, $($tail)*);
     }};
+    ($manager:ident, ($impt:expr) $name:ident : $value:expr, $($tail:tt)*) => {{
+        $manager.register(stringify!($name), &$value, $impt);
+        $crate::__settings_helper!($manager, $($tail)*);
+    }};
 }
 
 /// A convenience macro for creating an `OutputManager` with the given settings. The syntax is `[*]
 /// name: value` where `name` is the name of the setting, `value` is any expression that evaluates
-/// to the value of the setting, and the * is an optional token that signifies that the setting is
-/// important.
+/// to the value of the setting, and the `*` is an optional token that signifies that the setting is
+/// important. Alternately, `(cond)` can be used to dynamically mark a setting as important
+/// depending on their value (e.g. to call attention to a non-default value).
 ///
 /// ```rust
 /// let settings: OutputManager = settings! {
@@ -175,7 +180,8 @@ macro_rules! __settings_helper {
 ///     * size: 100, // gb
 ///     pattern: "-z",
 ///     calibrated: false,
-///     warmup: true,
+///
+///     (!warmup) warmup: warmup, // `warmup` is marked important if `false`.
 /// };
 ///
 /// ```
