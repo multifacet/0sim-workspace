@@ -379,7 +379,13 @@ where
 
         Workload::Memhog => {
             time!(timers, "Workload", {
-                run_memhog(&vshell, Some(MEMHOG_R), size, MemhogOptions::empty(), eager)?
+                run_memhog(
+                    &vshell,
+                    Some(MEMHOG_R),
+                    size,
+                    MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
+                    eager,
+                )?
             });
         }
 
