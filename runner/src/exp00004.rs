@@ -143,6 +143,9 @@ where
         transparent_hugepage_khugepaged_scan_sleep_ms,
     )?;
 
+    let cores = crate::common::get_num_cores(&ushell)?;
+    let mut tctx = crate::workloads::TasksetCtx::new(cores);
+
     // Run workload
     time!(
         timers,
@@ -159,6 +162,7 @@ where
             /* timing_file */ None,
             &dir!(BARE_METAL_RESULTS_DIR, output_file),
             /* eager */ false,
+            &mut tctx,
         )?
     );
 

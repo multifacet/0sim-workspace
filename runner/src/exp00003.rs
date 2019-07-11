@@ -221,6 +221,8 @@ where
         transparent_hugepage_khugepaged_scan_sleep_ms,
     )?;
 
+    let mut tctx = crate::workloads::TasksetCtx::new(cores);
+
     time!(
         timers,
         "Start and Workload",
@@ -236,6 +238,7 @@ where
             Some(&dir!(VAGRANT_RESULTS_DIR, memcached_timing_file)),
             &dir!(VAGRANT_RESULTS_DIR, output_file),
             /* eager */ false,
+            &mut tctx,
         )?
     );
 

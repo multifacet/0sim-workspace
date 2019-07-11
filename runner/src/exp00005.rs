@@ -184,6 +184,8 @@ where
         dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
+    let mut tctx = crate::workloads::TasksetCtx::new(cores);
+
     // Warm up
     if warmup {
         const WARM_UP_PATTERN: TimeMmapTouchPattern = TimeMmapTouchPattern::Zeros;
@@ -199,6 +201,7 @@ where
                 /* pf_time */ None,
                 None,
                 /* eager */ false,
+                &mut tctx,
             )?
         );
     }
@@ -236,6 +239,7 @@ where
         NasClass::E,
         Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
         /* eager */ false,
+        &mut tctx,
     )?;
 
     time!(

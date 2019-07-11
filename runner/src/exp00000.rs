@@ -205,6 +205,8 @@ where
         dir!(VAGRANT_RESULTS_DIR, params_file)
     ))?;
 
+    let mut tctx = crate::workloads::TasksetCtx::new(cores);
+
     // Warm up
     if warmup {
         //const WARM_UP_SIZE: usize = 50; // GB
@@ -221,6 +223,7 @@ where
                 /* pf_time */ None,
                 None,
                 /* eager */ false,
+                &mut tctx,
             )?
         );
     }
@@ -242,6 +245,7 @@ where
                 /* pf_time */ None,
                 Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                 /* eager */ false,
+                &mut tctx,
             )?
         );
     } else {
@@ -259,6 +263,7 @@ where
                 /* pf_time */ None,
                 Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                 /* eager */ false,
+                &mut tctx,
             )?
         );
     }

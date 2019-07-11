@@ -283,6 +283,8 @@ where
     // We want to use rdtsc as the time source, so find the cpu freq:
     let freq = get_cpu_freq(&ushell)?;
 
+    let mut tctx = crate::workloads::TasksetCtx::new(cores);
+
     // Record buddyinfo on the guest until signalled to stop.
     vshell.run(cmd!("rm -f /tmp/exp-stop"))?;
 
@@ -325,6 +327,7 @@ where
                     /* pf_time */ None,
                     None,
                     eager,
+                    &mut tctx,
                 )?
             );
         }
@@ -342,6 +345,7 @@ where
                     ),
                     ((size << 7) as f64).sqrt() as usize,
                     eager,
+                    &mut tctx,
                 )?
                 .1
                 .join()?
@@ -361,6 +365,7 @@ where
                     /* pf_time */ None,
                     None,
                     eager,
+                    &mut tctx,
                 )?
                 .wait_for_client()?
             );
@@ -374,6 +379,7 @@ where
                     NasClass::E,
                     Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                     eager,
+                    &mut tctx,
                 )?;
 
                 std::thread::sleep(std::time::Duration::from_secs(3600 * NAS_CG_HOURS));
@@ -388,6 +394,7 @@ where
                     size,
                     MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
                     eager,
+                    &mut tctx,
                 )?
                 .1
                 .join()?
@@ -407,6 +414,7 @@ where
                     freq,
                     size >> 20,
                     eager,
+                    &mut tctx,
                 )?
             });
         }

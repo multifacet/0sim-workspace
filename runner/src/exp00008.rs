@@ -342,6 +342,7 @@ where
     )?;
 
     let freq = crate::common::get_cpu_freq(&ushell)?;
+    let mut tctx = crate::workloads::TasksetCtx::new(cores);
 
     // Run the actual workload
     match workload {
@@ -361,6 +362,7 @@ where
                     /* pf_time */ None,
                     None,
                     /* eager */ false,
+                    &mut tctx,
                 )?
             );
         }
@@ -373,6 +375,7 @@ where
                     NasClass::E,
                     Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                     /* eager */ false,
+                    &mut tctx,
                 )?;
 
                 std::thread::sleep(std::time::Duration::from_secs(3600 * NAS_CG_HOURS));
@@ -388,7 +391,8 @@ where
                     Some(MEMHOG_R),
                     size,
                     MemhogOptions::empty(),
-                    /* eager */ false
+                    /* eager */ false,
+                    &mut tctx,
                 )?
             );
         }

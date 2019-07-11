@@ -26,6 +26,30 @@ pub fn setup_apriori_paging_process(shell: &SshShell, prog: &str) -> Result<(), 
     Ok(())
 }
 
+/// Keeps track of which guest vCPUs have been assigned.
+pub struct TasksetCtx {
+    /// The total number of vCPUs.
+    ncores: usize,
+
+    /// The number of assignments so far.
+    next: usize,
+}
+
+impl TasksetCtx {
+    /// Create a new context with the given total number of cores.
+    pub fn new(ncores: usize) -> Self {
+        assert!(ncores > 0);
+        TasksetCtx { ncores, next: 0 }
+    }
+
+    /// Get the next core (wrapping around to 0 if all cores have been assigned).
+    pub fn next(&mut self) -> usize {
+        let c = self.next % self.ncores;
+        self.next += 1;
+        c
+    }
+}
+
 /// The different patterns supported by the `time_mmap_touch` workload.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum TimeMmapTouchPattern {
@@ -52,6 +76,7 @@ pub fn run_time_mmap_touch(
     pf_time: Option<u64>,
     output_file: Option<&str>,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     let pattern = match pattern {
         TimeMmapTouchPattern::Counter => "-c",
@@ -64,7 +89,8 @@ pub fn run_time_mmap_touch(
 
     shell.run(
         cmd!(
-            "sudo ./target/release/time_mmap_touch {} {} {} {} > {}",
+            "sudo taskset -c {} ./target/release/time_mmap_touch {} {} {} {} > {}",
+            tctx.next(),
             pages,
             pattern,
             if prefault { "-p" } else { "" },
@@ -96,13 +122,15 @@ pub fn start_memcached(
     user: &str,
     allow_oom: bool,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     if eager {
         setup_apriori_paging_process(shell, "memcached")?;
     }
 
     shell.run(cmd!(
-        "memcached {} -m {} -d -u {}",
+        "taskset -c {} memcached {} -m {} -d -u {}",
+        tctx.next(),
         if allow_oom { "-M" } else { "" },
         size_mb,
         user
@@ -133,13 +161,15 @@ pub fn run_memcached_gen_data(
     pf_time: Option<u64>,
     output_file: Option<&str>,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     // Start server
-    start_memcached(&shell, server_size_mb, user, allow_oom, eager)?;
+    start_memcached(&shell, server_size_mb, user, allow_oom, eager, tctx)?;
 
     // Run workload
     let cmd = cmd!(
-        "./target/release/memcached_gen_data localhost:11211 {} {} {} | tee {}",
+        "taskset -c {} ./target/release/memcached_gen_data localhost:11211 {} {} {} | tee {}",
+        tctx.next(),
         wk_size_gb,
         if let Some(freq) = freq {
             format!("--freq {}", freq)
@@ -187,9 +217,10 @@ pub fn run_memcached_and_capture_thp(
     timing_file: Option<&str>,
     output_file: &str,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     // Start server
-    start_memcached(&shell, server_size_mb, user, allow_oom, eager)?;
+    start_memcached(&shell, server_size_mb, user, allow_oom, eager, tctx)?;
 
     // Turn on/off spurious failures
     if let Some(mode) = continual_compaction {
@@ -200,7 +231,8 @@ pub fn run_memcached_and_capture_thp(
 
     // Run workload
     let cmd = cmd!(
-        "./target/release/memcached_and_capture_thp localhost:11211 {} {} {} {} | tee {}",
+        "taskset -c {} ./target/release/memcached_and_capture_thp localhost:11211 {} {} {} {} | tee {}",
+        tctx.next(),
         wk_size_gb,
         interval,
         timing_file.unwrap_or("/dev/null"),
@@ -240,6 +272,7 @@ pub fn run_nas_cg(
     class: NasClass,
     output_file: Option<&str>,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     let class = match class {
         NasClass::E => "E",
@@ -251,7 +284,8 @@ pub fn run_nas_cg(
 
     let handle = shell.spawn(
         cmd!(
-            "./bin/cg.{}.x > {}",
+            "taskset -c {} ./bin/cg.{}.x > {}",
+            tctx.next(),
             class,
             output_file.unwrap_or("/dev/null")
         )
@@ -283,6 +317,7 @@ pub fn run_memhog(
     size_kb: usize,
     opts: MemhogOptions,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     if eager {
         setup_apriori_paging_process(shell, "memhog")?;
@@ -290,9 +325,10 @@ pub fn run_memhog(
 
     shell.spawn(cmd!(
         "{} ; do \
-         memhog -r1 {}k {} {} > /dev/null ; \
+         taskset -c {} memhog -r1 {}k {} {} > /dev/null ; \
          done; \
          echo memhog done ;",
+        tctx.next(),
         if let Some(r) = r {
             format!("for i in `seq {}`", r)
         } else {
@@ -324,15 +360,21 @@ pub fn run_time_loop(
     n: usize,
     output_file: &str,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     if eager {
         setup_apriori_paging_process(shell, "time_loop")?;
     }
 
     shell.run(
-        cmd!("sudo ./target/release/time_loop {} > {}", n, output_file)
-            .cwd(exp_dir)
-            .use_bash(),
+        cmd!(
+            "sudo taskset -c {} ./target/release/time_loop {} > {}",
+            tctx.next(),
+            n,
+            output_file
+        )
+        .cwd(exp_dir)
+        .use_bash(),
     )?;
 
     Ok(())
@@ -354,6 +396,7 @@ pub fn run_locality_mem_access(
     locality: LocalityMemAccessMode,
     output_file: &str,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     let locality = match locality {
         LocalityMemAccessMode::Local => "-l",
@@ -366,7 +409,8 @@ pub fn run_locality_mem_access(
 
     shell.run(
         cmd!(
-            "time sudo ./target/release/locality_mem_access {} > {}",
+            "time sudo taskset -c {} ./target/release/locality_mem_access {} > {}",
+            tctx.next(),
             locality,
             output_file,
         )
@@ -406,6 +450,7 @@ pub fn start_redis(
     shell: &SshShell,
     size_mb: usize,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     // Set overcommit
     shell.run(cmd!("echo 1 | sudo tee /proc/sys/vm/overcommit_memory"))?;
@@ -415,7 +460,10 @@ pub fn start_redis(
     }
 
     // Start the redis server
-    let handle = shell.spawn(cmd!("redis-server --port 7777 --loglevel warning"))?;
+    let handle = shell.spawn(cmd!(
+        "taskset -c {} redis-server --port 7777 --loglevel warning",
+        tctx.next()
+    ))?;
 
     // Wait for server to start
     loop {
@@ -459,14 +507,16 @@ pub fn run_redis_gen_data(
     pf_time: Option<u64>,
     output_file: Option<&str>,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<RedisWorkloadHandles, failure::Error> {
     // Start server
-    let (server_shell, server_spawn_handle) = start_redis(&shell, server_size_mb, eager)?;
+    let (server_shell, server_spawn_handle) = start_redis(&shell, server_size_mb, eager, tctx)?;
 
     // Run workload
     let (client_shell, client_spawn_handle) = shell.spawn(
         cmd!(
-            "./target/release/redis_gen_data localhost:7777 {} {} {} | tee {} ; echo redis_gen_data done",
+            "taskset -c {} ./target/release/redis_gen_data localhost:7777 {} {} {} | tee {} ; echo redis_gen_data done",
+            tctx.next(),
             wk_size_gb,
             if let Some(freq) = freq {
                 format!("--freq {}", freq)
@@ -509,6 +559,7 @@ pub fn run_metis_matrix_mult(
     bmk_dir: &str,
     dim: usize,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     if eager {
         setup_apriori_paging_process(shell, "matrix_mult2")?;
@@ -516,7 +567,8 @@ pub fn run_metis_matrix_mult(
 
     shell.spawn(
         cmd!(
-            "./obj/matrix_mult2 -q -o -l {} ; echo matrix_mult2 done ;",
+            "taskset -c {} ./obj/matrix_mult2 -q -o -l {} ; echo matrix_mult2 done ;",
+            tctx.next(),
             dim
         )
         .cwd(bmk_dir),
@@ -545,6 +597,7 @@ pub fn run_mix(
     freq: usize,
     size_gb: usize,
     eager: bool,
+    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     let redis_handles = run_redis_gen_data(
         shell,
@@ -555,10 +608,11 @@ pub fn run_mix(
         /* pf_time */ None,
         /* output_file */ None,
         eager,
+        tctx,
     )?;
 
     let matrix_dim = (((size_gb / 3) << 27) as f64).sqrt() as usize;
-    let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim, eager)?;
+    let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim, eager, tctx)?;
 
     let _memhog_handles = run_memhog(
         shell,
@@ -566,6 +620,7 @@ pub fn run_mix(
         (size_gb << 20) / 3,
         MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
         eager,
+        tctx,
     )?;
 
     // Wait for redis client to finish
