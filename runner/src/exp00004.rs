@@ -152,17 +152,19 @@ where
         "Setup and Workload",
         run_memcached_and_capture_thp(
             &ushell,
-            login.username.as_str(),
-            zerosim_exp_path,
-            size << 10,
-            size,
+            &crate::workloads::MemcachedWorkloadConfig::default()
+                .user(login.username.as_str())
+                .exp_dir(zerosim_exp_path)
+                .server_size_mb(size << 10)
+                .wk_size_gb(size)
+                .allow_oom(true)
+                .output_file(None)
+                .eager(false)
+                .client_pin_core(tctx.next())
+                .server_pin_core(None),
             INTERVAL,
-            /* allow_oom */ true,
             /* continual_compaction */ None,
-            /* timing_file */ None,
             &dir!(BARE_METAL_RESULTS_DIR, output_file),
-            /* eager */ false,
-            &mut tctx,
         )?
     );
 

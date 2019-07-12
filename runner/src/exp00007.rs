@@ -318,16 +318,18 @@ where
                 "Start and Workload",
                 run_memcached_gen_data(
                     &vshell,
-                    "vagrant",
-                    zerosim_exp_path,
-                    size >> 10,
-                    size >> 20,
-                    Some(freq),
-                    /* allow_oom */ true,
-                    /* pf_time */ None,
-                    None,
-                    eager,
-                    &mut tctx,
+                    &crate::workloads::MemcachedWorkloadConfig::default()
+                        .user("vagrant")
+                        .exp_dir(zerosim_exp_path)
+                        .server_size_mb(size >> 10)
+                        .wk_size_gb(size >> 20)
+                        .freq(Some(freq))
+                        .allow_oom(true)
+                        .pf_time(None)
+                        .output_file(None)
+                        .eager(eager,)
+                        .client_pin_core(tctx.next())
+                        .server_pin_core(None)
                 )?
             );
         }
@@ -358,14 +360,16 @@ where
                 "Start and Workload",
                 run_redis_gen_data(
                     &vshell,
-                    zerosim_exp_path,
-                    size >> 10,
-                    size >> 20,
-                    Some(freq),
-                    /* pf_time */ None,
-                    None,
-                    eager,
-                    &mut tctx,
+                    &crate::workloads::RedisWorkloadConfig::default()
+                        .exp_dir(zerosim_exp_path)
+                        .server_size_mb(size >> 10)
+                        .wk_size_gb(size >> 20)
+                        .freq(Some(freq))
+                        .pf_time(None)
+                        .output_file(None)
+                        .eager(eager)
+                        .client_pin_core(tctx.next())
+                        .server_pin_core(None),
                 )?
                 .wait_for_client()?
             );

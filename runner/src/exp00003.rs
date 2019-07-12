@@ -228,17 +228,19 @@ where
         "Start and Workload",
         run_memcached_and_capture_thp(
             &vshell,
-            "vagrant",
-            zerosim_exp_path,
-            size << 10,
-            size,
+            &crate::workloads::MemcachedWorkloadConfig::default()
+                .user("vagrant")
+                .exp_dir(zerosim_exp_path)
+                .server_size_mb(size << 10)
+                .wk_size_gb(size)
+                .allow_oom(false)
+                .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, memcached_timing_file)))
+                .eager(false)
+                .client_pin_core(tctx.next())
+                .server_pin_core(None),
             INTERVAL,
-            /* allow_oom */ false,
             continual_compaction,
-            Some(&dir!(VAGRANT_RESULTS_DIR, memcached_timing_file)),
             &dir!(VAGRANT_RESULTS_DIR, output_file),
-            /* eager */ false,
-            &mut tctx,
         )?
     );
 

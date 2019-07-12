@@ -344,16 +344,18 @@ where
                 "Start and Workload",
                 run_memcached_gen_data(
                     &vshell,
-                    "vagrant",
-                    zerosim_exp_path,
-                    size << 10,
-                    size,
-                    Some(freq),
-                    /* allow_oom */ true,
-                    pf_time,
-                    Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
-                    /* eager */ false,
-                    &mut tctx,
+                    &crate::workloads::MemcachedWorkloadConfig::default()
+                        .user("vagrant")
+                        .exp_dir(zerosim_exp_path)
+                        .server_size_mb(size << 10)
+                        .wk_size_gb(size)
+                        .freq(Some(freq))
+                        .allow_oom(true)
+                        .pf_time(pf_time)
+                        .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, output_file)))
+                        .eager(false)
+                        .client_pin_core(tctx.next())
+                        .server_pin_core(None)
                 )?
             );
 

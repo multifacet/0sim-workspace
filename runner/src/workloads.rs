@@ -9,6 +9,14 @@ use spurs::{
     ssh::{Execute, SshShell, SshSpawnHandle},
 };
 
+macro_rules! impl_conf {
+    ($name:ident : $ty:ty) => {
+        pub fn $name(self, $name: $ty) -> Self {
+            Self { $name, ..self }
+        }
+    }
+}
+
 /// Set the apriori paging process using Swapnil's program. Requires `sudo`.
 ///
 /// For example, to cause `ls` to be eagerly paged:
@@ -108,6 +116,68 @@ pub fn run_time_mmap_touch(
     Ok(())
 }
 
+/// The configuration of a memcached workload.
+pub struct MemcachedWorkloadConfig<'s> {
+    /// The path of the `0sim-experiments` submodule on the remote.
+    exp_dir: &'s str,
+
+    /// The user to run the `memcached` server as.
+    user: &'s str,
+    /// The size of `memcached` server in MB.
+    server_size_mb: usize,
+    /// Specifies whether the memcached server is allowed to OOM.
+    allow_oom: bool,
+
+    /// The core number that the memcached server is pinned to, if any.
+    server_pin_core: Option<usize>,
+    /// The core number that the workload client is pinned to.
+    client_pin_core: usize,
+
+    /// The size of the workload in GB.
+    wk_size_gb: usize,
+    /// The file to which the workload will write its output. If `None`, then `/dev/null` is used.
+    output_file: Option<&'s str>,
+
+    /// The CPU frequency. If passed, the workload will use rdtsc for timing.
+    freq: Option<usize>,
+    /// Specifies the page fault time if TSC offsetting is to try to account for it.
+    pf_time: Option<u64>,
+    /// Indicates whether the workload should be run with eager paging.
+    eager: bool,
+}
+
+impl Default for MemcachedWorkloadConfig<'_> {
+    fn default() -> Self {
+        Self {
+            exp_dir: "",
+            user: "",
+            server_size_mb: 0,
+            allow_oom: false,
+            wk_size_gb: 0,
+            output_file: None,
+            server_pin_core: None,
+            client_pin_core: 0,
+            freq: None,
+            pf_time: None,
+            eager: false,
+        }
+    }
+}
+
+impl<'s> MemcachedWorkloadConfig<'s> {
+    impl_conf! {exp_dir: &'s str}
+    impl_conf! {user: &'s str}
+    impl_conf! {server_size_mb: usize}
+    impl_conf! {allow_oom: bool}
+    impl_conf! {wk_size_gb: usize}
+    impl_conf! {output_file: Option<&'s str>}
+    impl_conf! {server_pin_core: Option<usize>}
+    impl_conf! {client_pin_core: usize}
+    impl_conf! {freq: Option<usize>}
+    impl_conf! {pf_time: Option<u64>}
+    impl_conf! {eager: bool}
+}
+
 /// Start a `memcached` server in daemon mode as the given user with the given amount of memory.
 /// Usually this is called indirectly through one of the other workload routines.
 ///
@@ -118,74 +188,63 @@ pub fn run_time_mmap_touch(
 /// `eager` indicates whether the workload should be run with eager paging.
 pub fn start_memcached(
     shell: &SshShell,
-    size_mb: usize,
-    user: &str,
-    allow_oom: bool,
-    eager: bool,
-    tctx: &mut TasksetCtx,
+    cfg: &MemcachedWorkloadConfig<'_>,
 ) -> Result<(), failure::Error> {
-    if eager {
+    if cfg.eager {
         setup_apriori_paging_process(shell, "memcached")?;
     }
 
-    shell.run(cmd!(
-        "taskset -c {} memcached {} -m {} -d -u {}",
-        tctx.next(),
-        if allow_oom { "-M" } else { "" },
-        size_mb,
-        user
-    ))?;
+    if let Some(server_pin_core) = cfg.server_pin_core {
+        shell.run(cmd!(
+            "taskset -c {} memcached {} -m {} -d -u {}",
+            server_pin_core,
+            if cfg.allow_oom { "-M" } else { "" },
+            cfg.server_size_mb,
+            cfg.user
+        ))?
+    } else {
+        shell.run(cmd!(
+            "memcached {} -m {} -d -u {}",
+            if cfg.allow_oom { "-M" } else { "" },
+            cfg.server_size_mb,
+            cfg.user
+        ))?
+    };
     Ok(())
 }
 
 /// Run the `memcached_gen_data` workload.
-///
-/// - `user` is the user to run the `memcached` server as.
-/// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
-/// - `server_size_mb` is the size of `memcached` server in MB.
-/// - `wk_size_gb` is the size of the workload in GB.
-/// - `freq` is the CPU frequency. If passed, the workload will use rdtsc for timing.
-/// - `allow_oom` specifies whether the memcached server is allowed to OOM.
-/// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
-/// - `output_file` is the file to which the workload will write its output. If `None`, then
-///   `/dev/null` is used.
-/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_memcached_gen_data(
     shell: &SshShell,
-    user: &str,
-    exp_dir: &str,
-    server_size_mb: usize,
-    wk_size_gb: usize,
-    freq: Option<usize>,
-    allow_oom: bool,
-    pf_time: Option<u64>,
-    output_file: Option<&str>,
-    eager: bool,
-    tctx: &mut TasksetCtx,
+    cfg: &MemcachedWorkloadConfig<'_>,
 ) -> Result<(), failure::Error> {
     // Start server
-    start_memcached(&shell, server_size_mb, user, allow_oom, eager, tctx)?;
+    start_memcached(&shell, cfg)?;
 
     // Run workload
     let cmd = cmd!(
         "taskset -c {} ./target/release/memcached_gen_data localhost:11211 {} {} {} | tee {}",
-        tctx.next(),
-        wk_size_gb,
-        if let Some(freq) = freq {
+        cfg.client_pin_core,
+        cfg.wk_size_gb,
+        if let Some(freq) = cfg.freq {
             format!("--freq {}", freq)
         } else {
             "".into()
         },
-        if let Some(pf_time) = pf_time {
+        if let Some(pf_time) = cfg.pf_time {
             format!("--pftime {}", pf_time)
         } else {
             "".into()
         },
-        output_file.unwrap_or("/dev/null")
+        cfg.output_file.unwrap_or("/dev/null")
     )
-    .cwd(exp_dir);
+    .cwd(cfg.exp_dir);
 
-    let cmd = if allow_oom { cmd.allow_error() } else { cmd };
+    let cmd = if cfg.allow_oom {
+        cmd.allow_error()
+    } else {
+        cmd
+    };
 
     shell.run(cmd)?;
 
@@ -194,33 +253,19 @@ pub fn run_memcached_gen_data(
 
 /// Run the `memcached_gen_data` workload.
 ///
-/// - `user` is the user to run the `memcached` server as.
-/// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
-/// - `server_size_mb` is the size of `memcached` server in MB.
-/// - `wk_size_gb` is the size of the workload in GB.
 /// - `interval` is the interval at which to collect THP stats.
-/// - `allow_oom` specifies whether the memcached server is allowed to OOM.
 /// - `continual_compaction` specifies whether spurious failures are employed and what type.
-/// - `timing_file` is the file to which memcached request latencies will be written. If `None`,
-///    then `/dev/null` is used.
-/// - `output_file` is the file to which the workload will write its output.
-/// - `eager` indicates whether the workload should be run with eager paging.
+/// - `output_file` is the file to which the workload will write its output; note that,
+///   `cfg.output_file` is the file to which memcached request latency are written.
 pub fn run_memcached_and_capture_thp(
     shell: &SshShell,
-    user: &str,
-    exp_dir: &str,
-    server_size_mb: usize,
-    wk_size_gb: usize,
+    cfg: &MemcachedWorkloadConfig<'_>,
     interval: usize,
-    allow_oom: bool,
     continual_compaction: Option<usize>,
-    timing_file: Option<&str>,
     output_file: &str,
-    eager: bool,
-    tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     // Start server
-    start_memcached(&shell, server_size_mb, user, allow_oom, eager, tctx)?;
+    start_memcached(&shell, cfg)?;
 
     // Turn on/off spurious failures
     if let Some(mode) = continual_compaction {
@@ -232,10 +277,10 @@ pub fn run_memcached_and_capture_thp(
     // Run workload
     let cmd = cmd!(
         "taskset -c {} ./target/release/memcached_and_capture_thp localhost:11211 {} {} {} {} | tee {}",
-        tctx.next(),
-        wk_size_gb,
+        cfg.client_pin_core,
+        cfg.wk_size_gb,
         interval,
-        timing_file.unwrap_or("/dev/null"),
+        cfg.output_file.unwrap_or("/dev/null"),
         if continual_compaction.is_some() {
             "--continual_compaction"
         } else {
@@ -243,10 +288,14 @@ pub fn run_memcached_and_capture_thp(
         },
         output_file
     )
-    .cwd(exp_dir)
+    .cwd(cfg.exp_dir)
     .use_bash();
 
-    let cmd = if allow_oom { cmd.allow_error() } else { cmd };
+    let cmd = if cfg.allow_oom {
+        cmd.allow_error()
+    } else {
+        cmd
+    };
 
     shell.run(cmd)?;
 
@@ -435,6 +484,59 @@ impl RedisWorkloadHandles {
     }
 }
 
+/// Every setting of the redis workload.
+pub struct RedisWorkloadConfig<'s> {
+    /// The path of the `0sim-experiments` submodule on the remote.
+    exp_dir: &'s str,
+
+    /// The size of `redis` server in MB.
+    server_size_mb: usize,
+    /// The size of the workload in GB.
+    wk_size_gb: usize,
+    /// The file to which the workload will write its output. If `None`, then `/dev/null` is used.
+    output_file: Option<&'s str>,
+
+    /// The core number that the redis server is pinned to, if any.
+    server_pin_core: Option<usize>,
+    /// The core number that the workload client is pinned to.
+    client_pin_core: usize,
+
+    /// The CPU frequency. If passed, the workload will use rdtsc for timing.
+    freq: Option<usize>,
+    /// Specifies the page fault time if TSC offsetting is to try to account for it.
+    pf_time: Option<u64>,
+    /// Indicates whether the workload should be run with eager paging.
+    eager: bool,
+}
+
+impl Default for RedisWorkloadConfig<'_> {
+    fn default() -> Self {
+        Self {
+            exp_dir: "",
+            server_size_mb: 0,
+            wk_size_gb: 0,
+            output_file: None,
+            server_pin_core: None,
+            client_pin_core: 0,
+            freq: None,
+            pf_time: None,
+            eager: false,
+        }
+    }
+}
+
+impl<'s> RedisWorkloadConfig<'s> {
+    impl_conf! {exp_dir: &'s str}
+    impl_conf! {server_size_mb: usize}
+    impl_conf! {wk_size_gb: usize}
+    impl_conf! {output_file: Option<&'s str>}
+    impl_conf! {server_pin_core: Option<usize>}
+    impl_conf! {client_pin_core: usize}
+    impl_conf! {freq: Option<usize>}
+    impl_conf! {pf_time: Option<u64>}
+    impl_conf! {eager: bool}
+}
+
 /// Spawn a `redis` server in a new shell with the given amount of memory and set some important
 /// config settings. Usually this is called indirectly through one of the other workload routines.
 ///
@@ -448,22 +550,24 @@ impl RedisWorkloadHandles {
 /// Returns the spawned shell.
 pub fn start_redis(
     shell: &SshShell,
-    size_mb: usize,
-    eager: bool,
-    tctx: &mut TasksetCtx,
+    cfg: &RedisWorkloadConfig<'_>,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     // Set overcommit
     shell.run(cmd!("echo 1 | sudo tee /proc/sys/vm/overcommit_memory"))?;
 
-    if eager {
+    if cfg.eager {
         setup_apriori_paging_process(shell, "redis-server")?;
     }
 
     // Start the redis server
-    let handle = shell.spawn(cmd!(
-        "taskset -c {} redis-server --port 7777 --loglevel warning",
-        tctx.next()
-    ))?;
+    let handle = if let Some(server_pin_core) = cfg.server_pin_core {
+        shell.spawn(cmd!(
+            "taskset -c {} redis-server --port 7777 --loglevel warning",
+            server_pin_core
+        ))?
+    } else {
+        shell.spawn(cmd!("redis-server --port 7777 --loglevel warning"))?
+    };
 
     // Wait for server to start
     loop {
@@ -480,7 +584,7 @@ pub fn start_redis(
     // - save snapshots every 300 seconds if >= 1 key changed to the file /tmp/dump.rdb
     with_shell! { shell =>
         cmd!("redis-cli -p 7777 CONFIG SET maxmemory-policy allkeys-random"),
-        cmd!("redis-cli -p 7777 CONFIG SET maxmemory {}mb", size_mb),
+        cmd!("redis-cli -p 7777 CONFIG SET maxmemory {}mb", cfg.server_size_mb),
 
         cmd!("redis-cli -p 7777 CONFIG SET dir /tmp/"),
         cmd!("redis-cli -p 7777 CONFIG SET dbfilename dump.rdb"),
@@ -491,48 +595,32 @@ pub fn start_redis(
 }
 
 /// Run the `redis_gen_data` workload.
-///
-/// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
-/// - `server_size_mb` is the size of `redis` server in MB.
-/// - `wk_size_gb` is the size of the workload in GB.
-/// - `freq` is the CPU frequency. If passed, the workload will use rdtsc for timing.
-/// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
-/// - `output_file` is the file to which the workload will write its output. If `None`, then
-///   `/dev/null` is used.
-/// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_redis_gen_data(
     shell: &SshShell,
-    exp_dir: &str,
-    server_size_mb: usize,
-    wk_size_gb: usize,
-    freq: Option<usize>,
-    pf_time: Option<u64>,
-    output_file: Option<&str>,
-    eager: bool,
-    tctx: &mut TasksetCtx,
+    cfg: &RedisWorkloadConfig<'_>,
 ) -> Result<RedisWorkloadHandles, failure::Error> {
     // Start server
-    let (server_shell, server_spawn_handle) = start_redis(&shell, server_size_mb, eager, tctx)?;
+    let (server_shell, server_spawn_handle) = start_redis(&shell, cfg)?;
 
     // Run workload
     let (client_shell, client_spawn_handle) = shell.spawn(
         cmd!(
             "taskset -c {} ./target/release/redis_gen_data localhost:7777 {} {} {} | tee {} ; echo redis_gen_data done",
-            tctx.next(),
-            wk_size_gb,
-            if let Some(freq) = freq {
+            cfg.client_pin_core,
+            cfg.wk_size_gb,
+            if let Some(freq) = cfg.freq {
                 format!("--freq {}", freq)
             } else {
                 "".into()
             },
-            if let Some(pf_time) = pf_time {
+            if let Some(pf_time) = cfg.pf_time {
                 format!("--pftime {}", pf_time)
             } else {
                 "".into()
             },
-            output_file.unwrap_or("/dev/null")
+            cfg.output_file.unwrap_or("/dev/null")
         )
-        .cwd(exp_dir),
+        .cwd(cfg.exp_dir),
     )?;
 
     Ok(RedisWorkloadHandles {
@@ -603,14 +691,16 @@ pub fn run_mix(
 ) -> Result<(), failure::Error> {
     let redis_handles = run_redis_gen_data(
         shell,
-        exp_dir,
-        (size_gb << 10) / 3,
-        size_gb / 3,
-        Some(freq),
-        /* pf_time */ None,
-        /* output_file */ None,
-        eager,
-        tctx,
+        &RedisWorkloadConfig::default()
+            .exp_dir(exp_dir)
+            .server_size_mb((size_gb << 10) / 3)
+            .wk_size_gb(size_gb / 3)
+            .freq(Some(freq))
+            .pf_time(None)
+            .output_file(None)
+            .eager(true)
+            .client_pin_core(tctx.next())
+            .server_pin_core(None),
     )?;
 
     let matrix_dim = (((size_gb / 3) << 27) as f64).sqrt() as usize;
