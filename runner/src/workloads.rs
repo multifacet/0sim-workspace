@@ -473,16 +473,18 @@ pub fn start_redis(
         }
     }
 
+    const REDIS_SNAPSHOT_FREQ_SECS: usize = 300;
+
     // Settings
     // - maxmemory amount + evict random keys when full
-    // - save snapshots every 60 seconds if >= 1 key changed to the file /tmp/dump.rdb
+    // - save snapshots every 300 seconds if >= 1 key changed to the file /tmp/dump.rdb
     with_shell! { shell =>
         cmd!("redis-cli -p 7777 CONFIG SET maxmemory-policy allkeys-random"),
         cmd!("redis-cli -p 7777 CONFIG SET maxmemory {}mb", size_mb),
 
         cmd!("redis-cli -p 7777 CONFIG SET dir /tmp/"),
         cmd!("redis-cli -p 7777 CONFIG SET dbfilename dump.rdb"),
-        cmd!("redis-cli -p 7777 CONFIG SET save \"60 1\""),
+        cmd!("redis-cli -p 7777 CONFIG SET save \"{} 1\"", REDIS_SNAPSHOT_FREQ_SECS),
     }
 
     Ok(handle)
