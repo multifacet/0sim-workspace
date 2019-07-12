@@ -1,6 +1,7 @@
 //! Boot the kernel and dump the contents of `/proc/ktask_instrumentation`.
 //!
-//! Requires `setup00000` followed by `setup00001` with the `markm_instrument_ktask` kernel.
+//! Requires `setup00000` followed by `setup00001` with the `markm_instrument_ktask` or
+//! `markm_instrument_mem_init` kernel.
 
 use clap::clap_app;
 
@@ -33,10 +34,15 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The number of GBs of the VM")
         (@arg CORES: +takes_value {is_usize} +required
          "The number of cores of the VM")
-        (@arg KTASK_DIV: +takes_value {is_usize} +required
-         "The scaling factor to pass a boot parameter. The max number of threads \
-          in ktask is set to `CORES / KTASK_DIV`. 4 is the default for \
-          normal ktask.")
+        (@group KTASK_DIV =>
+            (@attributes +required)
+            (@arg DIV: +takes_value {is_usize}
+             "The scaling factor to pass a boot parameter. The max number of threads \
+              in ktask is set to `CORES / KTASK_DIV`. 4 is the default for \
+              normal ktask.")
+            (@arg NO_KTASK: --no_ktask
+             "Measure boot without ktask.")
+        )
     }
 }
 
@@ -52,11 +58,7 @@ pub fn run(
     };
     let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
     let cores = sub_m.value_of("CORES").unwrap().parse::<usize>().unwrap();
-    let ktask_div = sub_m
-        .value_of("KTASK_DIV")
-        .unwrap()
-        .parse::<usize>()
-        .unwrap();
+    let ktask_div = sub_m.value_of("DIV").map(|s| s.parse::<usize>().unwrap());
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
@@ -64,13 +66,13 @@ pub fn run(
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
-        * workload: "ktask_boot_mem_init",
+        * workload: if ktask_div.is_some() { "ktask_boot_mem_init" } else { "boot_mem_init" },
         exp: 00006,
 
         * vm_size: vm_size,
         * cores: cores,
 
-        * ktask_div: ktask_div,
+        (ktask_div.is_some()) ktask_div: ktask_div,
 
         username: login.username.as_str(),
         host: login.hostname,
@@ -98,13 +100,13 @@ where
 {
     let vm_size = settings.get::<usize>("vm_size");
     let cores = settings.get::<usize>("cores");
-    let ktask_div = settings.get::<usize>("ktask_div");
+    let ktask_div = settings.get::<Option<usize>>("ktask_div");
 
     // Collect timers on VM
     let mut timers = vec![];
 
     // We first need to set the guest kernel boot param.
-    {
+    if let Some(ktask_div) = ktask_div {
         let ushell = SshShell::with_default_key(login.username.as_str(), login.hostname)?;
         let vshell = time!(
             timers,
