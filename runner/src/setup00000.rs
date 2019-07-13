@@ -497,6 +497,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         "maven",
         "numactl", // for memhog
         "redis",
+        "perf", // for debugging
     ]))?;
 
     vrshell.run(
