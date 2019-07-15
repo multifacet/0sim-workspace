@@ -26,6 +26,7 @@ mod exp00005;
 mod exp00006;
 mod exp00007;
 mod exp00008;
+mod exp00009;
 
 fn run() -> Result<(), failure::Error> {
     let matches = clap::App::new("runner")
@@ -57,6 +58,7 @@ fn run() -> Result<(), failure::Error> {
         .subcommand(exp00006::cli_options())
         .subcommand(exp00007::cli_options())
         .subcommand(exp00008::cli_options())
+        .subcommand(exp00009::cli_options())
         .setting(clap::AppSettings::SubcommandRequired)
         .setting(clap::AppSettings::DisableVersion)
         .get_matches();
@@ -81,6 +83,7 @@ fn run() -> Result<(), failure::Error> {
         ("exp00006", Some(sub_m)) => exp00006::run(dry_run, print_results_path, sub_m),
         ("exp00007", Some(sub_m)) => exp00007::run(dry_run, print_results_path, sub_m),
         ("exp00008", Some(sub_m)) => exp00008::run(dry_run, print_results_path, sub_m),
+        ("exp00009", Some(sub_m)) => exp00009::run(dry_run, print_results_path, sub_m),
 
         _ => {
             unreachable!();
