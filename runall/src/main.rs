@@ -92,6 +92,19 @@ fn do_work(
     let results = Arc::new(Mutex::new(Vec::new()));
 
     for (i, cmd) in cmds.into_iter().enumerate() {
+        // Handle barriers
+        if cmd == "barrier" {
+            // We wait until all previous commands have completed before scheduling the new ones.
+            while results.lock().unwrap().len() < i {
+                // Sleep a bit and wait.
+                std::thread::sleep(time::Duration::from_secs(5));
+            }
+
+            // Barrier met.
+            results.lock().unwrap().push((cmd, "NONE".into()));
+            continue;
+        }
+
         // Each command has 3 steps:
         // 1) Get a machine.
         // 2) Run the command.
