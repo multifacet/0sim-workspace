@@ -179,7 +179,7 @@ fn run_inner<A>(
     settings: OutputManager,
 ) -> Result<(), failure::Error>
 where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     let workload = settings.get::<Workload>("app");
     let interval = settings.get::<usize>("stats_interval");

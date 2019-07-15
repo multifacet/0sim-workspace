@@ -17,7 +17,7 @@ use crate::{
         get_cpu_freq,
         output::OutputManager,
         paths::{setup00000::*, *},
-        Username,
+        KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Username,
     },
     settings,
     workloads::{run_memcached_gen_data, run_time_mmap_touch, TimeMmapTouchPattern},
@@ -105,7 +105,7 @@ pub fn run(
 
     let settings = settings! {
         * workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
-        exp: 00000,
+        exp: 00009,
 
         * size: size,
         pattern: pattern,
@@ -140,7 +140,7 @@ fn run_inner<A>(
     settings: OutputManager,
 ) -> Result<(), failure::Error>
 where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     let vm_size = settings.get::<usize>("vm_size");
     let size = settings.get::<usize>("size");
@@ -187,6 +187,15 @@ where
         ZEROSIM_EXPERIMENTS_SUBMODULE
     );
 
+    // Reuse the kernel 5.1.4 build folder we used during setup 0 to build the guest kernel. We
+    // need to clean it first...
+    let tarball_path: String = KERNEL_RECENT_TARBALL_NAME
+        .trim_end_matches(".tar.gz")
+        .trim_end_matches(".tar.xz")
+        .trim_end_matches(".tgz")
+        .into();
+    ushell.run(cmd!("make clean").cwd(tarball_path))?;
+
     // Calibrate
     if calibrate {
         time!(
@@ -231,6 +240,35 @@ where
 
     // We want to use rdtsc as the time source, so find the cpu freq:
     let freq = get_cpu_freq(&ushell)?;
+
+    // Spawn a kernel build in another thread...
+    let _handle = std::thread::spawn({
+        let ushell2 = SshShell::with_default_key(login.username.as_str(), &login.host)
+            .expect("Unable to connect to host for kernel build");
+
+        move || {
+            crate::common::build_kernel(
+                dry_run,
+                &ushell2,
+                KernelSrc::Tar {
+                    tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
+                },
+                KernelConfig {
+                    base_config: KernelBaseConfigSource::Current,
+                    extra_options: &[
+                        // disable spectre/meltdown mitigations
+                        ("CONFIG_PAGE_TABLE_ISOLATION", false),
+                        ("CONFIG_RETPOLINE", false),
+                        // for `perf` stack traces
+                        ("CONFIG_FRAME_POINTER", true),
+                    ],
+                },
+                None,
+                KernelPkgType::Rpm,
+            )
+            .expect("Kernel Build FAILED");
+        }
+    });
 
     // Run memcached or time_touch_mmap
     if let Some(pattern) = pattern {

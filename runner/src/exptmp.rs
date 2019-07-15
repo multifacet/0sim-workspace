@@ -181,7 +181,7 @@ fn run_inner<A>(
     settings: OutputManager,
 ) -> Result<(), failure::Error>
 where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     let vm_size = settings.get::<usize>("vm_size");
     let size = settings.get::<usize>("size");

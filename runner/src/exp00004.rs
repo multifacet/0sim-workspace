@@ -93,7 +93,7 @@ fn run_inner<A>(
     settings: OutputManager,
 ) -> Result<(), failure::Error>
 where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     let size = settings.get::<usize>("size");
     let transparent_hugepage_enabled = settings.get::<&str>("transparent_hugepage_enabled");

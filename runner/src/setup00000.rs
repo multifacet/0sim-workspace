@@ -35,10 +35,6 @@ const SPARK_HOME: &str = "spark-2.4.3-bin-hadoop2.7";
 const QEMU_TARBALL: &str = "https://download.qemu.org/qemu-4.0.0.tar.xz";
 const QEMU_TARBALL_NAME: &str = "qemu-4.0.0.tar.xz";
 
-const KERNEL_RECENT_TARBALL: &str =
-    "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.1.4.tar.xz";
-const KERNEL_RECENT_TARBALL_NAME: &str = "linux-5.1.4.tar.xz";
-
 /// Location of `.ssh` directory on UW CS AFS so we can install it on experimental machines.
 const SSH_LOCATION: &str = "/u/m/a/markm/.ssh";
 

@@ -28,7 +28,8 @@ impl Username<'_> {
     }
 }
 
-pub struct Login<'u, 'h, A: std::net::ToSocketAddrs + std::fmt::Display> {
+#[derive(Clone, Debug)]
+pub struct Login<'u, 'h, A: std::net::ToSocketAddrs + std::fmt::Display + Clone> {
     pub host: A,
     pub hostname: &'h str,
     pub username: Username<'u>,
@@ -114,6 +115,13 @@ pub mod paths {
 
         /// The shared directory for results on the guest.
         pub const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
+
+        /// The URL of the tarball used to build the guest kernel.
+        pub const KERNEL_RECENT_TARBALL: &str =
+            "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.1.4.tar.xz";
+
+        /// The location of the tarball used to build the guest kernel.
+        pub const KERNEL_RECENT_TARBALL_NAME: &str = "linux-5.1.4.tar.xz";
     }
 
     pub mod setup00001 {
@@ -641,7 +649,7 @@ pub mod exp_0sim {
     /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
     pub fn initial_reboot<A>(dry_run: bool, login: &Login<A>) -> Result<(), failure::Error>
     where
-        A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+        A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
     {
         // Connect to the remote
         let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
@@ -665,7 +673,7 @@ pub mod exp_0sim {
         cores: usize,
     ) -> Result<(SshShell, SshShell), failure::Error>
     where
-        A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug,
+        A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
     {
         let ushell = connect_and_setup_host_only(dry_run, &login)?;
         let vshell = start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?;
@@ -716,7 +724,7 @@ pub mod exp_0sim {
         login: &Login<A>,
     ) -> Result<SshShell, failure::Error>
     where
-        A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display,
+        A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display + Clone,
     {
         // Keep trying to connect until we succeed
         let ushell = {
