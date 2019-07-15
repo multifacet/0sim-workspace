@@ -1,8 +1,10 @@
-//! Run the time_loop workload on the remote test machine.
+//! Run the `time_loop` or `locality_mem_access` workload on the remote test machine.
 //!
 //! Requires `setup00000`.
 
 use clap::clap_app;
+
+use serde::{Deserialize, Serialize};
 
 use spurs::{
     cmd,
@@ -17,8 +19,24 @@ use crate::{
         paths::{setup00000::*, *},
     },
     settings,
-    workloads::{run_time_loop, run_time_mmap_touch, TimeMmapTouchPattern},
+    workloads::{
+        run_locality_mem_access, run_time_loop, run_time_mmap_touch, LocalityMemAccessMode,
+        TimeMmapTouchPattern,
+    },
 };
+
+/// Which workload to run?
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+enum Workload {
+    /// `time_loop`
+    TimeLoop,
+
+    /// Single-threaded `locality_mem_access`
+    LocalityMemAccess,
+
+    /// Multithreaded `locality_mem_access` with the given number of threads
+    MtLocalityMemAccess(usize),
+}
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {
@@ -35,13 +53,21 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
         (@arg N: +required +takes_value {is_usize}
-         "The number of iterations of the workload (e.g. 50000000)")
+         "The number of iterations of the workload (e.g. 50000000), preferably \
+          divisible by 8 for `locality_mem_access`")
         (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
          "The number of GBs of the VM (defaults to 1024)")
         (@arg CORES: +takes_value {is_usize} -C --cores
          "The number of cores of the VM (defaults to 1)")
         (@arg WARMUP: -w --warmup
          "Pass this flag to warmup the VM before running the main workload.")
+        (@group WORKLOAD =>
+            (@attributes +required)
+            (@arg TIME_LOOP: -t "Run time_loop")
+            (@arg LOCALITY: -l "Run locality_mem_access")
+            (@arg MTLOCALITY: -L +takes_value {is_usize}
+             "Run multithreaded locality_mem_access with the given number of threads")
+        )
     }
 }
 
@@ -76,18 +102,37 @@ pub fn run(
         VAGRANT_CORES
     };
 
+    let mut nthreads = 1;
+
+    let workload = if sub_m.is_present("TIME_LOOP") {
+        Workload::TimeLoop
+    } else if sub_m.is_present("LOCALITY") {
+        Workload::LocalityMemAccess
+    } else if let Some(threads) = sub_m.value_of("MTLOCALITY") {
+        let threads = threads.parse().unwrap();
+        nthreads = threads;
+        Workload::MtLocalityMemAccess(threads)
+    } else {
+        unreachable!()
+    };
+
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
-        * workload: "time_loop",
+        * workload: match workload {
+            Workload::TimeLoop => "time_loop",
+            Workload::LocalityMemAccess => "locality_mem_access",
+            Workload::MtLocalityMemAccess(..) => "locality_mem_access",
+        },
         exp: 00002,
 
         warmup: warmup,
         calibrated: false,
         * n: n,
+        (nthreads > 1) threads: nthreads,
 
         * vm_size: vm_size,
         cores: cores,
@@ -101,6 +146,9 @@ pub fn run(
         remote_git_hash: remote_git_hash,
 
         remote_research_settings: remote_research_settings,
+
+        // machine readable version for convenience
+        workload_mr: workload,
     };
 
     run_inner(dry_run, print_results_path, &login, settings)
@@ -123,6 +171,7 @@ where
     let warmup = settings.get::<bool>("warmup");
     let calibrate = settings.get::<bool>("calibrated");
     let n = settings.get::<usize>("n");
+    let workload = settings.get::<Workload>("workload_mr");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
 
     // Reboot
@@ -197,18 +246,78 @@ where
     }
 
     // Then, run the actual experiment
-    time!(
-        timers,
-        "Workload",
-        run_time_loop(
-            &vshell,
-            zerosim_exp_path,
-            n,
-            &dir!(VAGRANT_RESULTS_DIR, output_file),
-            /* eager */ false,
-            &mut tctx,
-        )?
-    );
+    match workload {
+        Workload::TimeLoop => {
+            time!(
+                timers,
+                "Workload",
+                run_time_loop(
+                    &vshell,
+                    zerosim_exp_path,
+                    n,
+                    &dir!(VAGRANT_RESULTS_DIR, output_file),
+                    /* eager */ false,
+                    &mut tctx,
+                )?
+            );
+        }
+
+        Workload::LocalityMemAccess => {
+            let local_file = settings.gen_file_name("local");
+            let nonlocal_file = settings.gen_file_name("nonlocal");
+
+            time!(timers, "Workload", {
+                run_locality_mem_access(
+                    &vshell,
+                    zerosim_exp_path,
+                    LocalityMemAccessMode::Local,
+                    n,
+                    None,
+                    &dir!(VAGRANT_RESULTS_DIR, local_file),
+                    /* eager */ false,
+                    &mut tctx,
+                )?;
+                run_locality_mem_access(
+                    &vshell,
+                    zerosim_exp_path,
+                    LocalityMemAccessMode::Random,
+                    n,
+                    None,
+                    &dir!(VAGRANT_RESULTS_DIR, nonlocal_file),
+                    /* eager */ false,
+                    &mut tctx,
+                )?;
+            });
+        }
+
+        Workload::MtLocalityMemAccess(threads) => {
+            let local_file = settings.gen_file_name("local");
+            let nonlocal_file = settings.gen_file_name("nonlocal");
+
+            time!(timers, "Workload", {
+                run_locality_mem_access(
+                    &vshell,
+                    zerosim_exp_path,
+                    LocalityMemAccessMode::Local,
+                    n,
+                    Some(threads),
+                    &dir!(VAGRANT_RESULTS_DIR, local_file),
+                    /* eager */ false,
+                    &mut tctx,
+                )?;
+                run_locality_mem_access(
+                    &vshell,
+                    zerosim_exp_path,
+                    LocalityMemAccessMode::Random,
+                    n,
+                    Some(threads),
+                    &dir!(VAGRANT_RESULTS_DIR, nonlocal_file),
+                    /* eager */ false,
+                    &mut tctx,
+                )?;
+            });
+        }
+    }
 
     ushell.run(cmd!("date"))?;
 

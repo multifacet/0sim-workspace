@@ -24,6 +24,9 @@ use crate::{
     },
 };
 
+/// # of iterations for locality_mem_access workload
+const LOCALITY_N: usize = 10000;
+
 #[derive(Copy, Clone, Debug)]
 enum Workload {
     Memcached,
@@ -400,6 +403,8 @@ where
                     &vshell,
                     zerosim_exp_path,
                     LocalityMemAccessMode::Local,
+                    LOCALITY_N,
+                    None,
                     &dir!(VAGRANT_RESULTS_DIR, output_local),
                     /* eager */ false,
                     &mut tctx,
@@ -424,6 +429,8 @@ where
                     &vshell,
                     zerosim_exp_path,
                     LocalityMemAccessMode::Random,
+                    LOCALITY_N,
+                    None,
                     &dir!(VAGRANT_RESULTS_DIR, output_nonlocal),
                     /* eager */ false,
                     &mut tctx,

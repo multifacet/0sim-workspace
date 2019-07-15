@@ -438,11 +438,16 @@ pub enum LocalityMemAccessMode {
     Random,
 }
 
-/// Run the `locality_mem_access` workload on the remote.
+/// Run the `locality_mem_access` workload on the remote of the given number of iterations.
+///
+/// If `threads` is `None`, a single-threaded workload is run. Otherwise, a multithreaded workload
+/// is run.
 pub fn run_locality_mem_access(
     shell: &SshShell,
     exp_dir: &str,
     locality: LocalityMemAccessMode,
+    n: usize,
+    threads: Option<usize>,
     output_file: &str,
     eager: bool,
     tctx: &mut TasksetCtx,
@@ -458,9 +463,15 @@ pub fn run_locality_mem_access(
 
     shell.run(
         cmd!(
-            "time sudo taskset -c {} ./target/release/locality_mem_access {} > {}",
+            "time sudo taskset -c {} ./target/release/locality_mem_access {} {} {} > {}",
             tctx.next(),
             locality,
+            n,
+            if let Some(threads) = threads {
+                format!("-t {}", threads)
+            } else {
+                "".into()
+            },
             output_file,
         )
         .cwd(exp_dir)
