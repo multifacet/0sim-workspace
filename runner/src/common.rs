@@ -1069,8 +1069,8 @@ pub mod exp_0sim {
             // If the swap device in use is a thin swap
             vec![
                 dm_data.replace("/dev/", ""),
-                "/dev/mapper/mythin".into(),
-                "/dev/mapper/mypool".into(),
+                "mapper/mythin".into(),
+                "mapper/mypool".into(),
             ]
         } else if let Some(devs) =
             crate::common::get_remote_research_setting(&settings, "swap-devices")?
