@@ -321,12 +321,14 @@ impl Server {
             }
 
             CloneJob { jid } => {
-                if let Some(job) = self.jobs.lock().unwrap().get(&jid) {
+                let mut locked_jobs = self.jobs.lock().unwrap();
+
+                if let Some(job) = locked_jobs.get(&jid).map(Clone::clone) {
                     let new_jid = self.next_jid.fetch_add(1, Ordering::Relaxed);
 
                     info!("Cloning job {} to job {}, {:?}", jid, new_jid, job);
 
-                    self.jobs.lock().unwrap().insert(
+                    locked_jobs.insert(
                         new_jid,
                         Job {
                             jid: new_jid,
