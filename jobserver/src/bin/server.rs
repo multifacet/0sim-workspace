@@ -955,5 +955,5 @@ fn main() {
     // Listen for client requests on the main thread, while we do work in the background.
     let server = Arc::new(Server::new());
     Arc::clone(&server).start_work_thread();
-    server.listen(SERVER_ADDR);
+    server.listen(addr);
 }
