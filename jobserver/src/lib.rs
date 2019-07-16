@@ -79,6 +79,13 @@ pub enum JobServerReq {
         /// The job ID of the job.
         jid: usize,
     },
+
+    /// Clone a running or scheduled job. That is, create a new job with the same properties as the
+    /// given job.
+    CloneJob {
+        /// The job ID of the job to cancel.
+        jid: usize,
+    },
 }
 
 /// A response to the client.

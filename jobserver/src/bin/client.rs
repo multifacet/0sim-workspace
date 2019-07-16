@@ -82,6 +82,12 @@ fn main() {
             (@arg JID: +required {is_usize}
              "The job ID of the job")
         )
+
+        (@subcommand clonejob =>
+            (about: "Clone a job.")
+            (@arg JID: +required {is_usize}
+             "The job ID of the job to clone.")
+        )
     }
     .setting(clap::AppSettings::SubcommandRequired)
     .setting(clap::AppSettings::DisableVersion)
@@ -159,6 +165,10 @@ fn make_request(matches: clap::ArgMatches<'_>) -> JobServerReq {
         },
 
         ("statjob", Some(sub_m)) => JobServerReq::JobStatus {
+            jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
+        },
+
+        ("clonejob", Some(sub_m)) => JobServerReq::CloneJob {
             jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
         },
 

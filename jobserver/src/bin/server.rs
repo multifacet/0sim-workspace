@@ -319,6 +319,30 @@ impl Server {
                     JobServerResp::NoSuchJob
                 }
             }
+
+            CloneJob { jid } => {
+                if let Some(job) = self.jobs.lock().unwrap().get(&jid) {
+                    let new_jid = self.next_jid.fetch_add(1, Ordering::Relaxed);
+
+                    info!("Cloning job {} to job {}, {:?}", jid, new_jid, job);
+
+                    self.jobs.lock().unwrap().insert(
+                        new_jid,
+                        Job {
+                            jid: new_jid,
+                            cmd: job.cmd.clone(),
+                            class: job.class.clone(),
+                            cp_results: job.cp_results.clone(),
+                            status: Status::Waiting,
+                        },
+                    );
+
+                    JobServerResp::JobId(new_jid)
+                } else {
+                    error!("No such job: {}", jid);
+                    JobServerResp::NoSuchJob
+                }
+            }
         };
 
         Ok(response)
