@@ -10,7 +10,7 @@ use jobserver::{JobServerReq, JobServerResp, SERVER_ADDR};
 fn main() {
     let matches = clap_app! { client =>
         (about: "CLI client for the jobserver")
-        (@arg ADDR: --address
+        (@arg ADDR: --address +takes_value
          "The server IP:PORT (defaults to `localhost:3030`)")
 
         (@subcommand ping =>
