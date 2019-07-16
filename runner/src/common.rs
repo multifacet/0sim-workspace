@@ -1062,10 +1062,19 @@ pub mod exp_0sim {
     /// swap devices of the right size are used (according to `list_swapdevs`).
     pub fn turn_on_ssdswap(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
         // Find out what swap devs are there
-        let devs = if let Some(devs) = {
-            let settings = crate::common::get_remote_research_settings(shell)?;
+        let settings = crate::common::get_remote_research_settings(shell)?;
+        let devs = if let Some(dm_data) =
+            crate::common::get_remote_research_setting(&settings, "dm-data")?
+        {
+            // If the swap device in use is a thin swap
+            vec![
+                dm_data,
+                "/dev/mapper/mythin".into(),
+                "/dev/mapper/mypool".into(),
+            ]
+        } else if let Some(devs) =
             crate::common::get_remote_research_setting(&settings, "swap-devices")?
-        } {
+        {
             devs
         } else {
             list_swapdevs(shell, dry_run)?
