@@ -95,11 +95,40 @@ fn main() {
 
     let addr = matches.value_of("ADDR").unwrap_or(SERVER_ADDR);
 
-    // Connect to server
-    let mut tcp_stream = TcpStream::connect(addr).expect("Unable to connect to server");
-
     // Form the request
-    let request = make_request(matches);
+    let request = form_request(&matches);
+
+    // Special case the `lsjobs` command for convenience.
+    match request {
+        JobServerReq::ListJobs => {
+            let job_ids = make_request(addr, request);
+
+            println!("Jobs:");
+
+            if let JobServerResp::Jobs(mut job_ids) = job_ids {
+                // Sort by jid
+                job_ids.sort();
+
+                // Query each job's status
+                for &jid in job_ids.iter() {
+                    let status = make_request(addr, JobServerReq::JobStatus { jid });
+                    println!("Job {}: {:?}", jid, status);
+                }
+            } else {
+                unreachable!();
+            }
+        }
+
+        request => {
+            let response = make_request(addr, request);
+            println!("Server response: {:?}", response);
+        }
+    }
+}
+
+fn make_request(server_addr: &str, request: JobServerReq) -> JobServerResp {
+    // Connect to server
+    let mut tcp_stream = TcpStream::connect(server_addr).expect("Unable to connect to server");
 
     // Send request
     let request = serde_json::to_string(&request).expect("Unable to serialize message");
@@ -118,13 +147,10 @@ fn main() {
         .read_to_string(&mut response)
         .expect("Unable to read server response");
 
-    let response: JobServerResp =
-        serde_json::from_str(&response).expect("Unable to deserialize server response");
-
-    println!("Server response: {:?}", response);
+    serde_json::from_str(&response).expect("Unable to deserialize server response")
 }
 
-fn make_request(matches: clap::ArgMatches<'_>) -> JobServerReq {
+fn form_request(matches: &clap::ArgMatches<'_>) -> JobServerReq {
     match matches.subcommand() {
         ("ping", Some(_sub_m)) => JobServerReq::Ping,
 
