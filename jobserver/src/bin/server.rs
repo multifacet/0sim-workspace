@@ -625,7 +625,7 @@ impl Server {
                     let mut locked_jobs = self.jobs.lock().unwrap();
                     if let Some(job) = locked_jobs.get_mut(&jid) {
                         job.status = Status::Done {
-                            machine,
+                            machine: machine.clone(),
                             output: None,
                         };
                     } else {
@@ -665,6 +665,20 @@ impl Server {
 
                     // drop locks
                 }
+            }
+        }
+
+        // Mark machine as available again
+        {
+            let mut locked_machines = self.machines.lock().unwrap();
+            let locked_machine = locked_machines.get_mut(&machine);
+
+            if let Some(locked_machine) = locked_machine {
+                info!("Releasing machine {:?}", locked_machine);
+                locked_machine.running = None;
+            } else {
+                // Not sure why this would happen, but clearly it doesn't matter...
+                error!("Unable to release machine {}", machine);
             }
         }
     }
