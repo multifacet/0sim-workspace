@@ -19,15 +19,21 @@ macro_rules! impl_conf {
 
 /// Set the apriori paging process using Swapnil's program. Requires `sudo`.
 ///
+/// This should be run only from a vagrant VM.
+///
 /// For example, to cause `ls` to be eagerly paged:
 ///
 /// ```rust,ignore
-/// setup_apriori_paging_process(&shell, "ls")?;
+/// vagrant_setup_apriori_paging_process(&shell, "ls")?;
 /// ```
-pub fn setup_apriori_paging_process(shell: &SshShell, prog: &str) -> Result<(), failure::Error> {
+pub fn vagrant_setup_apriori_paging_process(
+    shell: &SshShell,
+    prog: &str,
+) -> Result<(), failure::Error> {
     shell.run(cmd!(
         "{}/apriori_paging_set_process {}",
         dir![
+            "/home/vagrant",
             crate::common::paths::RESEARCH_WORKSPACE_PATH,
             crate::common::paths::ZEROSIM_BENCHMARKS_DIR,
             crate::common::paths::ZEROSIM_SWAPNIL_PATH
@@ -77,7 +83,7 @@ pub enum TimeMmapTouchPattern {
 /// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
 /// - `output_file` is the file to which the workload will write its output. If `None`, then
 ///   `/dev/null` is used.
-/// - `eager` indicates whether the workload should be run with eager paging.
+/// - `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn run_time_mmap_touch(
     shell: &SshShell,
     exp_dir: &str,
@@ -95,7 +101,7 @@ pub fn run_time_mmap_touch(
     };
 
     if eager {
-        setup_apriori_paging_process(shell, "time_mmap_touch")?;
+        vagrant_setup_apriori_paging_process(shell, "time_mmap_touch")?;
     }
 
     shell.run(
@@ -188,13 +194,13 @@ impl<'s> MemcachedWorkloadConfig<'s> {
 /// behaviors. memcached uses a large amount of the memory you give it for bookkeeping, rather
 /// than user data, so OOM will almost certainly happen.
 ///
-/// `eager` indicates whether the workload should be run with eager paging.
+/// `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn start_memcached(
     shell: &SshShell,
     cfg: &MemcachedWorkloadConfig<'_>,
 ) -> Result<(), failure::Error> {
     if cfg.eager {
-        setup_apriori_paging_process(shell, "memcached")?;
+        vagrant_setup_apriori_paging_process(shell, "memcached")?;
     }
 
     if let Some(server_pin_core) = cfg.server_pin_core {
@@ -317,7 +323,7 @@ pub enum NasClass {
 /// - `zerosim_bmk_path` is the path to the `bmks` directory of `research-workspace`.
 /// - `output_file` is the file to which the workload will write its output. If `None`, then
 ///   `/dev/null` is used.
-/// - `eager` indicates whether the workload should be run with eager paging.
+/// - `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn run_nas_cg(
     shell: &SshShell,
     zerosim_bmk_path: &str,
@@ -331,7 +337,7 @@ pub fn run_nas_cg(
     };
 
     if eager {
-        setup_apriori_paging_process(shell, &format!("cg.{}.x", class))?;
+        vagrant_setup_apriori_paging_process(shell, &format!("cg.{}.x", class))?;
     }
 
     let handle = shell.spawn(
@@ -362,7 +368,7 @@ bitflags! {
 /// - `r` is the number of times to call `memhog`, not the value of `-r`. `-r` is always passed
 ///   a value of `1`. If `None`, then run indefinitely.
 /// - `size_kb` is the number of kilobytes to mmap and touch.
-/// - `eager` indicates whether the workload should be run with eager paging.
+/// - `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn run_memhog(
     shell: &SshShell,
     r: Option<usize>,
@@ -372,7 +378,7 @@ pub fn run_memhog(
     tctx: &mut TasksetCtx,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     if eager {
-        setup_apriori_paging_process(shell, "memhog")?;
+        vagrant_setup_apriori_paging_process(shell, "memhog")?;
     }
 
     shell.spawn(cmd!(
@@ -405,7 +411,7 @@ pub fn run_memhog(
 /// - `exp_dir` is the path of the 0sim-experiments submodule.
 /// - `n` is the number of times to loop.
 /// - `output_file` is the location to put the output.
-/// - `eager` indicates whether the workload should be run with eager paging.
+/// - `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn run_time_loop(
     shell: &SshShell,
     exp_dir: &str,
@@ -415,7 +421,7 @@ pub fn run_time_loop(
     tctx: &mut TasksetCtx,
 ) -> Result<(), failure::Error> {
     if eager {
-        setup_apriori_paging_process(shell, "time_loop")?;
+        vagrant_setup_apriori_paging_process(shell, "time_loop")?;
     }
 
     shell.run(
@@ -445,6 +451,8 @@ pub enum LocalityMemAccessMode {
 ///
 /// If `threads` is `None`, a single-threaded workload is run. Otherwise, a multithreaded workload
 /// is run.
+///
+/// `eager` should only be used in a VM.
 pub fn run_locality_mem_access(
     shell: &SshShell,
     exp_dir: &str,
@@ -461,7 +469,7 @@ pub fn run_locality_mem_access(
     };
 
     if eager {
-        setup_apriori_paging_process(shell, "locality_mem_access")?;
+        vagrant_setup_apriori_paging_process(shell, "locality_mem_access")?;
     }
 
     shell.run(
@@ -561,6 +569,8 @@ impl<'s> RedisWorkloadConfig<'s> {
 ///
 /// The caller should ensure that any previous RDB is deleted.
 ///
+/// `eager` should only be used in a VM.
+///
 /// Returns the spawned shell.
 pub fn start_redis(
     shell: &SshShell,
@@ -570,7 +580,7 @@ pub fn start_redis(
     shell.run(cmd!("echo 1 | sudo tee /proc/sys/vm/overcommit_memory"))?;
 
     if cfg.eager {
-        setup_apriori_paging_process(shell, "redis-server")?;
+        vagrant_setup_apriori_paging_process(shell, "redis-server")?;
     }
 
     // Start the redis server
@@ -657,7 +667,7 @@ pub fn run_redis_gen_data(
 ///
 /// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
 /// - `dim` is the dimension of the matrix (one side), which is assumed to be square.
-/// - `eager` indicates whether the workload should be run with eager paging.
+/// - `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn run_metis_matrix_mult(
     shell: &SshShell,
     bmk_dir: &str,
@@ -666,7 +676,7 @@ pub fn run_metis_matrix_mult(
     tctx: &mut TasksetCtx,
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     if eager {
-        setup_apriori_paging_process(shell, "matrix_mult2")?;
+        vagrant_setup_apriori_paging_process(shell, "matrix_mult2")?;
     }
 
     shell.spawn(
