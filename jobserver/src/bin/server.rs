@@ -11,6 +11,8 @@ use std::sync::{
 };
 use std::time::Duration;
 
+use clap::clap_app;
+
 use crossbeam::channel::{select, unbounded, Receiver, TryRecvError};
 
 use jobserver::{JobServerReq, JobServerResp, Status, SERVER_ADDR};
@@ -935,10 +937,20 @@ impl Server {
 }
 
 fn main() {
+    let matches = clap_app! { jobserver =>
+        (about: "Serves jobs to machines")
+        (@arg ADDR: --addr +takes_value
+         "The IP:ADDR for the server to listen on for commands \
+         (defaults to `localhost:3030`)")
+    }
+    .get_matches();
+
+    let addr = matches.value_of("ADDR").unwrap_or(SERVER_ADDR.into());
+
     // Start logger
     env_logger::init();
 
-    info!("Starting server at {}", SERVER_ADDR);
+    info!("Starting server at {}", addr);
 
     // Listen for client requests on the main thread, while we do work in the background.
     let server = Arc::new(Server::new());
