@@ -1064,11 +1064,11 @@ pub mod exp_0sim {
         // Find out what swap devs are there
         let settings = crate::common::get_remote_research_settings(shell)?;
         let devs = if let Some(dm_data) =
-            crate::common::get_remote_research_setting(&settings, "dm-data")?
+            crate::common::get_remote_research_setting::<String>(&settings, "dm-data")?
         {
             // If the swap device in use is a thin swap
             vec![
-                dm_data,
+                dm_data.replace("/dev/", ""),
                 "/dev/mapper/mythin".into(),
                 "/dev/mapper/mypool".into(),
             ]
