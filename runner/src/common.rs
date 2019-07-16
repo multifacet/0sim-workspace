@@ -655,8 +655,7 @@ pub mod exp_0sim {
         let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
         ushell.set_dry_run(dry_run);
 
-        let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
-        ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
+        vagrant_halt(&ushell)?;
 
         // Reboot the remote to make sure we have a clean slate
         spurs::util::reboot(&mut ushell, dry_run)?;
@@ -813,6 +812,19 @@ pub mod exp_0sim {
         connect_to_vagrant_user(hostname, "vagrant")
     }
 
+    pub fn vagrant_halt(shell: &SshShell) -> Result<(), failure::Error> {
+        let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+
+        let res = shell.run(cmd!("vagrant halt").cwd(vagrant_path));
+
+        if res.is_err() {
+            // Try again
+            shell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
+        }
+
+        Ok(())
+    }
+
     /// Start the VM with the given amount of memory and core. If `fast` is `true`, TSC offsetting
     /// is disabled during the VM boot (and re-enabled afterwards), which is much faster.
     pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
@@ -837,7 +849,7 @@ pub mod exp_0sim {
 
         gen_vagrantfile(shell, memgb, cores)?;
 
-        let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+        let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
         if fast {
             shell.run(
@@ -846,7 +858,7 @@ pub mod exp_0sim {
             )?;
         }
 
-        shell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
+        vagrant_halt(&shell)?;
 
         // We want to pin the vCPUs as soon as possible because otherwise, they tend to switch
         // around a lot, causing a lot of printk overhead.
