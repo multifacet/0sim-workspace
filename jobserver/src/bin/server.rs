@@ -391,7 +391,8 @@ impl Server {
 
                 // If there is a task to run, run it.
                 if let Some(can_run) = waiting_job {
-                    // Get a machine for it to run on.
+                    // Get a machine for it to run on. Safe because we already checked that a
+                    // machine is available, and we are holding the lock.
                     let machine = idle_machines
                         .iter_mut()
                         .find(|m| m.1.class == can_run.1.class)
@@ -463,12 +464,10 @@ impl Server {
                 });
 
                 if let Some(to_cancel) = to_cancel {
-                    let cancelled = locked_jobs.remove(&to_cancel).unwrap();
-                    let _ = running_job_handles
-                        .remove(&cancelled.jid)
-                        .unwrap()
-                        .1
-                        .send(());
+                    let cancelled = locked_jobs.remove(&to_cancel).unwrap(); // safe because we just checked.
+                    if let Some((_, cancel_chan)) = running_job_handles.remove(&cancelled.jid) {
+                        let _ = cancel_chan.send(());
+                    }
                 }
 
                 // drop locks
@@ -486,12 +485,10 @@ impl Server {
                 });
 
                 if let Some(to_cancel) = to_cancel {
-                    let cancelled = locked_setup_tasks.remove(&to_cancel).unwrap();
-                    let _ = running_job_handles
-                        .remove(&cancelled.jid)
-                        .unwrap()
-                        .1
-                        .send(());
+                    let cancelled = locked_setup_tasks.remove(&to_cancel).unwrap(); // safe because we just checked.
+                    if let Some((_, cancel_chan)) = running_job_handles.remove(&cancelled.jid) {
+                        let _ = cancel_chan.send(());
+                    }
                 }
 
                 // drop locks
