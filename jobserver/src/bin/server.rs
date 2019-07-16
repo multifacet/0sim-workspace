@@ -15,7 +15,7 @@ use crossbeam::channel::{select, unbounded, Receiver, TryRecvError};
 
 use jobserver::{JobServerReq, JobServerResp, Status, SERVER_ADDR};
 
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 
 const RUNNER: &str = "/nobackup/research-workspace/runner/";
 
@@ -386,7 +386,7 @@ impl Server {
 
                     running_job_handles.insert(*can_run.0, (handle, sender));
                 } else {
-                    info!("No jobs can run.");
+                    debug!("No jobs can run.");
                 }
 
                 // drop locks
