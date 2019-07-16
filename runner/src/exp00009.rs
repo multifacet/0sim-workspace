@@ -37,23 +37,23 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
-        (@arg SIZE: +required +takes_value {is_usize}
-         "The number of GBs of the workload (e.g. 500)")
+        (@arg VMSIZE: +required +takes_value {is_usize}
+         "The number of GBs of the VM (e.g. 500)")
+        (@arg CORES: +required +takes_value {is_usize}
+         "The number of cores of the VM")
         (@group PATTERN =>
             (@attributes +required)
             (@arg zeros: -z "Fill pages with zeros")
             (@arg counter: -c "Fill pages with counter values")
             (@arg memcached: -m "Run a memcached workload")
         )
-        (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
-         "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
-        (@arg CORES: +takes_value {is_usize} -C --cores
-         "The number of cores of the VM (defaults to 1)")
         (@arg WARMUP: -w --warmup
          "Pass this flag to warmup the VM before running the main workload.")
         (@arg PREFAULT: -p --prefault
          "Pass this flag to prefault memory before running the main workload \
          (ignored for memcached).")
+        (@arg SIZE: -s --size +takes_value {is_usize}
+         "The number of GBs of the workload (e.g. 500)")
     }
 }
 
@@ -67,7 +67,10 @@ pub fn run(
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
-    let size = sub_m.value_of("SIZE").unwrap().parse::<usize>().unwrap();
+
+    let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
+    let cores = sub_m.value_of("CORES").unwrap().parse::<usize>().unwrap();
+
     let pattern = if sub_m.is_present("memcached") {
         None
     } else {
@@ -77,26 +80,12 @@ pub fn run(
             TimeMmapTouchPattern::Counter
         })
     };
-    let vm_size = sub_m
-        .value_of("VMSIZE")
-        .map(|value| value.parse::<usize>().unwrap());
-    let cores = sub_m
-        .value_of("CORES")
+
+    let size = sub_m
+        .value_of("SIZE")
         .map(|value| value.parse::<usize>().unwrap());
     let warmup = sub_m.is_present("WARMUP");
     let prefault = sub_m.is_present("PREFAULT");
-
-    let vm_size = if let Some(vm_size) = vm_size {
-        vm_size
-    } else {
-        VAGRANT_MEM
-    };
-
-    let cores = if let Some(cores) = cores {
-        cores
-    } else {
-        VAGRANT_CORES
-    };
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
@@ -104,17 +93,21 @@ pub fn run(
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
-        * workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
+        * workload: if pattern.is_some() {
+            "time_mmap_touch_host_kbuild"
+        } else {
+            "memcached_gen_data_host_kbuild"
+        },
         exp: 00009,
 
-        * size: size,
+        * vm_size: vm_size,
+        (cores > 1) cores: cores,
         pattern: pattern,
         prefault: prefault,
+
+        (size.is_some()) size: size,
         calibrated: false,
         warmup: warmup,
-
-        * vm_size: vm_size,
-        cores: cores,
 
         zswap_max_pool_percent: 50,
 
@@ -143,9 +136,9 @@ where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     let vm_size = settings.get::<usize>("vm_size");
-    let size = settings.get::<usize>("size");
     let cores = settings.get::<usize>("cores");
     let pattern = settings.get::<Option<TimeMmapTouchPattern>>("pattern");
+    let size = settings.get::<Option<usize>>("size");
     let warmup = settings.get::<bool>("warmup");
     let prefault = settings.get::<bool>("prefault");
     let calibrate = settings.get::<bool>("calibrated");
@@ -196,6 +189,16 @@ where
         .into();
     ushell.run(cmd!("make clean").cwd(tarball_path))?;
 
+    let size = if let Some(size) = size {
+        size // GB
+    } else {
+        // Get the amount of memory the guest thinks it has (in KB).
+        let size = vshell
+            .run(cmd!("grep MemAvailable /proc/meminfo | awk '{{print $2}}'").use_bash())?
+            .stdout;
+        size.trim().parse::<usize>().unwrap() >> 20 // turn into GB
+    };
+
     // Calibrate
     if calibrate {
         time!(
@@ -219,7 +222,6 @@ where
 
     // Warm up
     if warmup {
-        //const WARM_UP_SIZE: usize = 50; // GB
         const WARM_UP_PATTERN: TimeMmapTouchPattern = TimeMmapTouchPattern::Zeros;
         time!(
             timers,
