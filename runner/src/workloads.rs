@@ -26,9 +26,12 @@ macro_rules! impl_conf {
 /// ```
 pub fn setup_apriori_paging_process(shell: &SshShell, prog: &str) -> Result<(), failure::Error> {
     shell.run(cmd!(
-        "{}/{}/apriori_paging_set_process {}",
-        crate::common::paths::RESEARCH_WORKSPACE_PATH,
-        crate::common::paths::ZEROSIM_SWAPNIL_PATH,
+        "{}/apriori_paging_set_process {}",
+        dir![
+            crate::common::paths::RESEARCH_WORKSPACE_PATH,
+            crate::common::paths::ZEROSIM_BENCHMARKS_DIR,
+            crate::common::paths::ZEROSIM_SWAPNIL_PATH
+        ],
         prog
     ))?;
     Ok(())
