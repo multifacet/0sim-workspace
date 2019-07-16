@@ -1,0 +1,16 @@
+[package]
+name = "jobserver"
+version = "0.1.0"
+authors = ["Mark Mansi <markm@cs.wisc.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0.94", features = ["derive"] }
+serde_json = "1.0.40"
+log = "0.4.7"
+env_logger = "0.6.2"
+clap = "2.33.0"
+crossbeam = "0.7.1"
+libc = "0.2.60"
