@@ -663,6 +663,17 @@ pub mod exp_0sim {
         Ok(())
     }
 
+    /// Dump a bunch of kernel info for debugging.
+    pub fn dump_sys_info(shell: &SshShell) -> Result<(), failure::Error> {
+        with_shell! { shell =>
+            cmd!("uname -a"),
+            cmd!("lsblk"),
+            cmd!("free -h"),
+        }
+
+        Ok(())
+    }
+
     /// Connects to the host and to vagrant. Returns shells for both. TSC offsetting is disabled
     /// during VM startup to speed things up.
     pub fn connect_and_setup_host_and_vagrant<A>(
@@ -748,7 +759,7 @@ pub mod exp_0sim {
             shell
         };
 
-        ushell.run(cmd!("uname -a").dry_run(dry_run))?;
+        dump_sys_info(&ushell)?;
 
         // Set up swapping
         setup_swapping(&ushell, dry_run)?;
@@ -875,6 +886,8 @@ pub mod exp_0sim {
 
         shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
         let vshell = connect_to_vagrant_as_root(hostname)?;
+
+        dump_sys_info(&vshell)?;
 
         if fast {
             shell.run(
