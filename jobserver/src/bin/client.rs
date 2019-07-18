@@ -173,7 +173,7 @@ fn main() {
                             class,
                             status: Status::Failed { error },
                         } => {
-                            table.add_row(row![b->jid, Frbu->"Failed", class, cmd, error, ""]);
+                            table.add_row(row![b->jid, Frbu->"Failed", class, cmd, "", error]);
                         }
 
                         JobServerResp::JobStatus {
