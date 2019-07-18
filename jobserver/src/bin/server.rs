@@ -290,7 +290,14 @@ impl Server {
                 JobServerResp::JobId(jid)
             }
 
-            ListJobs => JobServerResp::Jobs(self.jobs.lock().unwrap().keys().map(|&k| k).collect()),
+            ListJobs => {
+                let mut jobs: Vec<_> = self.jobs.lock().unwrap().keys().map(|&k| k).collect();
+                jobs.extend(self.setup_tasks.lock().unwrap().keys());
+
+                JobServerResp::Jobs(jobs)
+
+                // drop locks
+            }
 
             CancelJob { jid } => self.cancel_job(jid),
 
