@@ -44,10 +44,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     // Building the kernel on the guest is painful, so we will build it on the host and copy it to
     // the guest via NFS.
     let user_home = &get_user_home_dir(&ushell)?;
-    let kernel_path = &format!(
-        "{}/{}/{}",
-        user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
-    );
+    let kernel_path = &dir!(user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
 
     ushell.run(cmd!("git checkout {}", git_branch).cwd(kernel_path))?;
 
@@ -85,8 +82,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             git_branch: git_branch.into(),
         },
         KernelConfig {
-            base_config: KernelBaseConfigSource::Path(format!(
-                "{}/{}",
+            base_config: KernelBaseConfigSource::Path(dir!(
                 HOSTNAME_SHARED_DIR,
                 guest_config_base_name.to_str().unwrap()
             )),
