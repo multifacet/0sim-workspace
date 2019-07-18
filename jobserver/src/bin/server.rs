@@ -786,6 +786,21 @@ impl Server {
                         "Setup task {} cmd {} terminated with error {}. Aborting setup task {:?}",
                         jid, cmd, e, setup_task
                     );
+
+                    // Update status
+                    {
+                        let mut locked_setup_tasks = self.setup_tasks.lock().unwrap();
+                        if let Some(job) = locked_setup_tasks.get_mut(&jid) {
+                            job.status = Status::Failed {
+                                error: format!("{}", e),
+                            };
+                        } else {
+                            // doesn't matter, since we're done anyway
+                        }
+
+                        // drop locks
+                    }
+
                     return;
                 }
             }
@@ -892,7 +907,7 @@ impl Server {
             .open(&stderr_file_name)?;
 
         // Run the command, piping output to a buf reader.
-        let child = std::process::Command::new("cargo")
+        let mut child = std::process::Command::new("cargo")
             .args(&["run", "--", "--print_results_path"])
             .args(&cmd.split_whitespace().collect::<Vec<_>>())
             .current_dir(RUNNER)
@@ -904,7 +919,7 @@ impl Server {
         // take the pid and just send the kill signal manually.
         let child_pid = child.id();
 
-        let reader = BufReader::new(child.stdout.ok_or_else(|| {
+        let reader = BufReader::new(child.stdout.as_mut().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Could not capture standard output.",
@@ -914,58 +929,83 @@ impl Server {
         // Wait for the output to check for the results path. We do this in a side thread and let
         // the main thread poll for cancellations.
         let (results_path_chan_s, results_path_chan_r) = unbounded();
-        let _ = std::thread::spawn(move || {
-            let mut results_path = None;
-            reader
-                .lines()
-                .filter_map(|line| line.ok())
-                .for_each(|line| {
-                    // Check if there was a results path printed.
-                    if line.starts_with("RESULTS: ") {
-                        results_path = Some(line[9..].to_string());
-                    }
 
-                    match writeln!(tmp_file, "{}", line) {
-                        Ok(..) => {}
-                        Err(e) => {
-                            error!("Unable to write to tmp file: {} {}", e, line);
+        let results_path = crossbeam::scope(|s| {
+            s.spawn(|_| {
+                let mut results_path = None;
+                reader
+                    .lines()
+                    .filter_map(|line| line.ok())
+                    .for_each(|line| {
+                        // Check if there was a results path printed.
+                        if line.starts_with("RESULTS: ") {
+                            results_path = Some(line[9..].to_string());
                         }
+
+                        match writeln!(tmp_file, "{}", line) {
+                            Ok(..) => {}
+                            Err(e) => {
+                                error!("Unable to write to tmp file: {} {}", e, line);
+                            }
+                        }
+                    });
+
+                // Receiver may have closed
+                let _ = results_path_chan_s.send(results_path);
+            });
+
+            // Wait for either the child to finish or the cancel signal from the server.
+            select! {
+                recv(results_path_chan_r) -> results_path => match results_path {
+                    Ok(results_path) => {
+                        info!("Job {} completed. Results path: {:?}", jid, results_path);
+                        Ok(results_path)
                     }
-                });
+                    Err(chan_err) => {
+                        error!("Job completed, but there was an error reading results \
+                               path from thread: {}", chan_err);
+                        Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            "Could not capture standard output.",
+                        ))
+                    }
+                },
+                recv(cancel_chan) -> _ => {
+                    info!("Killing job {}, cmd {}, machine {}", jid, cmd, machine);
 
-            // Receiver may have closed
-            let _ = results_path_chan_s.send(results_path);
-        });
+                    // SIGKILL the child
+                    unsafe {
+                        libc::kill(child_pid as i32, 9);
+                    }
 
-        // Wait for either the child to finish or the cancel signal from the server.
-        select! {
-            recv(results_path_chan_r) -> results_path => match results_path {
-                Ok(results_path) => {
-                    info!("Job {} completed. Results path: {:?}", jid, results_path);
-                    Ok(results_path)
-                }
-                Err(chan_err) => {
-                    error!("Job completed, but there was an error reading results \
-                           path from thread: {}", chan_err);
                     Err(std::io::Error::new(
                         std::io::ErrorKind::Other,
-                        "Could not capture standard output.",
+                        "Job was cancelled."
                     ))
-                }
-            },
-            recv(cancel_chan) -> _ => {
-                info!("Killing job {}, cmd {}, machine {}", jid, cmd, machine);
+                },
+            }
+        });
 
-                // SIGKILL the child
-                unsafe {
-                    libc::kill(child_pid as i32, 9);
-                }
-
-                Err(std::io::Error::new(
+        let results_path = match results_path {
+            Ok(results_path) => results_path,
+            Err(err) => {
+                error!("Thread panicked while running job {}: {:?}", jid, err);
+                return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
-                    "Job was cancelled."
-                ))
-            },
+                    "Thread panicked",
+                ));
+            }
+        };
+
+        let exit = child.wait()?;
+
+        if exit.success() {
+            results_path
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Job failed.",
+            ))
         }
     }
 }
