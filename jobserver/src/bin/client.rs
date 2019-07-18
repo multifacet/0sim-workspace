@@ -5,7 +5,9 @@ use std::net::{Shutdown, TcpStream};
 
 use clap::clap_app;
 
-use jobserver::{JobServerReq, JobServerResp, SERVER_ADDR};
+use jobserver::{JobServerReq, JobServerResp, Status, SERVER_ADDR};
+
+use prettytable::{cell, row, Table};
 
 fn main() {
     let matches = clap_app! { client =>
@@ -103,17 +105,97 @@ fn main() {
         JobServerReq::ListJobs => {
             let job_ids = make_request(addr, request);
 
-            println!("Jobs:");
-
             if let JobServerResp::Jobs(mut job_ids) = job_ids {
                 // Sort by jid
                 job_ids.sort();
 
+                // Print a nice human-readable table
+                let mut table = Table::new();
+
+                table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
+
+                table.set_titles(row![ Fwbu =>
+                    "Job", "Status", "Class", "Command", "Machine", "Output"
+                ]);
+
                 // Query each job's status
                 for &jid in job_ids.iter() {
                     let status = make_request(addr, JobServerReq::JobStatus { jid });
-                    println!("Job {}: {:?}", jid, status);
+
+                    match status {
+                        JobServerResp::JobStatus {
+                            jid,
+                            cmd,
+                            class,
+                            status: Status::Cancelled,
+                        } => {
+                            table.add_row(row![b->jid, Fri->"Cancelled", class, cmd, "", ""]);
+                        }
+
+                        JobServerResp::JobStatus {
+                            jid,
+                            cmd,
+                            class,
+                            status: Status::Waiting,
+                        } => {
+                            table.add_row(row![b->jid, Fb->"Waiting", class, cmd, "", ""]);
+                        }
+
+                        JobServerResp::JobStatus {
+                            jid,
+                            cmd,
+                            class,
+                            status:
+                                Status::Done {
+                                    machine,
+                                    output: None,
+                                },
+                        } => {
+                            table.add_row(row![b->jid, Fm->"Done", class, cmd, machine, ""]);
+                        }
+
+                        JobServerResp::JobStatus {
+                            jid,
+                            cmd,
+                            class,
+                            status:
+                                Status::Done {
+                                    machine,
+                                    output: Some(path),
+                                },
+                        } => {
+                            table.add_row(row![b->jid, Fg->"Done", class, cmd, machine, Fg->path]);
+                        }
+
+                        JobServerResp::JobStatus {
+                            jid,
+                            cmd,
+                            class,
+                            status: Status::Failed { error },
+                        } => {
+                            table.add_row(row![b->jid, Frbu->"Failed", class, cmd, error, ""]);
+                        }
+
+                        JobServerResp::JobStatus {
+                            jid,
+                            cmd,
+                            class,
+                            status: Status::Running { machine },
+                        } => {
+                            table.add_row(row![b->jid, Fy->"Running", class, cmd, machine, ""]);
+                        }
+
+                        JobServerResp::Jobs(..)
+                        | JobServerResp::Ok
+                        | JobServerResp::Vars(..)
+                        | JobServerResp::JobId(..)
+                        | JobServerResp::Machines(..)
+                        | JobServerResp::NoSuchJob
+                        | JobServerResp::NoSuchMachine => unreachable!(),
+                    }
                 }
+
+                table.printstd();
             } else {
                 unreachable!();
             }
