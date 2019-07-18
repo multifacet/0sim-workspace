@@ -27,6 +27,7 @@ struct Server {
     // Lock ordering:
     // - machines
     // - jobs
+    // - setup_tasks
     /// Maps available machines to their classes.
     machines: Arc<Mutex<HashMap<String, MachineStatus>>>,
 
@@ -553,6 +554,8 @@ impl Server {
 
                 return;
             }
+
+            // drop locks
         };
 
         match cancel_chan.try_recv() {
@@ -567,7 +570,8 @@ impl Server {
         }
 
         // Actually run the command now.
-        let result = Self::run_cmd(jid, &machine, &cmd, cancel_chan);
+        let variables = self.variables.lock().unwrap().clone();
+        let result = Self::run_cmd(jid, &machine, &cmd, cancel_chan, &variables);
 
         // Check the results.
         match result {
@@ -711,6 +715,8 @@ impl Server {
             _ => {}
         }
 
+        let variables = self.variables.lock().unwrap().clone();
+
         // Execute all cmds
         for (i, cmd) in setup_task.cmds.iter().enumerate() {
             // Check for cancellation.
@@ -748,7 +754,13 @@ impl Server {
                 // drop locks
             }
 
-            let result = Self::run_cmd(jid, &setup_task.machine, cmd, cancel_chan.clone());
+            let result = Self::run_cmd(
+                jid,
+                &setup_task.machine,
+                cmd,
+                cancel_chan.clone(),
+                &variables,
+            );
 
             match result {
                 Ok(Some(results_path)) => {
@@ -844,8 +856,12 @@ impl Server {
         machine: &str,
         cmd: &str,
         cancel_chan: Receiver<()>,
+        variables: &HashMap<String, String>,
     ) -> std::io::Result<Option<String>> {
         let cmd = cmd.replace("{MACHINE}", &machine);
+        let cmd = variables.iter().fold(cmd.to_string(), |cmd, (key, value)| {
+            cmd.replace(&format!("{{{}}}", key), &value)
+        });
 
         // Open a tmp file for the cmd output
         let tmp_file_name = format!(
