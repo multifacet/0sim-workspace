@@ -455,11 +455,11 @@ impl Server {
             {
                 let mut locked_jobs = self.jobs.lock().unwrap();
 
-                let to_cancel = locked_jobs.iter().position(|(_, j)| {
+                let to_cancel = locked_jobs.iter().find_map(|(&jid, j)| {
                     if let Status::Cancelled = j.status {
-                        true
+                        Some(jid)
                     } else {
-                        false
+                        None
                     }
                 });
 
@@ -476,11 +476,11 @@ impl Server {
             {
                 let mut locked_setup_tasks = self.setup_tasks.lock().unwrap();
 
-                let to_cancel = locked_setup_tasks.iter().position(|(_, j)| {
+                let to_cancel = locked_setup_tasks.iter().find_map(|(&jid, j)| {
                     if let Status::Cancelled = j.status {
-                        true
+                        Some(jid)
                     } else {
-                        false
+                        None
                     }
                 });
 
