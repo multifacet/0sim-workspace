@@ -213,7 +213,7 @@ pub fn start_memcached(
         ))?
     } else {
         shell.run(cmd!(
-            "memcached {} -m {} -d -u {}",
+            "memcached {} -m {} -d -u {} -I 550K",
             if cfg.allow_oom { "-M" } else { "" },
             cfg.server_size_mb,
             cfg.user
