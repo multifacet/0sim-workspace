@@ -143,6 +143,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
                 "libfdt-devel",
                 "pixman-devel",
                 "zlib-devel",
+                "fuse-devel",
             ]),
             spurs_util::centos::yum_install(&["devtoolset-7"]),
 
