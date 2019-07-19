@@ -96,5 +96,6 @@ fn main() {
 
     if let Err(e) = run() {
         println!("RUNNER ERROR {:?}", e);
+        std::process::exit(1);
     }
 }
