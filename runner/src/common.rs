@@ -935,7 +935,10 @@ pub mod exp_0sim {
 
         // Turn on the HDDs as swap devs
         for (dev, size) in devs.iter().zip(sizes.iter()) {
-            if ["1.1T", "2.7T", "3.7T", "931.5G"].iter().any(|s| s == size) {
+            if ["1.1T", "1.8T", "2.7T", "3.7T", "931.5G"]
+                .iter()
+                .any(|s| s == size)
+            {
                 swapdevs.push(dev.clone());
             }
         }
