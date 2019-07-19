@@ -1,5 +1,6 @@
 //! Client implmentation
 
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpStream};
 
@@ -97,115 +98,30 @@ fn main() {
 
     let addr = matches.value_of("ADDR").unwrap_or(SERVER_ADDR);
 
-    // Form the request
-    let request = form_request(&matches);
-
-    // Special case the `lsjobs` command for convenience.
-    match request {
-        JobServerReq::ListJobs => {
-            let job_ids = make_request(addr, request);
-
-            if let JobServerResp::Jobs(mut job_ids) = job_ids {
-                // Sort by jid
-                job_ids.sort();
-
-                // Print a nice human-readable table
-                let mut table = Table::new();
-
-                table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
-
-                table.set_titles(row![ Fwbu =>
-                    "Job", "Status", "Class", "Command", "Machine", "Output"
-                ]);
-
-                // Query each job's status
-                for &jid in job_ids.iter() {
-                    let status = make_request(addr, JobServerReq::JobStatus { jid });
-
-                    match status {
-                        JobServerResp::JobStatus {
-                            jid,
-                            cmd,
-                            class,
-                            status: Status::Cancelled,
-                        } => {
-                            table.add_row(row![b->jid, Fri->"Cancelled", class, cmd, "", ""]);
-                        }
-
-                        JobServerResp::JobStatus {
-                            jid,
-                            cmd,
-                            class,
-                            status: Status::Waiting,
-                        } => {
-                            table.add_row(row![b->jid, Fb->"Waiting", class, cmd, "", ""]);
-                        }
-
-                        JobServerResp::JobStatus {
-                            jid,
-                            cmd,
-                            class,
-                            status:
-                                Status::Done {
-                                    machine,
-                                    output: None,
-                                },
-                        } => {
-                            table.add_row(row![b->jid, Fm->"Done", class, cmd, machine, ""]);
-                        }
-
-                        JobServerResp::JobStatus {
-                            jid,
-                            cmd,
-                            class,
-                            status:
-                                Status::Done {
-                                    machine,
-                                    output: Some(path),
-                                },
-                        } => {
-                            table.add_row(row![b->jid, Fg->"Done", class, cmd, machine, Fg->path]);
-                        }
-
-                        JobServerResp::JobStatus {
-                            jid,
-                            cmd,
-                            class,
-                            status: Status::Failed { error },
-                        } => {
-                            table.add_row(row![b->jid, Frbu->"Failed", class, cmd, "", error]);
-                        }
-
-                        JobServerResp::JobStatus {
-                            jid,
-                            cmd,
-                            class,
-                            status: Status::Running { machine },
-                        } => {
-                            table.add_row(row![b->jid, Fy->"Running", class, cmd, machine, ""]);
-                        }
-
-                        JobServerResp::Jobs(..)
-                        | JobServerResp::Ok
-                        | JobServerResp::Vars(..)
-                        | JobServerResp::JobId(..)
-                        | JobServerResp::Machines(..)
-                        | JobServerResp::NoSuchJob
-                        | JobServerResp::NoSuchMachine => unreachable!(),
-                    }
-                }
-
-                table.printstd();
-            } else {
-                unreachable!();
-            }
+    match matches.subcommand() {
+        ("lsjobs", _sub_m) => {
+            let jobs = list_jobs(addr);
+            print_jobs(jobs);
         }
 
-        request => {
-            let response = make_request(addr, request);
-            println!("Server response: {:?}", response);
+        ("lsavail", _sub_m) => {
+            let jobs = list_jobs(addr);
+            let avail = list_avail(addr, jobs);
+            print_avail(avail);
         }
+
+        (subcmd, Some(sub_m)) => request_from_subcommand(addr, subcmd, sub_m),
+
+        _ => unreachable!(),
     }
+}
+
+fn request_from_subcommand(addr: &str, subcmd: &str, sub_m: &clap::ArgMatches<'_>) {
+    // Form the request
+    let request = form_request(subcmd, sub_m);
+
+    let response = make_request(addr, request);
+    println!("Server response: {:?}", response);
 }
 
 fn make_request(server_addr: &str, request: JobServerReq) -> JobServerResp {
@@ -232,56 +148,265 @@ fn make_request(server_addr: &str, request: JobServerReq) -> JobServerResp {
     serde_json::from_str(&response).expect("Unable to deserialize server response")
 }
 
-fn form_request(matches: &clap::ArgMatches<'_>) -> JobServerReq {
-    match matches.subcommand() {
-        ("ping", Some(_sub_m)) => JobServerReq::Ping,
+fn form_request(subcmd: &str, sub_m: &clap::ArgMatches<'_>) -> JobServerReq {
+    match subcmd {
+        "ping" => JobServerReq::Ping,
 
-        ("mkavail", Some(sub_m)) => JobServerReq::MakeAvailable {
+        "mkavail" => JobServerReq::MakeAvailable {
             addr: sub_m.value_of("ADDR").unwrap().into(),
             class: sub_m.value_of("CLASS").unwrap().into(),
         },
 
-        ("rmavail", Some(sub_m)) => JobServerReq::RemoveAvailable {
+        "rmavail" => JobServerReq::RemoveAvailable {
             addr: sub_m.value_of("ADDR").unwrap().into(),
         },
 
-        ("lsavail", Some(_sub_m)) => JobServerReq::ListAvailable,
+        "lsavail" => JobServerReq::ListAvailable,
 
-        ("setup", Some(sub_m)) => JobServerReq::SetUpMachine {
+        "setup" => JobServerReq::SetUpMachine {
             addr: sub_m.value_of("ADDR").unwrap().into(),
             cmds: sub_m.values_of("CMD").unwrap().map(String::from).collect(),
             class: sub_m.value_of("CLASS").map(Into::into),
         },
 
-        ("setvar", Some(sub_m)) => JobServerReq::SetVar {
+        "setvar" => JobServerReq::SetVar {
             name: sub_m.value_of("NAME").unwrap().into(),
             value: sub_m.value_of("VALUE").unwrap().into(),
         },
 
-        ("addjob", Some(sub_m)) => JobServerReq::AddJob {
+        "addjob" => JobServerReq::AddJob {
             class: sub_m.value_of("CLASS").unwrap().into(),
             cmd: sub_m.value_of("CMD").unwrap().into(),
             cp_results: sub_m.value_of("CP_PATH").map(Into::into),
         },
 
-        ("lsvars", Some(_sub_m)) => JobServerReq::ListVars,
+        "lsvars" => JobServerReq::ListVars,
 
-        ("lsjobs", Some(_sub_m)) => JobServerReq::ListJobs,
+        "lsjobs" => JobServerReq::ListJobs,
 
-        ("canceljob", Some(sub_m)) => JobServerReq::CancelJob {
+        "canceljob" => JobServerReq::CancelJob {
             jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
         },
 
-        ("statjob", Some(sub_m)) => JobServerReq::JobStatus {
+        "statjob" => JobServerReq::JobStatus {
             jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
         },
 
-        ("clonejob", Some(sub_m)) => JobServerReq::CloneJob {
+        "clonejob" => JobServerReq::CloneJob {
             jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
         },
 
         _ => unreachable!(),
     }
+}
+
+struct JobInfo {
+    class: String,
+    cmd: String,
+    jid: usize,
+    status: Status,
+}
+
+fn list_jobs(addr: &str) -> Vec<JobInfo> {
+    let job_ids = make_request(addr, JobServerReq::ListJobs);
+
+    if let JobServerResp::Jobs(mut job_ids) = job_ids {
+        // Sort by jid
+        job_ids.sort();
+
+        job_ids
+            .into_iter()
+            .map(|jid| {
+                let status = make_request(addr, JobServerReq::JobStatus { jid });
+
+                if let JobServerResp::JobStatus {
+                    class,
+                    cmd,
+                    jid,
+                    status,
+                } = status
+                {
+                    JobInfo {
+                        class,
+                        cmd,
+                        jid,
+                        status,
+                    }
+                } else {
+                    unreachable!();
+                }
+            })
+            .collect()
+    } else {
+        unreachable!();
+    }
+}
+
+struct MachineInfo {
+    addr: String,
+    class: String,
+    running: Option<usize>,
+}
+
+fn list_avail(addr: &str, jobs: Vec<JobInfo>) -> Vec<MachineInfo> {
+    let avail = make_request(addr, JobServerReq::ListAvailable);
+
+    // Find out which jobs are running
+    let mut running_jobs = HashMap::new();
+    for job in jobs.into_iter() {
+        match job {
+            JobInfo {
+                jid,
+                status: Status::Running { machine },
+                ..
+            } => {
+                let old = running_jobs.insert(machine, jid);
+                assert!(old.is_none());
+            }
+
+            _ => {}
+        }
+    }
+
+    if let JobServerResp::Machines(machines) = avail {
+        let mut avail: Vec<_> = machines
+            .into_iter()
+            .map(|(machine, class)| {
+                let running = running_jobs.remove(&machine);
+
+                MachineInfo {
+                    addr: machine,
+                    class,
+                    running,
+                }
+            })
+            .collect();
+
+        avail.sort_by_key(|m| m.addr.clone());
+        avail.sort_by_key(|m| m.class.clone());
+
+        avail
+    } else {
+        unreachable!();
+    }
+}
+
+fn print_jobs(jobs: Vec<JobInfo>) {
+    // Print a nice human-readable table
+    let mut table = Table::new();
+
+    table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
+
+    table.set_titles(row![ Fwbu =>
+        "Job", "Status", "Class", "Command", "Machine", "Output"
+    ]);
+
+    // Query each job's status
+    for job in jobs.iter() {
+        match job {
+            JobInfo {
+                jid,
+                cmd,
+                class,
+                status: Status::Cancelled,
+            } => {
+                table.add_row(row![b->jid, Fri->"Cancelled", class, cmd, "", ""]);
+            }
+
+            JobInfo {
+                jid,
+                cmd,
+                class,
+                status: Status::Waiting,
+            } => {
+                table.add_row(row![b->jid, Fb->"Waiting", class, cmd, "", ""]);
+            }
+
+            JobInfo {
+                jid,
+                cmd,
+                class,
+                status:
+                    Status::Done {
+                        machine,
+                        output: None,
+                    },
+            } => {
+                table.add_row(row![b->jid, Fm->"Done", class, cmd, machine, ""]);
+            }
+
+            JobInfo {
+                jid,
+                cmd,
+                class,
+                status:
+                    Status::Done {
+                        machine,
+                        output: Some(path),
+                    },
+            } => {
+                table.add_row(row![b->jid, Fg->"Done", class, cmd, machine, Fg->path]);
+            }
+
+            JobInfo {
+                jid,
+                cmd,
+                class,
+                status: Status::Failed { error },
+            } => {
+                table.add_row(row![b->jid, Frbu->"Failed", class, cmd, "", error]);
+            }
+
+            JobInfo {
+                jid,
+                cmd,
+                class,
+                status: Status::Running { machine },
+            } => {
+                table.add_row(row![b->jid, Fy->"Running", class, cmd, machine, ""]);
+            }
+        }
+    }
+
+    table.printstd();
+}
+
+fn print_avail(machines: Vec<MachineInfo>) {
+    // Print a nice human-readable table
+    let mut table = Table::new();
+
+    table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
+
+    table.set_titles(row![ Fwbu =>
+                     "Machine", "Class", "Running"
+    ]);
+
+    // Query each job's status
+    for machine in machines.iter() {
+        match machine {
+            MachineInfo {
+                addr,
+                class,
+                running: Some(running),
+            } => {
+                table.add_row(row![ Fy =>
+                    addr,
+                    class,
+                        format!("{}", running)
+                ]);
+            }
+
+            MachineInfo {
+                addr,
+                class,
+                running: None,
+            } => {
+                table.add_row(row![addr, class, ""]);
+            }
+        }
+    }
+
+    table.printstd();
 }
 
 fn is_usize(s: String) -> Result<(), String> {
