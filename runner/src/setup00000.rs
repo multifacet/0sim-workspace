@@ -57,7 +57,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) only setup the VM")
         (@arg SWAP_DEV: -s --swap +takes_value ...
          "(Optional) specify which devices to use as swap devices. By default all \
-          unpartitioned, unmounted devices are used.")
+          unpartitioned, unmounted devices are used (e.g. -s sda sdb sdc).")
         (@arg DISABLE_EPT: --disable_ept
          "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
         (@arg HADOOP: --hadoop
