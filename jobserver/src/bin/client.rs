@@ -72,6 +72,8 @@ fn main() {
 
         (@subcommand lsjobs =>
             (about: "List all jobs.")
+            (@arg LONG: --long
+             "Show all output")
         )
 
         (@subcommand canceljob =>
@@ -99,12 +101,14 @@ fn main() {
     let addr = matches.value_of("ADDR").unwrap_or(SERVER_ADDR);
 
     match matches.subcommand() {
-        ("lsjobs", _sub_m) => {
+        ("lsjobs", Some(sub_m)) => {
+            let is_long = sub_m.is_present("LONG");
+
             let jobs = list_jobs(addr);
-            print_jobs(jobs);
+            print_jobs(jobs, is_long);
         }
 
-        ("lsavail", _sub_m) => {
+        ("lsavail", Some(_sub_m)) => {
             let jobs = list_jobs(addr);
             let avail = list_avail(addr, jobs);
             print_avail(avail);
@@ -291,7 +295,7 @@ fn list_avail(addr: &str, jobs: Vec<JobInfo>) -> Vec<MachineInfo> {
     }
 }
 
-fn print_jobs(jobs: Vec<JobInfo>) {
+fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
     // Print a nice human-readable table
     let mut table = Table::new();
 
@@ -301,30 +305,38 @@ fn print_jobs(jobs: Vec<JobInfo>) {
         "Job", "Status", "Class", "Command", "Machine", "Output"
     ]);
 
+    const TRUNC: usize = 30;
+
     // Query each job's status
-    for job in jobs.iter() {
+    for job in jobs.into_iter() {
         match job {
             JobInfo {
                 jid,
-                cmd,
+                mut cmd,
                 class,
                 status: Status::Cancelled,
             } => {
+                if !is_long {
+                    cmd.truncate(TRUNC);
+                }
                 table.add_row(row![b->jid, Fri->"Cancelled", class, cmd, "", ""]);
             }
 
             JobInfo {
                 jid,
-                cmd,
+                mut cmd,
                 class,
                 status: Status::Waiting,
             } => {
+                if !is_long {
+                    cmd.truncate(TRUNC);
+                }
                 table.add_row(row![b->jid, Fb->"Waiting", class, cmd, "", ""]);
             }
 
             JobInfo {
                 jid,
-                cmd,
+                mut cmd,
                 class,
                 status:
                     Status::Done {
@@ -332,12 +344,15 @@ fn print_jobs(jobs: Vec<JobInfo>) {
                         output: None,
                     },
             } => {
+                if !is_long {
+                    cmd.truncate(TRUNC);
+                }
                 table.add_row(row![b->jid, Fm->"Done", class, cmd, machine, ""]);
             }
 
             JobInfo {
                 jid,
-                cmd,
+                mut cmd,
                 class,
                 status:
                     Status::Done {
@@ -345,24 +360,34 @@ fn print_jobs(jobs: Vec<JobInfo>) {
                         output: Some(path),
                     },
             } => {
+                if !is_long {
+                    cmd.truncate(TRUNC);
+                }
+                let path = if is_long { path } else { "Ready".into() };
                 table.add_row(row![b->jid, Fg->"Done", class, cmd, machine, Fg->path]);
             }
 
             JobInfo {
                 jid,
-                cmd,
+                mut cmd,
                 class,
                 status: Status::Failed { error },
             } => {
+                if !is_long {
+                    cmd.truncate(TRUNC);
+                }
                 table.add_row(row![b->jid, Frbu->"Failed", class, cmd, "", error]);
             }
 
             JobInfo {
                 jid,
-                cmd,
+                mut cmd,
                 class,
                 status: Status::Running { machine },
             } => {
+                if !is_long {
+                    cmd.truncate(TRUNC);
+                }
                 table.add_row(row![b->jid, Fy->"Running", class, cmd, machine, ""]);
             }
         }
