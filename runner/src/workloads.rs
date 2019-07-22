@@ -234,7 +234,7 @@ pub fn run_memcached_gen_data(
     let cmd = cmd!(
         "taskset -c {} ./target/release/memcached_gen_data localhost:11211 {} {} {} | tee {}",
         cfg.client_pin_core,
-        cfg.wk_size_gb,
+        cfg.wk_size_gb - 1, // Avoid a OOM
         if let Some(freq) = cfg.freq {
             format!("--freq {}", freq)
         } else {
