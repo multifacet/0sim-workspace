@@ -98,7 +98,7 @@ pub fn run(
         } else {
             "memcached_gen_data_host_kbuild"
         },
-        exp: 00009,
+        exp: 9,
 
         * vm_size: vm_size,
         (cores > 1) cores: cores,

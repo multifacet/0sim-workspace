@@ -343,7 +343,7 @@ fn create_and_turn_on_thin_swap_inner(
 
         // find out which loopback device was created
         let out = shell.run(cmd!("sudo losetup -j {}", meta_file))?.stdout;
-        let loopback = out.trim().split(":").next().expect("expected device name");
+        let loopback = out.trim().split(':').next().expect("expected device name");
 
         // find out the size of the mapper_device
         let out = shell

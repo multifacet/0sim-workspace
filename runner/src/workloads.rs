@@ -390,7 +390,7 @@ pub fn run_memhog(
         if let Some(r) = r {
             format!("for i in `seq {}`", r)
         } else {
-            format!("while [ true ]")
+            "while [ true ]".into()
         },
         size_kb,
         if opts.contains(MemhogOptions::PIN) {

@@ -61,7 +61,7 @@ pub fn run(
 
     let settings = settings! {
         * workload: "memcached_thp_ops_per_page_bare_metal",
-        exp: 00004,
+        exp: 4,
 
         * size: size,
 

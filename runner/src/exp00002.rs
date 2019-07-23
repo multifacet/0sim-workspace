@@ -127,7 +127,7 @@ pub fn run(
             Workload::LocalityMemAccess => "locality_mem_access",
             Workload::MtLocalityMemAccess(..) => "locality_mem_access",
         },
-        exp: 00002,
+        exp: 2,
 
         warmup: warmup,
         calibrated: false,

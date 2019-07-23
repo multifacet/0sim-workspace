@@ -157,7 +157,7 @@ pub fn run(
 
     let settings = settings! {
         * workload: format!("swap_{}", workload.to_str()),
-        exp: 00008,
+        exp: 8,
 
         calibrated: false,
         warmup: warmup,

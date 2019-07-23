@@ -67,7 +67,7 @@ pub fn run(
 
     let settings = settings! {
         * workload: if ktask_div.is_some() { "ktask_boot_mem_init" } else { "boot_mem_init" },
-        exp: 00006,
+        exp: 6,
 
         * vm_size: vm_size,
         * cores: cores,

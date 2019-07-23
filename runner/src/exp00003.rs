@@ -100,7 +100,7 @@ pub fn run(
     let settings = settings! {
         * workload: "memcached_per_page_thp_ops",
         * continual_compaction: continual_compaction,
-        exp: 00003,
+        exp: 3,
 
         * size: size,
         calibrated: false,

@@ -84,7 +84,7 @@ pub fn run(
 
     let settings = settings! {
         * workload: "nas_cg_class_e",
-        exp: 00005,
+        exp: 5,
 
         calibrated: false,
         warmup: warmup,

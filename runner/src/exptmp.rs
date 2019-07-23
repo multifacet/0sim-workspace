@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// # of iterations for locality_mem_access workload
-const LOCALITY_N: usize = 10000;
+const LOCALITY_N: usize = 10_000;
 
 #[derive(Copy, Clone, Debug)]
 enum Workload {
@@ -383,8 +383,8 @@ where
             let (_shell, spawn_handle0) = ushell.spawn(cmd!(
                 "sudo taskset -c 3 {}/target/release/zerosim-trace trace {} {} {} -t {}",
                 dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE),
-                500,    // interval
-                100000, // buffer size
+                500,     // interval
+                100_000, // buffer size
                 dir!(HOSTNAME_SHARED_RESULTS_DIR, trace_output_local),
                 pf_time.unwrap(),
             ))?;
@@ -415,8 +415,8 @@ where
             let (_shell, spawn_handle0) = ushell.spawn(cmd!(
                 "sudo taskset -c 3 {}/target/release/zerosim-trace trace {} {} {} -t {}",
                 dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE),
-                500,    // interval
-                100000, // buffer size
+                500,     // interval
+                100_000, // buffer size
                 dir!(HOSTNAME_SHARED_RESULTS_DIR, trace_output_nonlocal),
                 pf_time.unwrap(),
             ))?;

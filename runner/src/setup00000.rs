@@ -540,7 +540,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         let guest_config = vushell
             .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
             .stdout;
-        let guest_config = guest_config.trim().into();
+        let guest_config = guest_config.trim();
         vushell.run(cmd!("cp {} {}", guest_config, VAGRANT_SHARED_DIR))?;
 
         let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();

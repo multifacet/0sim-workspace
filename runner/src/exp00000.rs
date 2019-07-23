@@ -93,7 +93,7 @@ pub fn run(
 
     let settings = settings! {
         * workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
-        exp: 00000,
+        exp: 0,
 
         * vm_size: vm_size,
         (cores > 1) cores: cores,

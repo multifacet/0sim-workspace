@@ -143,7 +143,7 @@ pub fn run(
     let settings = settings! {
         * workload: "fragmentation",
         * app: workload,
-        exp: 00007,
+        exp: 7,
 
         calibrated: false,
         (warmup) warmup: warmup,

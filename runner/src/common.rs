@@ -159,9 +159,8 @@ pub fn clone_research_workspace(
     submodules: &[&str],
 ) -> Result<String, failure::Error> {
     // Check if the repo is already cloned.
-    match research_workspace_git_hash(&ushell) {
-        Ok(hash) => return Ok(hash),
-        Err(..) => {}
+    if let Ok(hash) = research_workspace_git_hash(&ushell) {
+        return Ok(hash);
     }
 
     // Clone the repo.
@@ -453,8 +452,7 @@ pub fn build_kernel(
                 tarball_path
                     .trim_end_matches(".tar.gz")
                     .trim_end_matches(".tar.xz")
-                    .trim_end_matches(".tgz")
-                    .into(),
+                    .trim_end_matches(".tgz"),
             )?
         }
     };
