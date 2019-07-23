@@ -71,6 +71,25 @@ pub fn cli_options() -> clap::App<'static, 'static> {
     }
 }
 
+struct SetupConfig<'a, A>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    login: Login<'a, 'a, A>,
+    device: Option<&'a str>,
+    mapper_device: Option<&'a str>,
+    git_branch: Option<&'a str>,
+    only_vm: bool,
+    token: &'a str,
+    swap_devs: Vec<&'a str>,
+    disable_ept: bool,
+    setup_hadoop: bool,
+    setup_proxy: Option<&'a str>,
+    destroy_existing_vm: bool,
+    skip_vm_kernel: bool,
+    dry_run: bool,
+}
+
 pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
         username: Username(sub_m.value_of("USERNAME").unwrap()),
@@ -90,290 +109,352 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let setup_hadoop = sub_m.is_present("HADOOP");
     let setup_proxy = sub_m.value_of("PROXY");
     let destroy_existing_vm = sub_m.is_present("DESTROY_EXISTING");
-    let skip_vm_kerenl = sub_m.is_present("SKIP_VM_KERNEL");
+    let skip_vm_kernel = sub_m.is_present("SKIP_VM_KERNEL");
 
     assert!(mapper_device.is_none() || swap_devs.is_empty());
 
+    let mut cfg = SetupConfig {
+        dry_run,
+        login,
+        device,
+        mapper_device,
+        git_branch,
+        only_vm,
+        token,
+        swap_devs,
+        disable_ept,
+        setup_proxy,
+        setup_hadoop,
+        destroy_existing_vm,
+        skip_vm_kernel,
+    };
+
     // Connect to the remote
-    let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
+    let mut ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
     ushell.set_dry_run(dry_run);
 
+    if !cfg.only_vm {
+        set_up_host(&mut ushell, &mut cfg)?;
+    }
+
+    // Create the VM and install dependencies for the benchmarks/simulator.
+    let (vrshell, vushell) = init_vm(&mut ushell, &cfg)?;
+
+    // We share the research-workspace with the VM via a vagrant shared directory (NFS) so that
+    // there is only one version used across both (less versioning to track). Now, just compile the
+    // benchmarks and install rust on the host.
+
+    if !cfg.skip_vm_kernel {
+        install_guest_kernel(&ushell, &vrshell, &vushell, &cfg)?;
+    }
+
+    // Install benchmarks.
+    install_benchmarks(&ushell, &vrshell, &cfg)?;
+
+    // Make sure the TSC is marked as a reliable clock source in the guest.
+    set_kernel_boot_param(&vrshell, "tsc", Some("reliable"))?;
+
+    // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
+    vrshell.run(cmd!("sync"))?;
+    ushell.run(cmd!("sync"))?;
+    let _ = vrshell.run(cmd!("sudo poweroff")); // This will give a TCP error for obvious reasons
+
+    Ok(())
+}
+
+fn set_up_host<A>(ushell: &mut SshShell, cfg: &mut SetupConfig<'_, A>) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
     let user_home = &get_user_home_dir(&ushell)?;
 
-    if !only_vm {
-        // Rename `poweroff` so we can't accidentally use it
-        if let Ok(res) = ushell.run(
-            cmd!("PATH='/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin':$PATH type poweroff")
-                .use_bash(),
-        ) {
-            ushell.run(
+    // Rename `poweroff` so we can't accidentally use it
+    if let Ok(res) = ushell.run(
+        cmd!("PATH='/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin':$PATH type poweroff")
+            .use_bash(),
+    ) {
+        ushell.run(
+            cmd!(
+                "sudo mv $(echo '{}' | awk '{{print $3}}') /usr/sbin/poweroff-actually",
+                res.stdout.trim()
+            )
+            .use_bash(),
+        )?;
+    }
+
+    // Install a bunch of stuff
+    with_shell! { ushell =>
+        cmd!("sudo yum group install -y 'Development Tools'"),
+        spurs_util::centos::yum_install(&[
+            "bc",
+            "openssl-devel",
+            "libvirt",
+            "libvirt-devel",
+            "virt-manager",
+            "pciutils-devel",
+            "bash-completion",
+            "elfutils-devel",
+            "libunwind-devel",
+            "audit-libs-devel",
+            "slang-devel",
+            "perl-ExtUtils-Embed",
+            "binutils-devel",
+            "xz-devel",
+            "numactl-devel",
+            "lsof",
+            "java-1.8.0-openjdk",
+            "centos-release-scl",
+            "scl-utils",
+            "maven",
+            "glib2-devel",
+            "libfdt-devel",
+            "pixman-devel",
+            "zlib-devel",
+            "fuse-devel",
+        ]),
+        spurs_util::centos::yum_install(&["devtoolset-7"]),
+
+        // Add user to libvirt group after installing
+        spurs_util::util::add_to_group("libvirt"),
+    }
+
+    let installed = ushell
+        .run(cmd!("yum list installed vagrant | grep -q vagrant"))
+        .is_ok();
+
+    if !installed {
+        ushell.run(cmd!("sudo yum -y install {}", VAGRANT_RPM_URL))?;
+    }
+
+    let installed = ushell
+        .run(cmd!("vagrant plugin list | grep -q libvirt"))
+        .is_ok();
+
+    if !installed {
+        ushell.run(cmd!("vagrant plugin install vagrant-libvirt"))?;
+    }
+
+    // Need a new shell so that we get the new user group
+    *ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
+    ushell.set_dry_run(cfg.dry_run);
+
+    if let Some(device) = cfg.device {
+        // Set up home device/directory
+        // - format the device and create a partition
+        // - mkfs on the partition
+        // - copy data to new partition and mount as home dir
+        ushell.run(spurs_util::util::write_gpt(device))?;
+        ushell.run(spurs_util::util::create_partition(device))?;
+        spurs_util::util::format_partition_as_ext4(
+            ushell,
+            cfg.dry_run,
+            &format!("{}1", device), // assume it is the first device partition
+            user_home,
+            cfg.login.username.as_str(),
+        )?;
+    }
+
+    // Setup swap devices, and leave a research-settings.json file. If no swap devices were
+    // specififed, use all unpartitioned, unmounted devices.
+    if let Some(mapper_device) = cfg.mapper_device {
+        // Setup a thinkly provisioned swap device
+
+        const DM_META_FILE: &str = "dm.meta";
+
+        // create a 1GB zeroed file to be mounted as a loopback device for use as metadata dev for thin pool
+        ushell.run(cmd!("sudo fallocate -z -l 1073741824 {}", DM_META_FILE))?;
+
+        create_thin_swap(&ushell, DM_META_FILE, mapper_device)?;
+
+        // Save so that we can mount on reboot.
+        crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
+        crate::common::set_remote_research_setting(&ushell, "dm-data", mapper_device)?;
+    } else if cfg.swap_devs.is_empty() {
+        let unpartitioned = spurs_util::util::get_unpartitioned_devs(ushell, cfg.dry_run)?;
+        for dev in unpartitioned.iter() {
+            ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+        }
+    } else {
+        for dev in cfg.swap_devs.iter() {
+            ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+        }
+
+        crate::common::set_remote_research_setting(&ushell, "swap-devices", &cfg.swap_devs)?;
+    }
+
+    // clone the research workspace and build/install the 0sim kernel.
+    if let Some(git_branch) = cfg.git_branch {
+        const CONFIG_SET: &[(&str, bool)] = &[
+            // turn on 0sim
+            ("CONFIG_ZSWAP", true),
+            ("CONFIG_ZPOOL", true),
+            ("CONFIG_ZBUD", true),
+            ("CONFIG_ZTIER", true),
+            ("CONFIG_SBALLOC", true),
+            ("CONFIG_ZSMALLOC", true),
+            ("CONFIG_X86_TSC_OFFSET_HOST_ELAPSED", true),
+            ("CONFIG_SSDSWAP", true),
+            // disable spectre/meltdown mitigations
+            ("CONFIG_PAGE_TABLE_ISOLATION", false),
+            ("CONFIG_RETPOLINE", false),
+            // for `perf` stack traces
+            ("CONFIG_FRAME_POINTER", true),
+        ];
+
+        const SUBMODULES: &[&str] = &[
+            ZEROSIM_KERNEL_SUBMODULE,
+            ZEROSIM_EXPERIMENTS_SUBMODULE,
+            ZEROSIM_TRACE_SUBMODULE,
+            ZEROSIM_HIBENCH_SUBMODULE,
+            ZEROSIM_MEMHOG_SUBMODULE,
+            ZEROSIM_METIS_SUBMODULE,
+        ];
+
+        let kernel_path = dir!(
+            user_home.as_str(),
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_KERNEL_SUBMODULE
+        );
+
+        let git_hash = crate::common::clone_research_workspace(&ushell, cfg.token, SUBMODULES)?;
+
+        crate::common::build_kernel(
+            cfg.dry_run,
+            &ushell,
+            KernelSrc::Git {
+                repo_path: kernel_path.clone(),
+                git_branch: git_branch.into(),
+            },
+            KernelConfig {
+                base_config: KernelBaseConfigSource::Current,
+                extra_options: CONFIG_SET,
+            },
+            Some(&crate::common::gen_local_version(git_branch, &git_hash)),
+            KernelPkgType::Rpm,
+        )?;
+
+        // Get name of RPM by looking for most recent file.
+        let kernel_rpm = ushell
+            .run(
                 cmd!(
-                    "sudo mv $(echo '{}' | awk '{{print $3}}') /usr/sbin/poweroff-actually",
-                    res.stdout.trim()
+                    "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
+                    user_home
                 )
                 .use_bash(),
-            )?;
-        }
+            )?
+            .stdout;
+        let kernel_rpm = kernel_rpm.trim();
 
-        // Install a bunch of stuff
-        with_shell! { ushell =>
-            cmd!("sudo yum group install -y 'Development Tools'"),
-            spurs_util::centos::yum_install(&[
-                "bc",
-                "openssl-devel",
-                "libvirt",
-                "libvirt-devel",
-                "virt-manager",
-                "pciutils-devel",
-                "bash-completion",
-                "elfutils-devel",
-                "libunwind-devel",
-                "audit-libs-devel",
-                "slang-devel",
-                "perl-ExtUtils-Embed",
-                "binutils-devel",
-                "xz-devel",
-                "numactl-devel",
-                "lsof",
-                "java-1.8.0-openjdk",
-                "centos-release-scl",
-                "scl-utils",
-                "maven",
-                "glib2-devel",
-                "libfdt-devel",
-                "pixman-devel",
-                "zlib-devel",
-                "fuse-devel",
-            ]),
-            spurs_util::centos::yum_install(&["devtoolset-7"]),
-
-            // Add user to libvirt group after installing
-            spurs_util::util::add_to_group("libvirt"),
-        }
-
-        let installed = ushell
-            .run(cmd!("yum list installed vagrant | grep -q vagrant"))
-            .is_ok();
-
-        if !installed {
-            ushell.run(cmd!("sudo yum -y install {}", VAGRANT_RPM_URL))?;
-        }
-
-        let installed = ushell
-            .run(cmd!("vagrant plugin list | grep -q libvirt"))
-            .is_ok();
-
-        if !installed {
-            ushell.run(cmd!("vagrant plugin install vagrant-libvirt"))?;
-        }
-
-        // Need a new shell so that we get the new user group
-        ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
-        ushell.set_dry_run(dry_run);
-
-        if let Some(device) = device {
-            // Set up home device/directory
-            // - format the device and create a partition
-            // - mkfs on the partition
-            // - copy data to new partition and mount as home dir
-            ushell.run(spurs_util::util::write_gpt(device))?;
-            ushell.run(spurs_util::util::create_partition(device))?;
-            spurs_util::util::format_partition_as_ext4(
-                &ushell,
-                dry_run,
-                &format!("{}1", device), // assume it is the first device partition
+        ushell.run(
+            cmd!(
+                "sudo rpm -ivh --force {}/rpmbuild/RPMS/x86_64/{}",
                 user_home,
-                login.username.as_str(),
-            )?;
-        }
+                kernel_rpm
+            )
+            .use_bash(),
+        )?;
 
-        // Setup swap devices, and leave a research-settings.json file. If no swap devices were
-        // specififed, use all unpartitioned, unmounted devices.
-        if let Some(mapper_device) = mapper_device {
-            // Setup a thinkly provisioned swap device
+        // Build cpupower
+        ushell.run(
+            cmd!("make")
+                .cwd(&format!("{}/tools/power/cpupower/", kernel_path))
+                .dry_run(cfg.dry_run),
+        )?;
 
-            const DM_META_FILE: &str = "dm.meta";
-
-            // create a 1GB zeroed file to be mounted as a loopback device for use as metadata dev for thin pool
-            ushell.run(cmd!("sudo fallocate -z -l 1073741824 {}", DM_META_FILE))?;
-
-            create_thin_swap(&ushell, DM_META_FILE, mapper_device)?;
-
-            // Save so that we can mount on reboot.
-            crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
-            crate::common::set_remote_research_setting(&ushell, "dm-data", mapper_device)?;
-        } else if swap_devs.is_empty() {
-            let unpartitioned = spurs_util::util::get_unpartitioned_devs(&ushell, dry_run)?;
-            for dev in unpartitioned.iter() {
-                ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
-            }
-        } else {
-            for dev in swap_devs.iter() {
-                ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
-            }
-
-            crate::common::set_remote_research_setting(&ushell, "swap-devices", &swap_devs)?;
-        }
-
-        // clone the research workspace and build/install the 0sim kernel.
-        if let Some(git_branch) = git_branch {
-            const CONFIG_SET: &[(&str, bool)] = &[
-                // turn on 0sim
-                ("CONFIG_ZSWAP", true),
-                ("CONFIG_ZPOOL", true),
-                ("CONFIG_ZBUD", true),
-                ("CONFIG_ZTIER", true),
-                ("CONFIG_SBALLOC", true),
-                ("CONFIG_ZSMALLOC", true),
-                ("CONFIG_X86_TSC_OFFSET_HOST_ELAPSED", true),
-                ("CONFIG_SSDSWAP", true),
-                // disable spectre/meltdown mitigations
-                ("CONFIG_PAGE_TABLE_ISOLATION", false),
-                ("CONFIG_RETPOLINE", false),
-                // for `perf` stack traces
-                ("CONFIG_FRAME_POINTER", true),
-            ];
-
-            const SUBMODULES: &[&str] = &[
-                ZEROSIM_KERNEL_SUBMODULE,
-                ZEROSIM_EXPERIMENTS_SUBMODULE,
-                ZEROSIM_TRACE_SUBMODULE,
-                ZEROSIM_HIBENCH_SUBMODULE,
-                ZEROSIM_MEMHOG_SUBMODULE,
-                ZEROSIM_METIS_SUBMODULE,
-            ];
-
-            let kernel_path = dir!(
-                user_home.as_str(),
-                RESEARCH_WORKSPACE_PATH,
-                ZEROSIM_KERNEL_SUBMODULE
-            );
-
-            let git_hash = crate::common::clone_research_workspace(&ushell, token, SUBMODULES)?;
-
-            crate::common::build_kernel(
-                dry_run,
-                &ushell,
-                KernelSrc::Git {
-                    repo_path: kernel_path.clone(),
-                    git_branch: git_branch.into(),
-                },
-                KernelConfig {
-                    base_config: KernelBaseConfigSource::Current,
-                    extra_options: CONFIG_SET,
-                },
-                Some(&crate::common::gen_local_version(git_branch, &git_hash)),
-                KernelPkgType::Rpm,
-            )?;
-
-            // Get name of RPM by looking for most recent file.
-            let kernel_rpm = ushell
-                .run(
-                    cmd!(
-                        "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
-                        user_home
-                    )
-                    .use_bash(),
-                )?
-                .stdout;
-            let kernel_rpm = kernel_rpm.trim();
-
+        // disable Intel EPT if needed
+        if cfg.disable_ept {
             ushell.run(
                 cmd!(
-                    "sudo rpm -ivh --force {}/rpmbuild/RPMS/x86_64/{}",
-                    user_home,
-                    kernel_rpm
+                    r#"echo "options kvm-intel ept=0" | \
+                           sudo tee /etc/modprobe.d/kvm-intel.conf"#
                 )
                 .use_bash(),
             )?;
 
-            // Build cpupower
-            ushell.run(
-                cmd!("make")
-                    .cwd(&format!("{}/tools/power/cpupower/", kernel_path))
-                    .dry_run(dry_run),
-            )?;
+            ushell.run(cmd!("sudo rmmod kvm_intel"))?;
+            ushell.run(cmd!("sudo modprobe kvm_intel"))?;
 
-            // disable Intel EPT if needed
-            if disable_ept {
-                ushell.run(
-                    cmd!(
-                        r#"echo "options kvm-intel ept=0" | \
-                           sudo tee /etc/modprobe.d/kvm-intel.conf"#
-                    )
-                    .use_bash(),
-                )?;
-
-                ushell.run(cmd!("sudo rmmod kvm_intel"))?;
-                ushell.run(cmd!("sudo modprobe kvm_intel"))?;
-
-                ushell.run(cmd!("sudo tail /sys/module/kvm_intel/parameters/ept"))?;
-            }
-
-            // Build and Install QEMU 4.0.0 from source
-            ushell.run(cmd!("wget {}", QEMU_TARBALL))?;
-            ushell.run(cmd!("tar xvf {}", QEMU_TARBALL_NAME))?;
-
-            let qemu_dir = QEMU_TARBALL_NAME.trim_end_matches(".tar.xz");
-            let ncores = crate::common::get_num_cores(&ushell)?;
-
-            with_shell! { ushell in qemu_dir =>
-                cmd!("./configure"),
-                cmd!("make -j {}", ncores),
-                cmd!("sudo make install"),
-            }
-
-            ushell.run(cmd!(
-                "sudo chown qemu:kvm /usr/local/bin/qemu-system-x86_64"
-            ))?;
-
-            // Make sure libvirtd can run the qemu binary
-            ushell.run(cmd!(
-                r#"sudo sed -i 's/#security_driver = "selinux"/security_driver = "none"/' \
-                        /etc/libvirt/qemu.conf"#
-            ))?;
-
-            // Make sure libvirtd can access kvm
-            ushell.run(cmd!(
-                r#"echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' |\
-                               sudo tee /lib/udev/rules.d/99-kvm.rules"#
-            ))?;
-
-            crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
-
-            // update grub to choose this entry (new kernel) by default
-            ushell.run(cmd!("sudo grub2-set-default 0"))?;
+            ushell.run(cmd!("sudo tail /sys/module/kvm_intel/parameters/ept"))?;
         }
 
-        ushell.run(cmd!("mkdir -p {}", HOSTNAME_SHARED_RESULTS_DIR))?;
+        // Build and Install QEMU 4.0.0 from source
+        ushell.run(cmd!("wget {}", QEMU_TARBALL))?;
+        ushell.run(cmd!("tar xvf {}", QEMU_TARBALL_NAME))?;
 
-        // change image location
-        ushell.run(cmd!("mkdir -p images/"))?;
-        ushell.run(cmd!("chmod +x ."))?;
-        ushell.run(cmd!("chmod +x images/"))?;
-        ushell.run(cmd!("sudo chown {}:qemu images/", login.username.as_str()))?;
+        let qemu_dir = QEMU_TARBALL_NAME.trim_end_matches(".tar.xz");
+        let ncores = crate::common::get_num_cores(&ushell)?;
 
-        crate::common::service(&ushell, "libvirtd", ServiceAction::Start)?;
-
-        let def_exists = ushell
-            .run(cmd!("sudo virsh pool-list --all | grep -q default"))
-            .is_ok();
-        if def_exists {
-            ushell.run(cmd!("sudo virsh pool-destroy default"))?;
-            ushell.run(cmd!("sudo virsh pool-undefine default"))?;
+        with_shell! { ushell in qemu_dir =>
+            cmd!("./configure"),
+            cmd!("make -j {}", ncores),
+            cmd!("sudo make install"),
         }
 
         ushell.run(cmd!(
-            "sudo virsh pool-define-as --name default --type dir --target {}/images/",
-            user_home
+            "sudo chown qemu:kvm /usr/local/bin/qemu-system-x86_64"
         ))?;
-        ushell.run(cmd!("sudo virsh pool-autostart default"))?;
-        ushell.run(cmd!("sudo virsh pool-start default"))?;
-        ushell.run(cmd!("sudo virsh pool-list"))?;
 
-        spurs::util::reboot(&mut ushell, dry_run)?;
+        // Make sure libvirtd can run the qemu binary
+        ushell.run(cmd!(
+            r#"sudo sed -i 's/#security_driver = "selinux"/security_driver = "none"/' \
+                        /etc/libvirt/qemu.conf"#
+        ))?;
+
+        // Make sure libvirtd can access kvm
+        ushell.run(cmd!(
+            r#"echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' |\
+                               sudo tee /lib/udev/rules.d/99-kvm.rules"#
+        ))?;
+
+        crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
+
+        // update grub to choose this entry (new kernel) by default
+        ushell.run(cmd!("sudo grub2-set-default 0"))?;
     }
 
+    ushell.run(cmd!("mkdir -p {}", HOSTNAME_SHARED_RESULTS_DIR))?;
+
+    // change image location
+    ushell.run(cmd!("mkdir -p images/"))?;
+    ushell.run(cmd!("chmod +x ."))?;
+    ushell.run(cmd!("chmod +x images/"))?;
+    ushell.run(cmd!(
+        "sudo chown {}:qemu images/",
+        cfg.login.username.as_str()
+    ))?;
+
+    crate::common::service(&ushell, "libvirtd", ServiceAction::Start)?;
+
+    let def_exists = ushell
+        .run(cmd!("sudo virsh pool-list --all | grep -q default"))
+        .is_ok();
+    if def_exists {
+        ushell.run(cmd!("sudo virsh pool-destroy default"))?;
+        ushell.run(cmd!("sudo virsh pool-undefine default"))?;
+    }
+
+    ushell.run(cmd!(
+        "sudo virsh pool-define-as --name default --type dir --target {}/images/",
+        user_home
+    ))?;
+    ushell.run(cmd!("sudo virsh pool-autostart default"))?;
+    ushell.run(cmd!("sudo virsh pool-start default"))?;
+    ushell.run(cmd!("sudo virsh pool-list"))?;
+
+    spurs::util::reboot(ushell, cfg.dry_run)?;
+
+    Ok(())
+}
+
+/// Create the VM and install dependencies for the benchmarks/simulator. Returns root and user
+/// shells to the VM.
+fn init_vm<A>(
+    ushell: &mut SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(SshShell, SshShell), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
     // Disable TSC offsetting so that setup runs faster
     ushell.run(
         cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
@@ -395,7 +476,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     // Create the VM and add our ssh key to it.
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
-    if destroy_existing_vm {
+    if cfg.destroy_existing_vm {
         with_shell! { ushell in vagrant_path =>
             cmd!("vagrant halt --force || [ ! -e Vagrantfile ]").use_bash(),
             cmd!("vagrant destroy --force || [ ! -e Vagrantfile ]").use_bash(),
@@ -422,7 +503,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ushell.run(cmd!("vagrant ssh -- sudo cp -r /home/vagrant/.ssh /root/").cwd(vagrant_path))?;
 
     // Old key will be cached for the VM, but it is likely to have changed
-    let (host, _) = spurs::util::get_host_ip(&login.host);
+    let (host, _) = spurs::util::get_host_ip(&cfg.login.host);
     let _ = Command::new("ssh-keygen")
         .args(&[
             "-f",
@@ -434,18 +515,18 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         .unwrap();
 
     // Start vagrant
-    let mut vrshell = start_vagrant(&ushell, &login.host, 20, 1, /* fast */ true)?;
-    let mut vushell = connect_to_vagrant_as_user(&login.host)?;
+    let mut vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
+    let mut vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
 
     // Sometimes on adsl, networking is kind of messed up until a host restart. Check for
     // connectivity, and try restarting.
     let pub_net = vushell.run(cmd!("ping -c 1 -W 10 1.1.1.1")).is_ok();
     if !pub_net {
         ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
-        spurs::util::reboot(&mut ushell, dry_run)?;
+        spurs::util::reboot(ushell, cfg.dry_run)?;
 
-        vrshell = start_vagrant(&ushell, &login.host, 20, 1, /* fast */ true)?;
-        vushell = connect_to_vagrant_as_user(&login.host)?;
+        vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
+        vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
     }
 
     // Keep tsc offsetting off (it may be turned on by start_vagrant).
@@ -454,7 +535,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     )?;
 
     // If needed, setup the proxy.
-    if let Some(proxy) = setup_proxy {
+    if let Some(proxy) = cfg.setup_proxy {
         // user
         with_shell! { vushell =>
             cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
@@ -476,8 +557,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             .run(cmd!("echo proxy=https://{} | tee --append /etc/yum.conf", proxy).use_bash())?;
 
         // need to restart shell to get new env
-        vrshell = connect_to_vagrant_as_root(&login.host)?;
-        vushell = connect_to_vagrant_as_user(&login.host)?;
+        vrshell = connect_to_vagrant_as_root(&cfg.login.host)?;
+        vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
     }
 
     // Install stuff on the VM
@@ -529,80 +610,95 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
             .cwd(dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE)),
     )?;
 
-    // We share the research-workspace with the VM via a vagrant shared directory (NFS) so that
-    // there is only one version used across both (less versioning to track). Now, just compile the
-    // benchmarks and install rust on the host.
+    Ok((vrshell, vushell))
+}
 
-    if !skip_vm_kerenl {
-        // Install a recent kernel on the guest.
-        //
-        // We will compile on the host and copy the config and the RPM through the shared directory.
-        let guest_config = vushell
-            .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
-            .stdout;
-        let guest_config = guest_config.trim();
-        vushell.run(cmd!("cp {} {}", guest_config, VAGRANT_SHARED_DIR))?;
+/// Install a recent kernel on the guest.
+///
+/// We will compile on the host and copy the config and the RPM through the shared directory.
+fn install_guest_kernel<A>(
+    ushell: &SshShell,
+    vrshell: &SshShell,
+    vushell: &SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    let user_home = &get_user_home_dir(&ushell)?;
 
-        let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
+    let guest_config = vushell
+        .run(cmd!("ls -1 /boot/config-* | head -n1").use_bash())?
+        .stdout;
+    let guest_config = guest_config.trim();
+    vushell.run(cmd!("cp {} {}", guest_config, VAGRANT_SHARED_DIR))?;
 
-        ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
-        crate::common::build_kernel(
-            dry_run,
-            &ushell,
-            KernelSrc::Tar {
-                tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
-            },
-            KernelConfig {
-                base_config: KernelBaseConfigSource::Path(dir!(
-                    HOSTNAME_SHARED_DIR,
-                    guest_config_base_name.to_str().unwrap()
-                )),
-                extra_options: &[
-                    // disable spectre/meltdown mitigations
-                    ("CONFIG_PAGE_TABLE_ISOLATION", false),
-                    ("CONFIG_RETPOLINE", false),
-                    // for `perf` stack traces
-                    ("CONFIG_FRAME_POINTER", true),
-                ],
-            },
-            None,
-            KernelPkgType::Rpm,
-        )?;
+    let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
 
-        // Get name of RPM by looking for most recent file.
-        let kernel_rpm = ushell
-            .run(
-                cmd!(
-                    "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
-                    user_home
-                )
-                .use_bash(),
-            )?
-            .stdout;
-        let kernel_rpm = kernel_rpm.trim();
+    ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
+    crate::common::build_kernel(
+        cfg.dry_run,
+        &ushell,
+        KernelSrc::Tar {
+            tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),
+        },
+        KernelConfig {
+            base_config: KernelBaseConfigSource::Path(dir!(
+                HOSTNAME_SHARED_DIR,
+                guest_config_base_name.to_str().unwrap()
+            )),
+            extra_options: &[
+                // disable spectre/meltdown mitigations
+                ("CONFIG_PAGE_TABLE_ISOLATION", false),
+                ("CONFIG_RETPOLINE", false),
+                // for `perf` stack traces
+                ("CONFIG_FRAME_POINTER", true),
+            ],
+        },
+        None,
+        KernelPkgType::Rpm,
+    )?;
 
-        ushell.run(
+    // Get name of RPM by looking for most recent file.
+    let kernel_rpm = ushell
+        .run(
             cmd!(
-                "cp {}/rpmbuild/RPMS/x86_64/{} {}/",
-                user_home,
-                kernel_rpm,
-                dir!(user_home.as_str(), HOSTNAME_SHARED_DIR)
+                "basename `ls -Art {}/rpmbuild/RPMS/x86_64/ | grep -v headers | tail -n 1`",
+                user_home
             )
             .use_bash(),
-        )?;
+        )?
+        .stdout;
+    let kernel_rpm = kernel_rpm.trim();
 
-        vrshell.run(cmd!(
-            "rpm -ivh --force {}",
-            dir!(VAGRANT_SHARED_DIR, kernel_rpm)
-        ))?;
+    ushell.run(
+        cmd!(
+            "cp {}/rpmbuild/RPMS/x86_64/{} {}/",
+            user_home,
+            kernel_rpm,
+            dir!(user_home.as_str(), HOSTNAME_SHARED_DIR)
+        )
+        .use_bash(),
+    )?;
 
-        vrshell.run(cmd!("sudo grub2-set-default 0"))?;
-    }
+    vrshell.run(cmd!(
+        "rpm -ivh --force {}",
+        dir!(VAGRANT_SHARED_DIR, kernel_rpm)
+    ))?;
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Install benchmarks.
-    ////////////////////////////////////////////////////////////////////////////////
+    vrshell.run(cmd!("sudo grub2-set-default 0"))?;
 
+    Ok(())
+}
+
+fn install_benchmarks<A>(
+    ushell: &SshShell,
+    vushell: &SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
     // 0sim-experiments
     vushell.run(
         cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&dir!(
@@ -629,7 +725,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     }
 
     // Hadoop/spark/hibench
-    if setup_hadoop {
+    if cfg.setup_hadoop {
         with_shell! { vushell =>
             cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty(),
             cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"),
@@ -682,14 +778,6 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         ZEROSIM_BENCHMARKS_DIR,
         ZEROSIM_SWAPNIL_PATH
     )))?;
-
-    // Make sure the TSC is marked as a reliable clock source in the guest.
-    set_kernel_boot_param(&vrshell, "tsc", Some("reliable"))?;
-
-    // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
-    vrshell.run(cmd!("sync"))?;
-    ushell.run(cmd!("sync"))?;
-    let _ = vrshell.run(cmd!("sudo poweroff")); // This will give a TCP error for obvious reasons
 
     Ok(())
 }
