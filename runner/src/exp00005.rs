@@ -18,7 +18,9 @@ use crate::{
         paths::{setup00000::*, *},
     },
     settings,
-    workloads::{run_nas_cg, run_time_mmap_touch, NasClass, TimeMmapTouchPattern},
+    workloads::{
+        run_nas_cg, run_time_mmap_touch, NasClass, TimeMmapTouchConfig, TimeMmapTouchPattern,
+    },
 };
 
 const NAS_CG_TIME: usize = 7200; // seconds
@@ -193,14 +195,15 @@ where
             "Warmup",
             run_time_mmap_touch(
                 &vshell,
-                zerosim_exp_path,
-                (vm_size << 30) >> 12,
-                WARM_UP_PATTERN,
-                /* prefault */ false,
-                /* pf_time */ None,
-                None,
-                /* eager */ false,
-                &mut tctx,
+                &TimeMmapTouchConfig::default()
+                    .exp_dir(zerosim_exp_path)
+                    .pages((vm_size << 30) >> 12)
+                    .pattern(WARM_UP_PATTERN)
+                    .prefault(false)
+                    .pf_time(None)
+                    .output_file(None)
+                    .eager(false)
+                    .pin_core(tctx.next())
             )?
         );
     }

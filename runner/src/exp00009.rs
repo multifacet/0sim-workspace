@@ -20,7 +20,10 @@ use crate::{
         KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Username,
     },
     settings,
-    workloads::{run_memcached_gen_data, run_time_mmap_touch, TimeMmapTouchPattern},
+    workloads::{
+        run_memcached_gen_data, run_time_mmap_touch, MemcachedWorkloadConfig, TimeMmapTouchConfig,
+        TimeMmapTouchPattern,
+    },
 };
 
 pub fn cli_options() -> clap::App<'static, 'static> {
@@ -227,14 +230,15 @@ where
             "Warmup",
             run_time_mmap_touch(
                 &vshell,
-                zerosim_exp_path,
-                (size << 30) >> 12,
-                WARM_UP_PATTERN,
-                /* prefault */ false,
-                /* pf_time */ None,
-                None,
-                /* eager */ false,
-                &mut tctx,
+                &TimeMmapTouchConfig::default()
+                    .exp_dir(zerosim_exp_path)
+                    .pages((size << 30) >> 12)
+                    .pattern(WARM_UP_PATTERN,)
+                    .prefault(false)
+                    .pf_time(None)
+                    .output_file(None)
+                    .eager(false)
+                    .pin_core(tctx.next())
             )?
         );
     }
@@ -278,14 +282,15 @@ where
             "Workload",
             run_time_mmap_touch(
                 &vshell,
-                zerosim_exp_path,
-                (size << 30) >> 12,
-                pattern,
-                prefault,
-                /* pf_time */ None,
-                Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
-                /* eager */ false,
-                &mut tctx,
+                &TimeMmapTouchConfig::default()
+                    .exp_dir(zerosim_exp_path)
+                    .pages((size << 30) >> 12)
+                    .pattern(pattern)
+                    .prefault(prefault)
+                    .pf_time(None)
+                    .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, output_file)))
+                    .eager(false)
+                    .pin_core(tctx.next())
             )?
         );
     } else {
@@ -294,7 +299,7 @@ where
             "Workload",
             run_memcached_gen_data(
                 &vshell,
-                &crate::workloads::MemcachedWorkloadConfig::default()
+                &MemcachedWorkloadConfig::default()
                     .user("vagrant")
                     .exp_dir(zerosim_exp_path)
                     .server_size_mb(size << 10)

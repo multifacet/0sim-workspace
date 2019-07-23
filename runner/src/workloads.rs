@@ -74,51 +74,84 @@ pub enum TimeMmapTouchPattern {
     Counter,
 }
 
+/// Settings for a run of the `time_mmap_touch` workload.
+pub struct TimeMmapTouchConfig<'s> {
+    /// The path of the `0sim-experiments` submodule on the remote.
+    exp_dir: &'s str,
+
+    /// The number of _pages_ to touch.
+    pages: usize,
+    /// Specifies the pattern to write to the pages.
+    pattern: TimeMmapTouchPattern,
+
+    /// The file to which the workload will write its output. If `None`, then `/dev/null` is used.
+    output_file: Option<&'s str>,
+
+    /// The core to pin the workload to in the guest.
+    pin_core: usize,
+    /// Specifies whether to prefault memory or not (true = yes).
+    prefault: bool,
+    /// Specifies the page fault time if TSC offsetting is to try to account for it.
+    pf_time: Option<u64>,
+    /// Indicates whether the workload should be run with eager paging (only in VM).
+    eager: bool,
+}
+
+impl Default for TimeMmapTouchConfig<'_> {
+    fn default() -> Self {
+        Self {
+            exp_dir: "",
+            pages: 0,
+            pattern: TimeMmapTouchPattern::Zeros,
+            output_file: None,
+            pin_core: 0,
+            prefault: false,
+            pf_time: None,
+            eager: false,
+        }
+    }
+}
+
+impl<'s> TimeMmapTouchConfig<'s> {
+    impl_conf!(exp_dir: &'s str);
+    impl_conf!(pages: usize);
+    impl_conf!(pattern: TimeMmapTouchPattern);
+    impl_conf!(prefault: bool);
+    impl_conf!(pf_time: Option<u64>);
+    impl_conf!(output_file: Option<&'s str>);
+    impl_conf!(eager: bool);
+    impl_conf!(pin_core: usize);
+}
+
 /// Run the `time_mmap_touch` workload on the remote `shell`. Requires `sudo`.
-///
-/// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
-/// - `pages` is the number of _pages_ to touch.
-/// - `pattern` specifies the pattern to write to the pages.
-/// - `prefault` specifies whether to prefault memory or not (true = yes).
-/// - `pf_time` specifies the page fault time if TSC offsetting is to try to account for it.
-/// - `output_file` is the file to which the workload will write its output. If `None`, then
-///   `/dev/null` is used.
-/// - `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn run_time_mmap_touch(
     shell: &SshShell,
-    exp_dir: &str,
-    pages: usize,
-    pattern: TimeMmapTouchPattern,
-    prefault: bool,
-    pf_time: Option<u64>,
-    output_file: Option<&str>,
-    eager: bool,
-    tctx: &mut TasksetCtx,
+    cfg: &TimeMmapTouchConfig<'_>,
 ) -> Result<(), failure::Error> {
-    let pattern = match pattern {
+    let pattern = match cfg.pattern {
         TimeMmapTouchPattern::Counter => "-c",
         TimeMmapTouchPattern::Zeros => "-z",
     };
 
-    if eager {
+    if cfg.eager {
         vagrant_setup_apriori_paging_process(shell, "time_mmap_touch")?;
     }
 
     shell.run(
         cmd!(
             "sudo taskset -c {} ./target/release/time_mmap_touch {} {} {} {} > {}",
-            tctx.next(),
-            pages,
+            cfg.pin_core,
+            cfg.pages,
             pattern,
-            if prefault { "-p" } else { "" },
-            if let Some(pf_time) = pf_time {
+            if cfg.prefault { "-p" } else { "" },
+            if let Some(pf_time) = cfg.pf_time {
                 format!("--pftime {}", pf_time)
             } else {
                 "".into()
             },
-            output_file.unwrap_or("/dev/null")
+            cfg.output_file.unwrap_or("/dev/null")
         )
-        .cwd(exp_dir)
+        .cwd(cfg.exp_dir)
         .use_bash(),
     )?;
 

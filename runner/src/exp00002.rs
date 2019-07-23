@@ -21,7 +21,7 @@ use crate::{
     settings,
     workloads::{
         run_locality_mem_access, run_time_loop, run_time_mmap_touch, LocalityMemAccessMode,
-        TimeMmapTouchPattern,
+        TimeMmapTouchConfig, TimeMmapTouchPattern,
     },
 };
 
@@ -232,14 +232,15 @@ where
             "Warmup",
             run_time_mmap_touch(
                 &vshell,
-                zerosim_exp_path,
-                ((vm_size << 30) >> 12) >> 1,
-                WARM_UP_PATTERN,
-                /* prefault */ false,
-                /* pf_time */ None,
-                None,
-                /* eager */ false,
-                &mut tctx,
+                &TimeMmapTouchConfig::default()
+                    .exp_dir(zerosim_exp_path)
+                    .pages(((vm_size << 30) >> 12) >> 1)
+                    .pattern(WARM_UP_PATTERN)
+                    .prefault(false)
+                    .pf_time(None)
+                    .output_file(None)
+                    .eager(false)
+                    .pin_core(tctx.next())
             )?
         );
     }
