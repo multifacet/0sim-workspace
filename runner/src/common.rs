@@ -7,6 +7,7 @@
 //! ___━━___━*━___━━____━━*___━┗|::::|｡◕‿‿◕｡|
 //! ___*━__━━_*___━━___*━━___*━━╰O­-O---O--O ╯
 
+// Must be imported first because the other submodules use the macros defined therein.
 #[macro_use]
 mod macros;
 
