@@ -39,6 +39,11 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     // Connect to the remote.
     let (ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, 20, 1)?;
 
+    // Disable TSC offsetting so that setup runs faster
+    ushell.run(
+        cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
+    )?;
+
     // Install the instrumented kernel on the guest.
     //
     // Building the kernel on the guest is painful, so we will build it on the host and copy it to
@@ -117,12 +122,15 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         kernel_rpm
     ))?;
 
-    // create a swap device if it doesn't exist already
+    // create a swap device if it doesn't exist already. Note that on XFS, fallocate produces files
+    // with holes, so we need to manually fill them (slow and annoying, but there isn't another
+    // way, unfortunately).
     with_shell! { vshell =>
         cmd!(
-            "[ -e {} ] || fallocate -z -l {} {}",
+            "[ -e {} ] || (fallocate -z -l {} {} && dd if=/dev/zero of={})",
             VAGRANT_GUEST_SWAPFILE,
             GUEST_SWAP_GBS << 30, /* GB */
+            VAGRANT_GUEST_SWAPFILE,
             VAGRANT_GUEST_SWAPFILE
         )
         .use_bash(),
