@@ -52,13 +52,17 @@ impl OutputManager {
     }
 
     /// Generate the primary output and params filenames, in that order.
-    pub fn gen_file_names(&self) -> (String, String) {
+    pub fn gen_standard_names(&self) -> (String, String, String, String) {
         const OUTPUT_SUFFIX: &str = "out";
         const PARAMS_SUFFIX: &str = "params";
+        const TIMES_SUFFIX: &str = "time";
+        const SIM_SUFFIX: &str = "sim";
 
         (
             self.gen_file_name(OUTPUT_SUFFIX),
             self.gen_file_name(PARAMS_SUFFIX),
+            self.gen_file_name(TIMES_SUFFIX),
+            self.gen_file_name(SIM_SUFFIX),
         )
     }
 

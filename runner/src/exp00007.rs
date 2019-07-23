@@ -246,7 +246,7 @@ where
         );
     }
 
-    let (output_file, params_file) = settings.gen_file_names();
+    let (output_file, params_file, time_file, sim_file) = settings.gen_standard_names();
     let time_file = settings.gen_file_name("time");
     let guest_mem_file = settings.gen_file_name("guest_mem");
     let params = serde_json::to_string(&settings)?;
