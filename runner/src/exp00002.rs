@@ -20,8 +20,8 @@ use crate::{
     },
     settings,
     workloads::{
-        run_locality_mem_access, run_time_loop, run_time_mmap_touch, LocalityMemAccessMode,
-        TimeMmapTouchConfig, TimeMmapTouchPattern,
+        run_locality_mem_access, run_time_loop, run_time_mmap_touch, LocalityMemAccessConfig,
+        LocalityMemAccessMode, TimeMmapTouchConfig, TimeMmapTouchPattern,
     },
 };
 
@@ -269,23 +269,23 @@ where
             time!(timers, "Workload", {
                 run_locality_mem_access(
                     &vshell,
-                    zerosim_exp_path,
-                    LocalityMemAccessMode::Local,
-                    n,
-                    None,
-                    &dir!(VAGRANT_RESULTS_DIR, local_file),
-                    /* eager */ false,
-                    &mut tctx,
+                    &LocalityMemAccessConfig::default()
+                        .exp_dir(zerosim_exp_path)
+                        .locality(LocalityMemAccessMode::Local)
+                        .n(n)
+                        .threads(None)
+                        .output_file(&dir!(VAGRANT_RESULTS_DIR, local_file))
+                        .eager(false),
                 )?;
                 run_locality_mem_access(
                     &vshell,
-                    zerosim_exp_path,
-                    LocalityMemAccessMode::Random,
-                    n,
-                    None,
-                    &dir!(VAGRANT_RESULTS_DIR, nonlocal_file),
-                    /* eager */ false,
-                    &mut tctx,
+                    &LocalityMemAccessConfig::default()
+                        .exp_dir(zerosim_exp_path)
+                        .locality(LocalityMemAccessMode::Random)
+                        .n(n)
+                        .threads(None)
+                        .output_file(&dir!(VAGRANT_RESULTS_DIR, nonlocal_file))
+                        .eager(false),
                 )?;
             });
         }
@@ -297,23 +297,23 @@ where
             time!(timers, "Workload", {
                 run_locality_mem_access(
                     &vshell,
-                    zerosim_exp_path,
-                    LocalityMemAccessMode::Local,
-                    n,
-                    Some(threads),
-                    &dir!(VAGRANT_RESULTS_DIR, local_file),
-                    /* eager */ false,
-                    &mut tctx,
+                    &LocalityMemAccessConfig::default()
+                        .exp_dir(zerosim_exp_path)
+                        .locality(LocalityMemAccessMode::Local)
+                        .n(n)
+                        .threads(Some(threads))
+                        .output_file(&dir!(VAGRANT_RESULTS_DIR, local_file))
+                        .eager(false),
                 )?;
                 run_locality_mem_access(
                     &vshell,
-                    zerosim_exp_path,
-                    LocalityMemAccessMode::Random,
-                    n,
-                    Some(threads),
-                    &dir!(VAGRANT_RESULTS_DIR, nonlocal_file),
-                    /* eager */ false,
-                    &mut tctx,
+                    &LocalityMemAccessConfig::default()
+                        .exp_dir(zerosim_exp_path)
+                        .locality(LocalityMemAccessMode::Random)
+                        .n(n)
+                        .threads(Some(threads))
+                        .output_file(&dir!(VAGRANT_RESULTS_DIR, nonlocal_file))
+                        .eager(false),
                 )?;
             });
         }

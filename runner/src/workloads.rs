@@ -480,45 +480,80 @@ pub enum LocalityMemAccessMode {
     Random,
 }
 
+/// Settings for a single instance of the `locality_mem_access` workload.
+pub struct LocalityMemAccessConfig<'s> {
+    /// The path of the 0sim-experiments submodule.
+    exp_dir: &'s str,
+
+    /// Make local or non-local access patterns?
+    locality: LocalityMemAccessMode,
+    /// Number of accesses.
+    n: usize,
+    /// Turn on multithreading or not? And how many threads. Note that `None` is not the same as
+    /// `Some(1)`, which has the main thread and 1 worker.
+    threads: Option<usize>,
+
+    /// The location to write the output for the workload.
+    output_file: &'s str,
+
+    /// Turn on eager paging.
+    eager: bool,
+}
+
+impl Default for LocalityMemAccessConfig<'_> {
+    fn default() -> Self {
+        Self {
+            exp_dir: "",
+            locality: LocalityMemAccessMode::Local,
+            n: 0,
+            threads: None,
+            output_file: "",
+            eager: false,
+        }
+    }
+}
+
+impl<'s> LocalityMemAccessConfig<'s> {
+    impl_conf!(exp_dir: &'s str);
+    impl_conf!(locality: LocalityMemAccessMode);
+    impl_conf!(n: usize);
+    impl_conf!(threads: Option<usize>);
+    impl_conf!(output_file: &'s str);
+    impl_conf!(eager: bool);
+}
+
 /// Run the `locality_mem_access` workload on the remote of the given number of iterations.
 ///
 /// If `threads` is `None`, a single-threaded workload is run. Otherwise, a multithreaded workload
-/// is run.
+/// is run. The workload does its own CPU affinity assignments.
 ///
 /// `eager` should only be used in a VM.
 pub fn run_locality_mem_access(
     shell: &SshShell,
-    exp_dir: &str,
-    locality: LocalityMemAccessMode,
-    n: usize,
-    threads: Option<usize>,
-    output_file: &str,
-    eager: bool,
-    tctx: &mut TasksetCtx,
+    cfg: &LocalityMemAccessConfig<'_>,
 ) -> Result<(), failure::Error> {
-    let locality = match locality {
+    let locality = match cfg.locality {
         LocalityMemAccessMode::Local => "-l",
         LocalityMemAccessMode::Random => "-n",
     };
 
-    if eager {
+    if cfg.eager {
         vagrant_setup_apriori_paging_process(shell, "locality_mem_access")?;
     }
 
     shell.run(
         cmd!(
-            "time sudo taskset -c {} ./target/release/locality_mem_access {} {} {} > {}",
-            tctx.next(),
+            "time sudo ./target/release/locality_mem_access {} {} {} > {}",
             locality,
-            n,
-            if let Some(threads) = threads {
+            cfg.n,
+            if let Some(threads) = cfg.threads {
                 format!("-t {}", threads)
             } else {
                 "".into()
             },
-            output_file,
+            cfg.output_file,
         )
-        .cwd(exp_dir)
+        .cwd(cfg.exp_dir)
         .use_bash(),
     )?;
 

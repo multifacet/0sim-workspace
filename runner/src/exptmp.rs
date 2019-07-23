@@ -20,7 +20,7 @@ use crate::{
     settings,
     workloads::{
         run_locality_mem_access, run_memcached_gen_data, run_time_mmap_touch,
-        LocalityMemAccessMode, TimeMmapTouchConfig, TimeMmapTouchPattern,
+        LocalityMemAccessConfig, LocalityMemAccessMode, TimeMmapTouchConfig, TimeMmapTouchPattern,
     },
 };
 
@@ -402,13 +402,13 @@ where
                 "Workload 1",
                 run_locality_mem_access(
                     &vshell,
-                    zerosim_exp_path,
-                    LocalityMemAccessMode::Local,
-                    LOCALITY_N,
-                    None,
-                    &dir!(VAGRANT_RESULTS_DIR, output_local),
-                    /* eager */ false,
-                    &mut tctx,
+                    &LocalityMemAccessConfig::default()
+                        .exp_dir(zerosim_exp_path)
+                        .locality(LocalityMemAccessMode::Local)
+                        .n(LOCALITY_N)
+                        .threads(None)
+                        .output_file(&dir!(VAGRANT_RESULTS_DIR, output_local))
+                        .eager(false)
                 )?
             );
 
@@ -428,13 +428,13 @@ where
                 "Workload 2",
                 run_locality_mem_access(
                     &vshell,
-                    zerosim_exp_path,
-                    LocalityMemAccessMode::Random,
-                    LOCALITY_N,
-                    None,
-                    &dir!(VAGRANT_RESULTS_DIR, output_nonlocal),
-                    /* eager */ false,
-                    &mut tctx,
+                    &LocalityMemAccessConfig::default()
+                        .exp_dir(zerosim_exp_path)
+                        .locality(LocalityMemAccessMode::Random)
+                        .n(LOCALITY_N)
+                        .threads(None)
+                        .output_file(&dir!(VAGRANT_RESULTS_DIR, output_nonlocal))
+                        .eager(false)
                 )?
             );
 
