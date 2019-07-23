@@ -255,6 +255,8 @@ where
         dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
 
+    crate::common::exp_0sim::gen_standard_sim_output(&sim_file, &ushell, &vshell)?;
+
     if print_results_path {
         let glob = settings.gen_file_name("*");
         println!("RESULTS: {}", glob);

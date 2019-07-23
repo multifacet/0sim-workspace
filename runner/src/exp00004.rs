@@ -121,7 +121,7 @@ where
     // Collect timers on VM
     let mut timers = vec![];
 
-    let (output_file, params_file, time_file, sim_file) = settings.gen_standard_names();
+    let (output_file, params_file, time_file, _sim_file) = settings.gen_standard_names();
     let params = serde_json::to_string(&settings)?;
 
     ushell.run(cmd!(

@@ -247,7 +247,6 @@ where
     }
 
     let (output_file, params_file, time_file, sim_file) = settings.gen_standard_names();
-    let time_file = settings.gen_file_name("time");
     let guest_mem_file = settings.gen_file_name("guest_mem");
     let params = serde_json::to_string(&settings)?;
 
@@ -438,6 +437,8 @@ where
         crate::common::timings_str(timers.as_slice()),
         dir!(VAGRANT_RESULTS_DIR, time_file)
     ))?;
+
+    crate::common::exp_0sim::gen_standard_sim_output(&sim_file, &ushell, &vshell)?;
 
     if print_results_path {
         let glob = settings.gen_file_name("*");

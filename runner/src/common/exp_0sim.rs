@@ -681,3 +681,50 @@ pub fn set_kernel_boot_param(
 
     Ok(())
 }
+
+/// Gathers some common stats for any 0sim simulation. This is intended to be called after the
+/// simulation.
+///
+/// `sim_file` should be just the file name, not the directory path. This function will cause the
+/// output to be in the standard locations.
+///
+/// Requires `sudo`.
+pub fn gen_standard_sim_output(
+    sim_file: &str,
+    ushell: &SshShell,
+    vshell: &SshShell,
+) -> Result<(), failure::Error> {
+    // Get paths for the guest and host.
+    let host_sim_file = dir!(setup00000::HOSTNAME_SHARED_RESULTS_DIR, sim_file);
+    let guest_sim_file = dir!(setup00000::VAGRANT_RESULTS_DIR, sim_file);
+
+    // We first gather a bunch of stats. Then, we generate a report into the given file.
+
+    // Host config
+    ushell.run(cmd!("echo -e 'Host Config\n=====' > {}", host_sim_file))?;
+    ushell.run(cmd!("cat /proc/cpuinfo >> {}", host_sim_file))?;
+    ushell.run(cmd!("lsblk >> {}", host_sim_file))?;
+
+    // Memory usage, compressibility
+    ushell.run(cmd!(
+        "echo -e '\nSimulation Stats (Host)\n=====' >> {}",
+        host_sim_file
+    ))?;
+    ushell.run(cmd!("cat /proc/meminfo >> {}", host_sim_file))?;
+    ushell.run(cmd!(
+        "sudo bash -c 'tail /sys/kernel/debug/zswap/*' >> {}",
+        host_sim_file
+    ))?;
+
+    ushell.run(cmd!("sync"))?;
+    ushell.run(cmd!(
+        "echo -e '\nSimulation Stats (Guest)\n=====' >> {}",
+        host_sim_file
+    ))?;
+    vshell.run(cmd!("cat /proc/meminfo >> {}", guest_sim_file))?;
+
+    vshell.run(cmd!("sync"))?;
+    ushell.run(cmd!("sync"))?;
+
+    Ok(())
+}
