@@ -127,11 +127,10 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     // way, unfortunately).
     with_shell! { vshell =>
         cmd!(
-            "[ -e {} ] || (fallocate -z -l {} {} && dd if=/dev/zero of={})",
+            "[ -e {} ] || dd if=/dev/zero of={} bs=1G count={}",
             VAGRANT_GUEST_SWAPFILE,
-            GUEST_SWAP_GBS << 30, /* GB */
             VAGRANT_GUEST_SWAPFILE,
-            VAGRANT_GUEST_SWAPFILE
+            GUEST_SWAP_GBS,
         )
         .use_bash(),
         cmd!("mkswap {}", VAGRANT_GUEST_SWAPFILE),
