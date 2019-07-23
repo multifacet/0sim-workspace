@@ -199,23 +199,3 @@ macro_rules! settings {
         manager
     }}
 }
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn foo() {
-        let settings = settings! {
-            git_hash: { 0 + 1},
-            workload: "name",
-
-            setting1: false,
-            * setting2: String::new(),
-            setting3: 3.1E3,
-            setting4: (2, 1),
-        };
-
-        let (output_file, params_file) = settings.gen_file_names();
-        let params_json = serde_json::to_string(settings);
-        let git_hash = settings.get::<usize>(GIT_HASH);
-    }
-}
