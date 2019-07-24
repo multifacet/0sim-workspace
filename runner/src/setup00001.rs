@@ -69,6 +69,8 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         ("CONFIG_RETPOLINE", false),
         // Improve debugging, tracing, profiling.
         ("CONFIG_FRAME_POINTER", true),
+        // Improve time for SSH to become available.
+        ("CONFIG_RANDOM_TRUST_CPU", true),
     ];
 
     let git_hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
