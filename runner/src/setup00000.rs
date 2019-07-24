@@ -55,6 +55,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
         (@arg ONLY_VM: -v --only_vm
          "(Optional) only setup the VM")
+        (@arg ONLY_HOST: -H --only_host
+         "(Optional) only setup the host")
         (@arg SWAP_DEV: -s --swap +takes_value ...
          "(Optional) specify which devices to use as swap devices. By default all \
           unpartitioned, unmounted devices are used (e.g. -s sda sdb sdc).")
@@ -75,19 +77,23 @@ struct SetupConfig<'a, A>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
+    // flags that determine what to build/install
+    dry_run: bool,
+    only_vm: bool,
+    only_host: bool,
+    skip_vm_kernel: bool,
+    destroy_existing_vm: bool,
+    disable_ept: bool,
+    setup_hadoop: bool,
+
+    // parameters for the above
     login: Login<'a, 'a, A>,
+    token: &'a str,
     device: Option<&'a str>,
     mapper_device: Option<&'a str>,
     git_branch: Option<&'a str>,
-    only_vm: bool,
-    token: &'a str,
     swap_devs: Vec<&'a str>,
-    disable_ept: bool,
-    setup_hadoop: bool,
     setup_proxy: Option<&'a str>,
-    destroy_existing_vm: bool,
-    skip_vm_kernel: bool,
-    dry_run: bool,
 }
 
 pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
@@ -100,6 +106,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let mapper_device = sub_m.value_of("MAPPER_DEVICE");
     let git_branch = sub_m.value_of("GIT_BRANCH");
     let only_vm = sub_m.is_present("ONLY_VM");
+    let only_host = sub_m.is_present("ONLY_HOST");
     let token = sub_m.value_of("TOKEN").unwrap();
     let swap_devs = sub_m
         .values_of("SWAP_DEV")
@@ -111,15 +118,14 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let destroy_existing_vm = sub_m.is_present("DESTROY_EXISTING");
     let skip_vm_kernel = sub_m.is_present("SKIP_VM_KERNEL");
 
-    assert!(mapper_device.is_none() || swap_devs.is_empty());
-
-    let mut cfg = SetupConfig {
+    let cfg = SetupConfig {
         dry_run,
         login,
         device,
         mapper_device,
         git_branch,
         only_vm,
+        only_host,
         token,
         swap_devs,
         disable_ept,
@@ -129,45 +135,73 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
         skip_vm_kernel,
     };
 
-    // Connect to the remote
-    let mut ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
-    ushell.set_dry_run(dry_run);
+    validate_options(&cfg)?;
 
-    if !cfg.only_vm {
-        set_up_host(&mut ushell, &mut cfg)?;
-    }
+    run_inner(cfg)
+}
 
-    // Create the VM and install dependencies for the benchmarks/simulator.
-    let (vrshell, vushell) = init_vm(&mut ushell, &cfg)?;
+/// Check that the set of flags passed satisfies dependencies and is non-contradictory.
+fn validate_options<A>(cfg: &SetupConfig<'_, A>) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    // TODO
 
-    // We share the research-workspace with the VM via a vagrant shared directory (NFS) so that
-    // there is only one version used across both (less versioning to track). Now, just compile the
-    // benchmarks and install rust on the host.
-
-    if !cfg.skip_vm_kernel {
-        install_guest_kernel(&ushell, &vrshell, &vushell, &cfg)?;
-    }
-
-    // Install benchmarks.
-    install_benchmarks(&ushell, &vrshell, &cfg)?;
-
-    // Make sure the TSC is marked as a reliable clock source in the guest.
-    set_kernel_boot_param(&vrshell, "tsc", Some("reliable"))?;
-
-    // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
-    vrshell.run(cmd!("sync"))?;
-    ushell.run(cmd!("sync"))?;
-    let _ = vrshell.run(cmd!("sudo poweroff")); // This will give a TCP error for obvious reasons
+    assert!(cfg.mapper_device.is_none() || cfg.swap_devs.is_empty());
+    assert!(!cfg.only_vm || !cfg.only_host);
 
     Ok(())
 }
 
-fn set_up_host<A>(ushell: &mut SshShell, cfg: &mut SetupConfig<'_, A>) -> Result<(), failure::Error>
+/// Drives the actual setup, calling the other routines in this file.
+fn run_inner<A>(cfg: SetupConfig<'_, A>) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    let user_home = &get_user_home_dir(&ushell)?;
+    // Connect to the remote
+    let mut ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
+    ushell.set_dry_run(cfg.dry_run);
 
+    // Set up the host
+    if !cfg.only_vm {
+        rename_poweroff(&ushell)?;
+        install_host_dependencies(&mut ushell, &cfg)?;
+        set_up_host_devices(&ushell, &cfg)?;
+        install_host_kernel(&ushell, &cfg)?;
+        install_rust(&ushell)?;
+        build_host_benchmarks(&ushell)?;
+    }
+
+    if !cfg.only_host {
+        // Prepare to install VM
+        prepare_host_for_vm_and_reboot(&mut ushell, &cfg)?;
+
+        // Create the VM and install dependencies for the benchmarks/simulator.
+        let (vrshell, vushell) = init_vm(&mut ushell, &cfg)?;
+
+        install_guest_dependencies(&vrshell, &vushell)?;
+
+        if !cfg.skip_vm_kernel {
+            install_guest_kernel(&ushell, &vrshell, &vushell, &cfg)?;
+        }
+
+        // Install benchmarks.
+        install_guest_benchmarks(&ushell, &vrshell, &cfg)?;
+
+        // Make sure the TSC is marked as a reliable clock source in the guest.
+        set_kernel_boot_param(&vrshell, "tsc", Some("reliable"))?;
+
+        // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
+        vrshell.run(cmd!("sync"))?;
+        ushell.run(cmd!("sync"))?;
+        let _ = vrshell.run(cmd!("sudo poweroff")); // This will give a TCP error for obvious reasons
+    }
+
+    Ok(())
+}
+
+/// Rename `poweroff` to `poweroff-actually` so that we cannot accidentally use it.
+fn rename_poweroff(ushell: &SshShell) -> Result<(), failure::Error> {
     // Rename `poweroff` so we can't accidentally use it
     if let Ok(res) = ushell.run(
         cmd!("PATH='/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin':$PATH type poweroff")
@@ -182,6 +216,17 @@ where
         )?;
     }
 
+    Ok(())
+}
+
+/// Install a bunch of dependencies, including libvirt, which requires re-login-ing.
+fn install_host_dependencies<A>(
+    ushell: &mut SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
     // Install a bunch of stuff
     with_shell! { ushell =>
         cmd!("sudo yum group install -y 'Development Tools'"),
@@ -238,6 +283,15 @@ where
     *ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
     ushell.set_dry_run(cfg.dry_run);
 
+    Ok(())
+}
+
+fn set_up_host_devices<A>(ushell: &SshShell, cfg: &SetupConfig<'_, A>) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    let user_home = &get_user_home_dir(&ushell)?;
+
     if let Some(device) = cfg.device {
         // Set up home device/directory
         // - format the device and create a partition
@@ -281,6 +335,15 @@ where
 
         crate::common::set_remote_research_setting(&ushell, "swap-devices", &cfg.swap_devs)?;
     }
+
+    Ok(())
+}
+
+fn install_host_kernel<A>(ushell: &SshShell, cfg: &SetupConfig<'_, A>) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    let user_home = &get_user_home_dir(&ushell)?;
 
     // clone the research workspace and build/install the 0sim kernel.
     if let Some(git_branch) = cfg.git_branch {
@@ -412,9 +475,88 @@ where
         ushell.run(cmd!("sudo grub2-set-default 0"))?;
     }
 
+    Ok(())
+}
+
+/// Install rust in the home directory of the given shell (can be guest or host).
+fn install_rust(shell: &SshShell) -> Result<(), failure::Error> {
+    shell.run(
+        cmd!(
+            "curl https://sh.rustup.rs -sSf | \
+             sh -s -- --default-toolchain nightly --no-modify-path -y"
+        )
+        .use_bash()
+        .no_pty(),
+    )?;
+
+    Ok(())
+}
+
+/// Build benchmarks on the host. This requires rust to be installed. Building the on the host also
+/// makes them available to the guest, since they share the directory.
+fn build_host_benchmarks(ushell: &SshShell) -> Result<(), failure::Error> {
+    // Build 0sim trace tool
+    ushell.run(
+        cmd!("$HOME/.cargo/bin/cargo build --release")
+            .use_bash()
+            .cwd(dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE)),
+    )?;
+
+    // Make directory to put results
     ushell.run(cmd!("mkdir -p {}", HOSTNAME_SHARED_RESULTS_DIR))?;
 
-    // change image location
+    // 0sim-experiments
+    ushell.run(cmd!("$HOME/.cargo/bin/cargo build --release").cwd(&dir!(
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_EXPERIMENTS_SUBMODULE
+    )))?;
+
+    // NAS 3.4
+    ushell.run(
+        cmd!("tar xvf NPB3.4.tar.gz").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR)),
+    )?;
+
+    with_shell! { ushell
+        in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, "NPB3.4", "NPB3.4-OMP") =>
+
+        cmd!("cp config/NAS.samples/make.def_gcc config/make.def"),
+        cmd!(
+            "sed -i 's/^FFLAGS.*$/FFLAGS  = -O3 -fopenmp \
+             -m64 -fdefault-integer-8/' config/make.def"
+        ),
+        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )"),
+    }
+
+    // memhog
+    ushell.run(cmd!("make").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMHOG_SUBMODULE)))?;
+
+    // Metis
+    with_shell! { ushell in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_METIS_SUBMODULE) =>
+        cmd!("./configure"),
+        cmd!("make"),
+    }
+
+    // Eager paging scripts/programs
+    ushell.run(cmd!("make").cwd(&dir!(
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_BENCHMARKS_DIR,
+        ZEROSIM_SWAPNIL_PATH
+    )))?;
+
+    Ok(())
+}
+
+/// Prepare the host to install the VM. This involves rebooting the machine.
+fn prepare_host_for_vm_and_reboot<A>(
+    ushell: &mut SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    let user_home = &get_user_home_dir(&ushell)?;
+
+    // Configure libvirt to store images on the home device.
     ushell.run(cmd!("mkdir -p images/"))?;
     ushell.run(cmd!("chmod +x ."))?;
     ushell.run(cmd!("chmod +x images/"))?;
@@ -441,20 +583,9 @@ where
     ushell.run(cmd!("sudo virsh pool-start default"))?;
     ushell.run(cmd!("sudo virsh pool-list"))?;
 
+    // Reboot the host.
     spurs::util::reboot(ushell, cfg.dry_run)?;
 
-    Ok(())
-}
-
-/// Create the VM and install dependencies for the benchmarks/simulator. Returns root and user
-/// shells to the VM.
-fn init_vm<A>(
-    ushell: &mut SshShell,
-    cfg: &SetupConfig<'_, A>,
-) -> Result<(SshShell, SshShell), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
-{
     // Disable TSC offsetting so that setup runs faster
     ushell.run(
         cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
@@ -471,8 +602,21 @@ where
         crate::common::service(&ushell, "firewalld", ServiceAction::Disable)?;
     }
 
+    // Make sure libvirtd is running.
     crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
 
+    Ok(())
+}
+
+/// Create the VM and install dependencies for the benchmarks/simulator. Returns root and user
+/// shells to the VM.
+fn init_vm<A>(
+    ushell: &mut SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(SshShell, SshShell), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
     // Create the VM and add our ssh key to it.
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
@@ -561,6 +705,13 @@ where
         vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
     }
 
+    Ok((vrshell, vushell))
+}
+
+fn install_guest_dependencies(
+    vrshell: &SshShell,
+    vushell: &SshShell,
+) -> Result<(), failure::Error> {
     // Install stuff on the VM
     vrshell.run(spurs_util::centos::yum_install(&["epel-release"]))?;
     vrshell.run(spurs_util::centos::yum_install(&[
@@ -578,39 +729,10 @@ where
         "perf", // for debugging
     ]))?;
 
-    vrshell.run(
-        cmd!(
-            "curl https://sh.rustup.rs -sSf | \
-             sh -s -- --default-toolchain nightly --no-modify-path -y"
-        )
-        .use_bash()
-        .no_pty(),
-    )?;
-    vushell.run(
-        cmd!(
-            "curl https://sh.rustup.rs -sSf | \
-             sh -s -- --default-toolchain nightly --no-modify-path -y"
-        )
-        .use_bash()
-        .no_pty(),
-    )?;
-    ushell.run(
-        cmd!(
-            "curl https://sh.rustup.rs -sSf | \
-             sh -s -- --default-toolchain nightly --no-modify-path -y"
-        )
-        .use_bash()
-        .no_pty(),
-    )?;
+    install_rust(vrshell)?;
+    install_rust(vushell)?;
 
-    // Build 0sim trace tool
-    ushell.run(
-        cmd!("$HOME/.cargo/bin/cargo build --release")
-            .use_bash()
-            .cwd(dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_TRACE_SUBMODULE)),
-    )?;
-
-    Ok((vrshell, vushell))
+    Ok(())
 }
 
 /// Install a recent kernel on the guest.
@@ -691,7 +813,8 @@ where
     Ok(())
 }
 
-fn install_benchmarks<A>(
+/// Installation of benchmarks that must be done with a VM.
+fn install_guest_benchmarks<A>(
     ushell: &SshShell,
     vushell: &SshShell,
     cfg: &SetupConfig<'_, A>,
@@ -699,31 +822,6 @@ fn install_benchmarks<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    // 0sim-experiments
-    vushell.run(
-        cmd!("/home/vagrant/.cargo/bin/cargo build --release").cwd(&dir!(
-            "/home/vagrant",
-            RESEARCH_WORKSPACE_PATH,
-            ZEROSIM_EXPERIMENTS_SUBMODULE
-        )),
-    )?;
-
-    // NAS 3.4
-    ushell.run(
-        cmd!("tar xvf NPB3.4.tar.gz").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR)),
-    )?;
-
-    with_shell! { ushell
-        in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, "NPB3.4", "NPB3.4-OMP") =>
-
-        cmd!("cp config/NAS.samples/make.def_gcc config/make.def"),
-        cmd!(
-            "sed -i 's/^FFLAGS.*$/FFLAGS  = -O3 -fopenmp \
-             -m64 -fdefault-integer-8/' config/make.def"
-        ),
-        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )"),
-    }
-
     // Hadoop/spark/hibench
     if cfg.setup_hadoop {
         with_shell! { vushell =>
@@ -762,22 +860,6 @@ where
                 .use_bash(),
         )?;
     }
-
-    // memhog
-    vushell.run(cmd!("make").cwd(&dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMHOG_SUBMODULE)))?;
-
-    // Metis
-    with_shell! { vushell in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_METIS_SUBMODULE) =>
-        cmd!("./configure"),
-        cmd!("make"),
-    }
-
-    // Eager paging scripts/programs
-    ushell.run(cmd!("make").cwd(&dir!(
-        RESEARCH_WORKSPACE_PATH,
-        ZEROSIM_BENCHMARKS_DIR,
-        ZEROSIM_SWAPNIL_PATH
-    )))?;
 
     Ok(())
 }
