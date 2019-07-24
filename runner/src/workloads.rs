@@ -238,7 +238,7 @@ pub fn start_memcached(
 
     if let Some(server_pin_core) = cfg.server_pin_core {
         shell.run(cmd!(
-            "taskset -c {} memcached {} -m {} -d -u {} -I 513K -f 128",
+            "taskset -c {} memcached {} -m {} -d -u {} -f 1.11",
             server_pin_core,
             if cfg.allow_oom { "-M" } else { "" },
             cfg.server_size_mb,
@@ -246,7 +246,7 @@ pub fn start_memcached(
         ))?
     } else {
         shell.run(cmd!(
-            "memcached {} -m {} -d -u {} -I 513K -f 128",
+            "memcached {} -m {} -d -u {} -f 1.11",
             if cfg.allow_oom { "-M" } else { "" },
             cfg.server_size_mb,
             cfg.user
