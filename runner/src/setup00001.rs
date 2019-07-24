@@ -57,14 +57,17 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     ushell.run(cmd!("git pull").cwd(kernel_path))?;
 
     const CONFIG_SET: &[(&str, bool)] = &[
+        // Enable my changes, though we don't expect to use them in the guest much.
         ("CONFIG_ZSWAP", true),
         ("CONFIG_ZPOOL", true),
         ("CONFIG_ZBUD", true),
         ("CONFIG_ZTIER", true),
         ("CONFIG_SBALLOC", true),
         ("CONFIG_ZSMALLOC", true),
+        // Disable Spectre/Meltdown because they slow things down a lot.
         ("CONFIG_PAGE_TABLE_ISOLATION", false),
         ("CONFIG_RETPOLINE", false),
+        // Improve debugging, tracing, profiling.
         ("CONFIG_FRAME_POINTER", true),
     ];
 
