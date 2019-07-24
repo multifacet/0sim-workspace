@@ -419,12 +419,12 @@ pub fn run_memhog(
          taskset -c {} memhog -r1 {}k {} {} > /dev/null ; \
          done; \
          echo memhog done ;",
-        tctx.next(),
         if let Some(r) = r {
             format!("for i in `seq {}`", r)
         } else {
-            "while [ true ]".into()
+            "while [ 1 ]".into()
         },
+        tctx.next(),
         size_kb,
         if opts.contains(MemhogOptions::PIN) {
             "-p"
