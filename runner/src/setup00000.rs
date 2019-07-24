@@ -45,31 +45,48 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
-        (@arg TOKEN: +required +takes_value
-         "This is the Github personal token for cloning the repo.")
-        (@arg DEVICE: +takes_value -d --device
-         "(Optional) the device to format and use as a home directory (e.g. -d /dev/sda)")
-        (@arg MAPPER_DEVICE: +takes_value -m --mapper_device
-         "(Optional) the device to use with device mapper as a thinly-provisioned swap space (e.g. -d /dev/sda)")
-        (@arg GIT_BRANCH: +takes_value -g --git_branch
-         "(Optional) the git branch to compile the kernel from (e.g. -g markm_ztier)")
-        (@arg ONLY_VM: -v --only_vm
-         "(Optional) only setup the VM")
-        (@arg ONLY_HOST: -H --only_host
-         "(Optional) only setup the host")
-        (@arg SWAP_DEV: -s --swap +takes_value ...
+
+        (@arg PROXY: +takes_value --proxy
+         "(Optional) set up the VM to use the given proxy. Leave off the protocol \
+         (e.g. squid.cs.wisc.edu:3128)")
+
+        (@arg HOST_DEP: --host_dep
+         "(Optional) If passed, install host dependencies")
+
+        (@arg HOME_DEVICE: +takes_value --home_device
+         "(Optional) the device to format and use as a home directory \
+         (e.g. --home_device /dev/sda)")
+
+        (@arg MAPPER_DEVICE: +takes_value --mapper_device conflicts_with[SWAP_DEVS]
+         "(Optional) the device to use with device mapper as a thinly-provisioned \
+         swap space (e.g. --mapper_device /dev/sda)")
+        (@arg SWAP_DEVS: +takes_value --swap ... conflicts_with[MAPPER_DEVICE]
          "(Optional) specify which devices to use as swap devices. By default all \
-          unpartitioned, unmounted devices are used (e.g. -s sda sdb sdc).")
+          unpartitioned, unmounted devices are used (e.g. --swap sda sdb sdc).")
+
+        (@arg HOST_KERNEL: +takes_value --host_kernel requires[TOKEN]
+         "(Optional) the git branch to compile the kernel from (e.g. -host_kernel markm_ztier)")
+        (@arg TOKEN: +takes_value --token
+         "(Optional) This is the Github personal access token for cloning the repo.")
+
+        (@arg HOST_BMKS: --host_bmks
+         "(Optional) If passed, build host benchmarks. This also makes them available to the guest.")
+
+        (@arg HOST_PREP: --prepare_host
+         "(Optional) Prepare the host for initializing the VM.")
+
         (@arg DISABLE_EPT: --disable_ept
          "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
+        (@arg DESTROY_EXISTING: --DESTROY_EXISTING
+         "(Optional) Destroy any existing VM")
+        (@arg CREATE_VM: --create_vm
+         "(Optional) Create and initialize a new VM")
+
+        (@arg GUEST_KERNEL: --guest_kernel
+         "(Optional) Build and install a guest kernel")
+
         (@arg HADOOP: --hadoop
          "(Optional) set up hadoop stack on VM.")
-        (@arg PROXY: -p --proxy +takes_value
-         "(Optional) set up the VM to use the given proxy. Leave off the protocol (e.g. squid.cs.wisc.edu:3128)")
-        (@arg DESTROY_EXISTING: --DESTROY_EXISTING
-         "(Optional) destroy any existing VM before starting a new VM")
-        (@arg SKIP_VM_KERNEL: --skip_vm_kernel
-         "(Optional) don't build a guest kernel")
     }
 }
 
@@ -77,62 +94,96 @@ struct SetupConfig<'a, A>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    // flags that determine what to build/install
-    dry_run: bool,
-    only_vm: bool,
-    only_host: bool,
-    skip_vm_kernel: bool,
-    destroy_existing_vm: bool,
-    disable_ept: bool,
-    setup_hadoop: bool,
-
-    // parameters for the above
+    /// Login credentials for the host.
     login: Login<'a, 'a, A>,
-    token: &'a str,
-    device: Option<&'a str>,
-    mapper_device: Option<&'a str>,
-    git_branch: Option<&'a str>,
-    swap_devs: Vec<&'a str>,
+
+    /// Setup the host and guest to work behind the given proxy.
     setup_proxy: Option<&'a str>,
+
+    /// Install host dependencies, rename poweorff.
+    host_dep: bool,
+
+    /// Set the device to be used as the home device.
+    home_device: Option<&'a str>,
+    /// Set the device to be used with device mapper.
+    mapper_device: Option<&'a str>,
+    /// Set the devices to be used
+    swap_devs: Vec<&'a str>,
+
+    /// The branch to build the kernel from.
+    git_branch: Option<&'a str>,
+    /// The Github PAT for cloning the research workspace.
+    token: Option<&'a str>,
+
+    /// Should we build host benchmarks.
+    host_bmks: bool,
+
+    /// Should we prepare the host for initing the VM? This needs to be done only once.
+    host_prep: bool,
+
+    /// Disable EPT on the host.
+    disable_ept: bool,
+    /// Destroy any existing VM.
+    destroy_existing_vm: bool,
+    /// Create and init a new VM, including installing guest dependencies.
+    create_vm: bool,
+
+    /// Compile and install Linux 5.1.4 on the guest.
+    guest_kernel: bool,
+
+    /// Set up the Hadoop on the guest.
+    setup_hadoop: bool,
 }
 
-pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
         username: Username(sub_m.value_of("USERNAME").unwrap()),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
-    let device = sub_m.value_of("DEVICE");
+
+    let setup_proxy = sub_m.value_of("PROXY");
+
+    let host_dep = sub_m.is_present("HOST_DEP");
+
+    let home_device = sub_m.value_of("HOME_DEVICE");
     let mapper_device = sub_m.value_of("MAPPER_DEVICE");
-    let git_branch = sub_m.value_of("GIT_BRANCH");
-    let only_vm = sub_m.is_present("ONLY_VM");
-    let only_host = sub_m.is_present("ONLY_HOST");
-    let token = sub_m.value_of("TOKEN").unwrap();
     let swap_devs = sub_m
-        .values_of("SWAP_DEV")
+        .values_of("SWAP_DEVS")
         .map(|i| i.collect())
         .unwrap_or_else(|| vec![]);
+
+    let git_branch = sub_m.value_of("HOST_KERNEL");
+    let token = sub_m.value_of("TOKEN");
+
+    let host_bmks = sub_m.is_present("HOST_BMKS");
+
+    let host_prep = sub_m.is_present("HOST_PREP");
+
     let disable_ept = sub_m.is_present("DISABLE_EPT");
-    let setup_hadoop = sub_m.is_present("HADOOP");
-    let setup_proxy = sub_m.value_of("PROXY");
     let destroy_existing_vm = sub_m.is_present("DESTROY_EXISTING");
-    let skip_vm_kernel = sub_m.is_present("SKIP_VM_KERNEL");
+    let create_vm = sub_m.is_present("CREATE_VM");
+
+    let guest_kernel = sub_m.is_present("GUEST_KERNEL");
+
+    let setup_hadoop = sub_m.is_present("HADOOP");
 
     let cfg = SetupConfig {
-        dry_run,
         login,
-        device,
-        mapper_device,
-        git_branch,
-        only_vm,
-        only_host,
-        token,
-        swap_devs,
-        disable_ept,
         setup_proxy,
-        setup_hadoop,
+        host_dep,
+        home_device,
+        mapper_device,
+        swap_devs,
+        git_branch,
+        token,
+        host_bmks,
+        host_prep,
+        disable_ept,
         destroy_existing_vm,
-        skip_vm_kernel,
+        create_vm,
+        guest_kernel,
+        setup_hadoop,
     };
 
     validate_options(&cfg)?;
@@ -145,10 +196,8 @@ fn validate_options<A>(cfg: &SetupConfig<'_, A>) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    // TODO
-
     assert!(cfg.mapper_device.is_none() || cfg.swap_devs.is_empty());
-    assert!(!cfg.only_vm || !cfg.only_host);
+    assert!(cfg.token.is_some() || cfg.git_branch.is_none());
 
     Ok(())
 }
@@ -160,42 +209,60 @@ where
 {
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
-    ushell.set_dry_run(cfg.dry_run);
 
     // Set up the host
-    if !cfg.only_vm {
+    if cfg.host_dep {
         rename_poweroff(&ushell)?;
         install_host_dependencies(&mut ushell, &cfg)?;
-        set_up_host_devices(&ushell, &cfg)?;
-        install_host_kernel(&ushell, &cfg)?;
+    }
+    set_up_host_devices(&ushell, &cfg)?;
+    install_host_kernel(&ushell, &cfg)?;
+    if cfg.host_dep {
         install_rust(&ushell)?;
+    }
+    if cfg.host_bmks {
         build_host_benchmarks(&ushell)?;
     }
 
-    if !cfg.only_host {
-        // Prepare to install VM
+    // Prepare to install VM
+    if cfg.host_prep {
         prepare_host_for_vm_and_reboot(&mut ushell, &cfg)?;
-
-        // Create the VM and install dependencies for the benchmarks/simulator.
-        let (vrshell, vushell) = init_vm(&mut ushell, &cfg)?;
-
-        install_guest_dependencies(&vrshell, &vushell)?;
-
-        if !cfg.skip_vm_kernel {
-            install_guest_kernel(&ushell, &vrshell, &vushell, &cfg)?;
-        }
-
-        // Install benchmarks.
-        install_guest_benchmarks(&ushell, &vrshell, &cfg)?;
-
-        // Make sure the TSC is marked as a reliable clock source in the guest.
-        set_kernel_boot_param(&vrshell, "tsc", Some("reliable"))?;
-
-        // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
-        vrshell.run(cmd!("sync"))?;
-        ushell.run(cmd!("sync"))?;
-        let _ = vrshell.run(cmd!("sudo poweroff")); // This will give a TCP error for obvious reasons
     }
+
+    if cfg.destroy_existing_vm {
+        destroy_vm(&ushell)?;
+    }
+
+    let (vrshell, vushell) = if cfg.create_vm {
+        // Create the VM and install dependencies for the benchmarks/simulator.
+        init_vm(&mut ushell, &cfg)?
+    } else if cfg.guest_kernel || cfg.setup_hadoop {
+        // Start vagrant (that already exists)
+        let vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
+        let vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
+
+        (vrshell, vushell)
+    } else {
+        // Nothing left to do
+        return Ok(());
+    };
+
+    install_guest_dependencies(&vrshell, &vushell)?;
+
+    if cfg.guest_kernel {
+        install_guest_kernel(&ushell, &vrshell, &vushell)?;
+    }
+
+    // Install benchmarks.
+    install_guest_benchmarks(&ushell, &vrshell, &cfg)?;
+
+    // Make sure the TSC is marked as a reliable clock source in the guest.
+    set_kernel_boot_param(&vrshell, "tsc", Some("reliable"))?;
+
+    // Need to run shutdown to make sure that the next host reboot doesn't lose guest data.
+    vrshell.run(cmd!("sync"))?;
+    ushell.run(cmd!("sync"))?;
+    let _ = vrshell.run(cmd!("sudo poweroff")); // This will give a TCP error for obvious reasons
 
     Ok(())
 }
@@ -281,7 +348,6 @@ where
 
     // Need a new shell so that we get the new user group
     *ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
-    ushell.set_dry_run(cfg.dry_run);
 
     Ok(())
 }
@@ -292,7 +358,7 @@ where
 {
     let user_home = &get_user_home_dir(&ushell)?;
 
-    if let Some(device) = cfg.device {
+    if let Some(device) = cfg.home_device {
         // Set up home device/directory
         // - format the device and create a partition
         // - mkfs on the partition
@@ -301,7 +367,7 @@ where
         ushell.run(spurs_util::util::create_partition(device))?;
         spurs_util::util::format_partition_as_ext4(
             ushell,
-            cfg.dry_run,
+            /* dry_run */ false,
             &format!("{}1", device), // assume it is the first device partition
             user_home,
             cfg.login.username.as_str(),
@@ -324,7 +390,8 @@ where
         crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
         crate::common::set_remote_research_setting(&ushell, "dm-data", mapper_device)?;
     } else if cfg.swap_devs.is_empty() {
-        let unpartitioned = spurs_util::util::get_unpartitioned_devs(ushell, cfg.dry_run)?;
+        let unpartitioned =
+            spurs_util::util::get_unpartitioned_devs(ushell, /* dry_run */ false)?;
         for dev in unpartitioned.iter() {
             ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
         }
@@ -379,10 +446,11 @@ where
             ZEROSIM_KERNEL_SUBMODULE
         );
 
-        let git_hash = crate::common::clone_research_workspace(&ushell, cfg.token, SUBMODULES)?;
+        let git_hash =
+            crate::common::clone_research_workspace(&ushell, cfg.token.unwrap(), SUBMODULES)?;
 
         crate::common::build_kernel(
-            cfg.dry_run,
+            /* dry_run */ false,
             &ushell,
             KernelSrc::Git {
                 repo_path: kernel_path.clone(),
@@ -418,11 +486,7 @@ where
         )?;
 
         // Build cpupower
-        ushell.run(
-            cmd!("make")
-                .cwd(&format!("{}/tools/power/cpupower/", kernel_path))
-                .dry_run(cfg.dry_run),
-        )?;
+        ushell.run(cmd!("make").cwd(&format!("{}/tools/power/cpupower/", kernel_path)))?;
 
         // disable Intel EPT if needed
         if cfg.disable_ept {
@@ -584,7 +648,7 @@ where
     ushell.run(cmd!("sudo virsh pool-list"))?;
 
     // Reboot the host.
-    spurs::util::reboot(ushell, cfg.dry_run)?;
+    spurs::util::reboot(ushell, /* dry_run */ false)?;
 
     // Disable TSC offsetting so that setup runs faster
     ushell.run(
@@ -608,6 +672,19 @@ where
     Ok(())
 }
 
+/// Destroys any existing VM forcibly.
+fn destroy_vm(ushell: &SshShell) -> Result<(), failure::Error> {
+    // Create the VM and add our ssh key to it.
+    let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
+
+    with_shell! { ushell in vagrant_path =>
+        cmd!("vagrant halt --force || [ ! -e Vagrantfile ]").use_bash(),
+        cmd!("vagrant destroy --force || [ ! -e Vagrantfile ]").use_bash(),
+    }
+
+    Ok(())
+}
+
 /// Create the VM and install dependencies for the benchmarks/simulator. Returns root and user
 /// shells to the VM.
 fn init_vm<A>(
@@ -619,13 +696,6 @@ where
 {
     // Create the VM and add our ssh key to it.
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
-
-    if cfg.destroy_existing_vm {
-        with_shell! { ushell in vagrant_path =>
-            cmd!("vagrant halt --force || [ ! -e Vagrantfile ]").use_bash(),
-            cmd!("vagrant destroy --force || [ ! -e Vagrantfile ]").use_bash(),
-        }
-    }
 
     ushell.run(cmd!("cp Vagrantfile.bk Vagrantfile").cwd(vagrant_path))?;
     crate::common::gen_new_vagrantdomain(&ushell)?;
@@ -667,7 +737,7 @@ where
     let pub_net = vushell.run(cmd!("ping -c 1 -W 10 1.1.1.1")).is_ok();
     if !pub_net {
         ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
-        spurs::util::reboot(ushell, cfg.dry_run)?;
+        spurs::util::reboot(ushell, /* dry_run */ false)?;
 
         vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
         vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
@@ -738,15 +808,11 @@ fn install_guest_dependencies(
 /// Install a recent kernel on the guest.
 ///
 /// We will compile on the host and copy the config and the RPM through the shared directory.
-fn install_guest_kernel<A>(
+fn install_guest_kernel(
     ushell: &SshShell,
     vrshell: &SshShell,
     vushell: &SshShell,
-    cfg: &SetupConfig<'_, A>,
-) -> Result<(), failure::Error>
-where
-    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
-{
+) -> Result<(), failure::Error> {
     let user_home = &get_user_home_dir(&ushell)?;
 
     let guest_config = vushell
@@ -759,7 +825,7 @@ where
 
     ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
     crate::common::build_kernel(
-        cfg.dry_run,
+        /* dry_run */ false,
         &ushell,
         KernelSrc::Tar {
             tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),

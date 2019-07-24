@@ -67,7 +67,7 @@ fn run() -> Result<(), failure::Error> {
     let print_results_path = matches.is_present("PRINT_RESULTS_PATH");
 
     match matches.subcommand() {
-        ("setup00000", Some(sub_m)) => setup00000::run(dry_run, sub_m),
+        ("setup00000", Some(sub_m)) => setup00000::run(sub_m),
         ("setup00001", Some(sub_m)) => setup00001::run(dry_run, sub_m),
         ("setup00002", Some(sub_m)) => setup00002::run(dry_run, sub_m),
 
