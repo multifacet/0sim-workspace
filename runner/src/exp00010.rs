@@ -186,7 +186,7 @@ where
     let workload = settings.get::<Workload>("workload_settings");
 
     // Reboot
-    initial_reboot(&login)?;
+    initial_reboot_no_vagrant(&login)?;
 
     // Connect
     let ushell = connect_and_setup_host_only(&login)?;

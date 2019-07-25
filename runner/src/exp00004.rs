@@ -99,7 +99,7 @@ where
         settings.get::<usize>("transparent_hugepage_khugepaged_scan_sleep_ms");
 
     // Reboot
-    initial_reboot(&login)?;
+    initial_reboot_no_vagrant(&login)?;
 
     // Connect
     let ushell = connect_and_setup_host_only(&login)?;

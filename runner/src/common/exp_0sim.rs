@@ -20,7 +20,8 @@ pub const VAGRANT_MEM: usize = 1024;
 /// The default number of cores of the VM.
 pub const VAGRANT_CORES: usize = 1;
 
-/// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
+/// Shut off any virtual machine and reboot the machine and do nothing else. Useful for getting the
+/// machine into a clean state.
 pub fn initial_reboot<A>(login: &Login<A>) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
@@ -29,6 +30,24 @@ where
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
 
     vagrant_halt(&ushell)?;
+
+    // Reboot the remote to make sure we have a clean slate
+    spurs::util::reboot(&mut ushell, /* dry_run */ false)?;
+
+    Ok(())
+}
+
+/// Reboot the machine and do nothing else. Useful for getting the machine into a clean state. This
+/// also attempts to turn off any virtual machines, but if there is an error, we ignore it and
+/// reboot the host anyway.
+pub fn initial_reboot_no_vagrant<A>(login: &Login<A>) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    // Connect to the remote
+    let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
+
+    let _ = vagrant_halt(&ushell);
 
     // Reboot the remote to make sure we have a clean slate
     spurs::util::reboot(&mut ushell, /* dry_run */ false)?;
