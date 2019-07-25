@@ -18,7 +18,7 @@ pub const GUEST_SWAP_GBS: usize = 10;
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     clap_app! { setup00001 =>
-        (about: "Sets up the given _centos_ VM for use exp00003. Requires `sudo`.")
+        (about: "Sets up the given _centos_ with the given kernel. Requires `sudo`.")
         (@arg HOSTNAME: +required +takes_value
          "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
         (@arg USERNAME: +required +takes_value
