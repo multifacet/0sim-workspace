@@ -227,7 +227,11 @@ where
                     &ushell,
                     zerosim_exp_path,
                     n,
-                    &dir!(setup00000::HOSTNAME_SHARED_RESULTS_DIR, output_file),
+                    &dir!(
+                        user_home.as_str(),
+                        setup00000::HOSTNAME_SHARED_RESULTS_DIR,
+                        output_file
+                    ),
                     /* eager */ false,
                     &mut tctx,
                 )?
@@ -246,7 +250,11 @@ where
                         .locality(LocalityMemAccessMode::Local)
                         .n(n)
                         .threads(None)
-                        .output_file(&dir!(setup00000::HOSTNAME_SHARED_RESULTS_DIR, local_file))
+                        .output_file(&dir!(
+                            user_home.as_str(),
+                            setup00000::HOSTNAME_SHARED_RESULTS_DIR,
+                            local_file
+                        ))
                         .eager(false),
                 )?;
                 run_locality_mem_access(
@@ -257,6 +265,7 @@ where
                         .n(n)
                         .threads(None)
                         .output_file(&dir!(
+                            user_home.as_str(),
                             setup00000::HOSTNAME_SHARED_RESULTS_DIR,
                             nonlocal_file
                         ))
@@ -278,6 +287,7 @@ where
                         .prefault(false)
                         .pf_time(None)
                         .output_file(Some(&dir!(
+                            user_home.as_str(),
                             setup00000::HOSTNAME_SHARED_RESULTS_DIR,
                             output_file
                         )))
@@ -304,6 +314,7 @@ where
                         .allow_oom(true)
                         .pf_time(None)
                         .output_file(Some(&dir!(
+                            user_home.as_str(),
                             setup00000::HOSTNAME_SHARED_RESULTS_DIR,
                             output_file
                         )))
@@ -322,7 +333,11 @@ where
     ushell.run(cmd!(
         "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        dir!(setup00000::HOSTNAME_SHARED_RESULTS_DIR, time_file)
+        dir!(
+            user_home.as_str(),
+            setup00000::HOSTNAME_SHARED_RESULTS_DIR,
+            time_file
+        )
     ))?;
 
     if print_results_path {
