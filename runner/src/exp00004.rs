@@ -2,7 +2,7 @@
 //! remotely. Measure the number of per-page operations done and undone. Unlike exp00003, run
 //! this on the bare-metal host, rather than in a VM.
 //!
-//! Requires `setup00000` and `setup00002`.
+//! Requires `setup00000` with the `markm_instrument_thp_compaction` branch, no VM needed.
 
 use clap::clap_app;
 
