@@ -324,6 +324,7 @@ where
 
     with_shell! { ushell =>
         spurs_util::centos::yum_install(&[
+            "vim",
             "libxslt-devel",
             "libxml2-devel",
             "libguestfs-tools-c",
