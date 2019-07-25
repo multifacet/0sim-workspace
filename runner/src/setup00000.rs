@@ -50,6 +50,9 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) set up the VM to use the given proxy. Leave off the protocol \
          (e.g. squid.cs.wisc.edu:3128)")
 
+        (@arg AWS: --aws
+         "(Optional) Do AWS-specific stuff.")
+
         (@arg HOST_DEP: --host_dep
          "(Optional) If passed, install host dependencies")
 
@@ -64,10 +67,12 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) specify which devices to use as swap devices. By default all \
           unpartitioned, unmounted devices are used (e.g. --swap sda sdb sdc).")
 
-        (@arg HOST_KERNEL: +takes_value --host_kernel requires[TOKEN]
-         "(Optional) the git branch to compile the kernel from (e.g. -host_kernel markm_ztier)")
-        (@arg TOKEN: +takes_value --token
-         "(Optional) This is the Github personal access token for cloning the repo.")
+        (@arg TOKEN: +takes_value --clone_wkspc
+         "(Optional) If we should clone the workspace, this is the Github personal access \
+          token for cloning the repo.")
+
+        (@arg HOST_KERNEL: +takes_value --host_kernel
+         "(Optional) The git branch to compile the kernel from (e.g. --host_kernel markm_ztier)")
 
         (@arg HOST_BMKS: --host_bmks
          "(Optional) If passed, build host benchmarks. This also makes them available to the guest.")
@@ -97,6 +102,9 @@ where
     /// Login credentials for the host.
     login: Login<'a, 'a, A>,
 
+    /// Do AWS-specific stuff.
+    aws: bool,
+
     /// Setup the host and guest to work behind the given proxy.
     setup_proxy: Option<&'a str>,
 
@@ -110,10 +118,11 @@ where
     /// Set the devices to be used
     swap_devs: Vec<&'a str>,
 
+    /// The token to clone the workspace with.
+    clone_wkspc: Option<&'a str>,
+
     /// The branch to build the kernel from.
     git_branch: Option<&'a str>,
-    /// The Github PAT for cloning the research workspace.
-    token: Option<&'a str>,
 
     /// Should we build host benchmarks.
     host_bmks: bool,
@@ -142,6 +151,8 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
 
+    let aws = sub_m.is_present("AWS");
+
     let setup_proxy = sub_m.value_of("PROXY");
 
     let host_dep = sub_m.is_present("HOST_DEP");
@@ -153,8 +164,9 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         .map(|i| i.collect())
         .unwrap_or_else(|| vec![]);
 
+    let clone_wkspc = sub_m.value_of("TOKEN");
+
     let git_branch = sub_m.value_of("HOST_KERNEL");
-    let token = sub_m.value_of("TOKEN");
 
     let host_bmks = sub_m.is_present("HOST_BMKS");
 
@@ -170,13 +182,14 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
 
     let cfg = SetupConfig {
         login,
+        aws,
         setup_proxy,
         host_dep,
         home_device,
         mapper_device,
         swap_devs,
         git_branch,
-        token,
+        clone_wkspc,
         host_bmks,
         host_prep,
         disable_ept,
@@ -197,7 +210,6 @@ where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     assert!(cfg.mapper_device.is_none() || cfg.swap_devs.is_empty());
-    assert!(cfg.token.is_some() || cfg.git_branch.is_none());
 
     Ok(())
 }
@@ -216,12 +228,13 @@ where
         install_host_dependencies(&mut ushell, &cfg)?;
     }
     set_up_host_devices(&ushell, &cfg)?;
+    clone_research_workspace(&ushell, &cfg)?;
     install_host_kernel(&ushell, &cfg)?;
     if cfg.host_dep {
         install_rust(&ushell)?;
     }
     if cfg.host_bmks {
-        build_host_benchmarks(&ushell)?;
+        build_host_benchmarks(&ushell, &cfg)?;
     }
 
     // Prepare to install VM
@@ -295,9 +308,28 @@ where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     // Install a bunch of stuff
+    ushell.run(cmd!("sudo yum group install -y 'Development Tools'"))?;
+
+    if !cfg.aws {
+        with_shell! { ushell =>
+            spurs_util::centos::yum_install(&[
+                "libunwind-devel",
+                "centos-release-scl",
+                "libfdt-devel",
+            ]),
+
+            spurs_util::centos::yum_install(&["devtoolset-7"]),
+        }
+    }
+
     with_shell! { ushell =>
-        cmd!("sudo yum group install -y 'Development Tools'"),
         spurs_util::centos::yum_install(&[
+            "libxslt-devel",
+            "libxml2-devel",
+            "libguestfs-tools-c",
+            "gcc",
+            "gcc-gfortran",
+            "ruby-devel",
             "bc",
             "openssl-devel",
             "libvirt",
@@ -306,7 +338,6 @@ where
             "pciutils-devel",
             "bash-completion",
             "elfutils-devel",
-            "libunwind-devel",
             "audit-libs-devel",
             "slang-devel",
             "perl-ExtUtils-Embed",
@@ -315,16 +346,13 @@ where
             "numactl-devel",
             "lsof",
             "java-1.8.0-openjdk",
-            "centos-release-scl",
             "scl-utils",
             "maven",
             "glib2-devel",
-            "libfdt-devel",
             "pixman-devel",
             "zlib-devel",
             "fuse-devel",
         ]),
-        spurs_util::centos::yum_install(&["devtoolset-7"]),
 
         // Add user to libvirt group after installing
         spurs_util::util::add_to_group("libvirt"),
@@ -343,7 +371,17 @@ where
         .is_ok();
 
     if !installed {
-        ushell.run(cmd!("vagrant plugin install vagrant-libvirt"))?;
+        if cfg.aws {
+            // ruby-libvirt is finicky on AWS.
+            ushell.run(cmd!(
+                "CONFIGURE_ARGS='with-ldflags=-L/opt/vagrant/embedded/lib \
+                 with-libvirt-include=/usr/include/libvirt with-libvirt-lib=/usr/lib' \
+                 GEM_HOME=~/.vagrant.d/gems GEM_PATH=$GEM_HOME:/opt/vagrant/embedded/gems \
+                 PATH=/opt/vagrant/embedded/bin:$PATH vagrant plugin install vagrant-libvirt",
+            ))?;
+        } else {
+            ushell.run(cmd!("vagrant plugin install vagrant-libvirt"))?;
+        }
     }
 
     // Need a new shell so that we get the new user group
@@ -406,6 +444,29 @@ where
     Ok(())
 }
 
+fn clone_research_workspace<A>(
+    ushell: &SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    if let Some(token) = cfg.clone_wkspc {
+        const SUBMODULES: &[&str] = &[
+            ZEROSIM_KERNEL_SUBMODULE,
+            ZEROSIM_EXPERIMENTS_SUBMODULE,
+            ZEROSIM_TRACE_SUBMODULE,
+            ZEROSIM_HIBENCH_SUBMODULE,
+            ZEROSIM_MEMHOG_SUBMODULE,
+            ZEROSIM_METIS_SUBMODULE,
+        ];
+
+        crate::common::clone_research_workspace(&ushell, token, SUBMODULES)?;
+    }
+
+    Ok(())
+}
+
 fn install_host_kernel<A>(ushell: &SshShell, cfg: &SetupConfig<'_, A>) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
@@ -431,23 +492,13 @@ where
             ("CONFIG_FRAME_POINTER", true),
         ];
 
-        const SUBMODULES: &[&str] = &[
-            ZEROSIM_KERNEL_SUBMODULE,
-            ZEROSIM_EXPERIMENTS_SUBMODULE,
-            ZEROSIM_TRACE_SUBMODULE,
-            ZEROSIM_HIBENCH_SUBMODULE,
-            ZEROSIM_MEMHOG_SUBMODULE,
-            ZEROSIM_METIS_SUBMODULE,
-        ];
-
         let kernel_path = dir!(
             user_home.as_str(),
             RESEARCH_WORKSPACE_PATH,
             ZEROSIM_KERNEL_SUBMODULE
         );
 
-        let git_hash =
-            crate::common::clone_research_workspace(&ushell, cfg.token.unwrap(), SUBMODULES)?;
+        let git_hash = crate::common::research_workspace_git_hash(ushell)?;
 
         crate::common::build_kernel(
             /* dry_run */ false,
@@ -558,7 +609,13 @@ fn install_rust(shell: &SshShell) -> Result<(), failure::Error> {
 
 /// Build benchmarks on the host. This requires rust to be installed. Building the on the host also
 /// makes them available to the guest, since they share the directory.
-fn build_host_benchmarks(ushell: &SshShell) -> Result<(), failure::Error> {
+fn build_host_benchmarks<A>(
+    ushell: &SshShell,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
     // Build 0sim trace tool
     ushell.run(
         cmd!("$HOME/.cargo/bin/cargo build --release")
@@ -588,7 +645,24 @@ fn build_host_benchmarks(ushell: &SshShell) -> Result<(), failure::Error> {
             "sed -i 's/^FFLAGS.*$/FFLAGS  = -O3 -fopenmp \
              -m64 -fdefault-integer-8/' config/make.def"
         ),
-        cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )"),
+    }
+
+    if cfg.aws {
+        ushell.run(cmd!("make clean cg CLASS=E").cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            "NPB3.4",
+            "NPB3.4-OMP"
+        )))?;
+    } else {
+        ushell.run(
+            cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )").cwd(&dir!(
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_BENCHMARKS_DIR,
+                "NPB3.4",
+                "NPB3.4-OMP"
+            )),
+        )?;
     }
 
     // memhog
