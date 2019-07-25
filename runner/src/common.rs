@@ -319,7 +319,13 @@ pub fn get_num_cores(shell: &SshShell) -> Result<usize, failure::Error> {
 pub fn get_cpu_freq(shell: &SshShell) -> Result<usize, failure::Error> {
     let freq =
         shell.run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
-    Ok(freq.stdout.trim().parse::<usize>().unwrap())
+    let alt =
+        shell.run(cmd!("lscpu | grep 'CPU MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
+    if freq.stdout.trim().is_empty() {
+        Ok(alt.stdout.trim().parse::<usize>().unwrap())
+    } else {
+        Ok(freq.stdout.trim().parse::<usize>().unwrap())
+    }
 }
 
 /// Turn on THP on the remote using the given settings. Requires `sudo`.
