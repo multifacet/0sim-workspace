@@ -18,8 +18,6 @@ use crate::{
     workloads::run_memcached_and_capture_thp,
 };
 
-const BARE_METAL_RESULTS_DIR: &str = "vm_shared/results/";
-
 /// Interval at which to collect thp stats
 const INTERVAL: usize = 60; // seconds
 
@@ -122,7 +120,11 @@ where
     ushell.run(cmd!(
         "echo '{}' > {}",
         escape_for_bash(&params),
-        dir!(user_home.as_str(), BARE_METAL_RESULTS_DIR, params_file)
+        dir!(
+            user_home.as_str(),
+            setup00000::HOSTNAME_SHARED_RESULTS_DIR,
+            params_file
+        )
     ))?;
 
     ushell.run(cmd!("sudo swapon /dev/sda3"))?;
@@ -158,7 +160,7 @@ where
                 .server_pin_core(None),
             INTERVAL,
             /* continual_compaction */ None,
-            &dir!(BARE_METAL_RESULTS_DIR, output_file),
+            &dir!(setup00000::HOSTNAME_SHARED_RESULTS_DIR, output_file),
         )?
     );
 
@@ -169,7 +171,7 @@ where
     ushell.run(cmd!(
         "echo -e '{}' > {}",
         crate::common::timings_str(timers.as_slice()),
-        dir!(BARE_METAL_RESULTS_DIR, time_file)
+        dir!(setup00000::HOSTNAME_SHARED_RESULTS_DIR, time_file)
     ))?;
 
     if print_results_path {
