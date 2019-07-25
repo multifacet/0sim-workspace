@@ -398,12 +398,14 @@ bitflags! {
 
 /// Run `memhog` on the remote.
 ///
-/// - `r` is the number of times to call `memhog`, not the value of `-r`. `-r` is always passed
-///   a value of `1`. If `None`, then run indefinitely.
+/// - `exp_dir` is the path of the `numactl` benchmark directory.
+/// - `r` is the number of times to call `memhog`, not the value of `-r`. `-r` is always passed a
+///   value of `1`. If `None`, then run indefinitely.
 /// - `size_kb` is the number of kilobytes to mmap and touch.
 /// - `eager` indicates whether the workload should be run with eager paging (only in VM).
 pub fn run_memhog(
     shell: &SshShell,
+    exp_dir: &str,
     r: Option<usize>,
     size_kb: usize,
     opts: MemhogOptions,
@@ -416,7 +418,7 @@ pub fn run_memhog(
 
     shell.spawn(cmd!(
         "{} ; do \
-         taskset -c {} memhog -r1 {}k {} {} > /dev/null ; \
+         taskset -c {} {}/memhog -r1 {}k {} {} > /dev/null ; \
          done; \
          echo memhog done ;",
         if let Some(r) = r {
@@ -425,6 +427,7 @@ pub fn run_memhog(
             "while [ 1 ]".into()
         },
         tctx.next(),
+        exp_dir,
         size_kb,
         if opts.contains(MemhogOptions::PIN) {
             "-p"
@@ -768,14 +771,16 @@ pub fn run_metis_matrix_mult(
 /// Given a requested workload size of `size_gb` GB, each sub-workload gets 1/3 of the space.
 ///
 /// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
-/// - `bmk_dir` is the path to the `Metis` directory in the workspace on the remote.
+/// - `metis_dir` is the path to the `Metis` directory in the workspace on the remote.
+/// - `numactl_dir` is the path to the `numactl` directory in the workspace on the remote.
 /// - `freq` is the _host_ CPU frequency in MHz.
 /// - `size_gb` is the total amount of memory of the mix workload in GB.
 /// - `eager` indicates whether the workload should be run with eager paging.
 pub fn run_mix(
     shell: &SshShell,
     exp_dir: &str,
-    bmk_dir: &str,
+    metis_dir: &str,
+    numactl_dir: &str,
     freq: usize,
     size_gb: usize,
     eager: bool,
@@ -796,10 +801,11 @@ pub fn run_mix(
     )?;
 
     let matrix_dim = (((size_gb / 3) << 27) as f64).sqrt() as usize;
-    let _metis_handle = run_metis_matrix_mult(shell, bmk_dir, matrix_dim, eager, tctx)?;
+    let _metis_handle = run_metis_matrix_mult(shell, metis_dir, matrix_dim, eager, tctx)?;
 
     let _memhog_handles = run_memhog(
         shell,
+        numactl_dir,
         None,
         (size_gb << 20) / 3,
         MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,

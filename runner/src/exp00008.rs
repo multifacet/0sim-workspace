@@ -389,6 +389,11 @@ where
                 "Workload",
                 run_memhog(
                     &vshell,
+                    &dir!(
+                        "/home/vagrant",
+                        RESEARCH_WORKSPACE_PATH,
+                        ZEROSIM_MEMHOG_SUBMODULE
+                    ),
                     Some(MEMHOG_R),
                     size,
                     MemhogOptions::empty(),

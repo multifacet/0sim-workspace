@@ -869,7 +869,6 @@ fn install_guest_dependencies(
         "libcgroup-tools",
         "java-1.8.0-openjdk",
         "maven",
-        "numactl", // for memhog
         "redis",
         "perf", // for debugging
     ]))?;

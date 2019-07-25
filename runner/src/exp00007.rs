@@ -393,6 +393,11 @@ where
             time!(timers, "Workload", {
                 run_memhog(
                     &vshell,
+                    &dir!(
+                        "/home/vagrant",
+                        RESEARCH_WORKSPACE_PATH,
+                        ZEROSIM_MEMHOG_SUBMODULE
+                    ),
                     Some(MEMHOG_R),
                     size,
                     MemhogOptions::PIN | MemhogOptions::DATA_OBLIV,
@@ -413,6 +418,11 @@ where
                         "/home/vagrant",
                         RESEARCH_WORKSPACE_PATH,
                         ZEROSIM_METIS_SUBMODULE
+                    ),
+                    &dir!(
+                        "/home/vagrant",
+                        RESEARCH_WORKSPACE_PATH,
+                        ZEROSIM_MEMHOG_SUBMODULE
                     ),
                     freq,
                     size >> 20,
