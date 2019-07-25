@@ -362,6 +362,7 @@ where
             "maven",
             "redis",
             "perf", // for debugging
+            "wget",
         ]),
 
         // Add user to libvirt group after installing
