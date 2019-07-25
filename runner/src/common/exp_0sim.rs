@@ -21,18 +21,17 @@ pub const VAGRANT_MEM: usize = 1024;
 pub const VAGRANT_CORES: usize = 1;
 
 /// Reboot the machine and do nothing else. Useful for getting the machine into a clean state.
-pub fn initial_reboot<A>(dry_run: bool, login: &Login<A>) -> Result<(), failure::Error>
+pub fn initial_reboot<A>(login: &Login<A>) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     // Connect to the remote
     let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
-    ushell.set_dry_run(dry_run);
 
     vagrant_halt(&ushell)?;
 
     // Reboot the remote to make sure we have a clean slate
-    spurs::util::reboot(&mut ushell, dry_run)?;
+    spurs::util::reboot(&mut ushell, /* dry_run */ false)?;
 
     Ok(())
 }
@@ -51,7 +50,6 @@ pub fn dump_sys_info(shell: &SshShell) -> Result<(), failure::Error> {
 /// Connects to the host and to vagrant. Returns shells for both. TSC offsetting is disabled
 /// during VM startup to speed things up.
 pub fn connect_and_setup_host_and_vagrant<A>(
-    dry_run: bool,
     login: &Login<A>,
     vm_size: usize,
     cores: usize,
@@ -59,7 +57,7 @@ pub fn connect_and_setup_host_and_vagrant<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    let ushell = connect_and_setup_host_only(dry_run, &login)?;
+    let ushell = connect_and_setup_host_only(&login)?;
     let vshell = start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?;
 
     Ok((ushell, vshell))
@@ -67,14 +65,14 @@ where
 
 /// Turn off all previous swap spaces, and turn on the configured ones (e.g. via
 /// research-settings.json).
-pub fn setup_swapping(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
-    turn_off_swapdevs(shell, dry_run)?;
-    turn_on_swapdevs(shell, dry_run)?;
+pub fn setup_swapping(shell: &SshShell) -> Result<(), failure::Error> {
+    turn_off_swapdevs(shell)?;
+    turn_on_swapdevs(shell)?;
     Ok(())
 }
 
 /// Set the scaling governor to "performance".
-pub fn set_perf_scaling_gov(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+pub fn set_perf_scaling_gov(shell: &SshShell) -> Result<(), failure::Error> {
     let user_home = crate::common::get_user_home_dir(shell)?;
 
     let kernel_path = format!(
@@ -82,13 +80,10 @@ pub fn set_perf_scaling_gov(shell: &SshShell, dry_run: bool) -> Result<(), failu
         user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE
     );
 
-    shell.run(
-        cmd!(
-            "sudo {}/tools/power/cpupower/cpupower frequency-set -g performance",
-            kernel_path
-        )
-        .dry_run(dry_run),
-    )?;
+    shell.run(cmd!(
+        "sudo {}/tools/power/cpupower/cpupower frequency-set -g performance",
+        kernel_path
+    ))?;
 
     Ok(())
 }
@@ -103,10 +98,7 @@ pub fn set_kernel_printk_level(shell: &SshShell, level: usize) -> Result<(), fai
 
 /// Connects to the host, waiting for it to come up if necessary. Turn on only the swap devices we
 /// want. Set the scaling governor. Returns the shell to the host.
-pub fn connect_and_setup_host_only<A>(
-    dry_run: bool,
-    login: &Login<A>,
-) -> Result<SshShell, failure::Error>
+pub fn connect_and_setup_host_only<A>(login: &Login<A>) -> Result<SshShell, failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Debug + std::fmt::Display + Clone,
 {
@@ -136,12 +128,12 @@ where
     dump_sys_info(&ushell)?;
 
     // Set up swapping
-    setup_swapping(&ushell, dry_run)?;
+    setup_swapping(&ushell)?;
 
     println!("Assuming home dir already mounted... uncomment this line if it's not");
     //mount_home_dir(ushell)
 
-    set_perf_scaling_gov(&ushell, dry_run)?;
+    set_perf_scaling_gov(&ushell)?;
 
     set_kernel_printk_level(&ushell, 4)?;
 
@@ -149,9 +141,7 @@ where
 }
 
 /// Turn on Zswap with some default parameters.
-pub fn turn_on_zswap(shell: &mut SshShell, dry_run: bool) -> Result<(), failure::Error> {
-    shell.set_dry_run(dry_run);
-
+pub fn turn_on_zswap(shell: &mut SshShell) -> Result<(), failure::Error> {
     // apparently permissions can get weird
     shell.run(cmd!("sudo chmod +w /sys/module/zswap/parameters/*").use_bash())?;
 
@@ -171,8 +161,6 @@ pub fn turn_on_zswap(shell: &mut SshShell, dry_run: bool) -> Result<(), failure:
     shell.run(cmd!("echo ztier | sudo tee /sys/module/zswap/parameters/zpool").use_bash())?;
     shell.run(cmd!("echo y | sudo tee /sys/module/zswap/parameters/enabled").use_bash())?;
     shell.run(cmd!("sudo tail /sys/module/zswap/parameters/*").use_bash())?;
-
-    shell.set_dry_run(false);
 
     Ok(())
 }
@@ -273,8 +261,8 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     Ok(vshell)
 }
 
-pub fn turn_off_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
-    let devs = spurs_util::util::get_mounted_devs(shell, dry_run)?;
+pub fn turn_off_swapdevs(shell: &SshShell) -> Result<(), failure::Error> {
+    let devs = spurs_util::util::get_mounted_devs(shell, /* dry_run */ false)?;
 
     // Turn off all swap devs
     for (dev, mount) in devs {
@@ -287,15 +275,18 @@ pub fn turn_off_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure:
 }
 
 /// Returns a list of swap devices, with SSDs listed first.
-pub fn list_swapdevs(shell: &SshShell, dry_run: bool) -> Result<Vec<String>, failure::Error> {
+pub fn list_swapdevs(shell: &SshShell) -> Result<Vec<String>, failure::Error> {
     let mut swapdevs = vec![];
 
     // Find out what swap devs are there
-    let devs = spurs_util::util::get_unpartitioned_devs(shell, dry_run)?;
+    let devs = spurs_util::util::get_unpartitioned_devs(shell, /* dry_run */ false)?;
 
     // Get the size of each one
-    let sizes =
-        spurs_util::util::get_dev_sizes(shell, devs.iter().map(String::as_str).collect(), dry_run)?;
+    let sizes = spurs_util::util::get_dev_sizes(
+        shell,
+        devs.iter().map(String::as_str).collect(),
+        /* dry_run */ false,
+    )?;
 
     // Turn on the SSDs as swap devs
     for (dev, size) in devs.iter().zip(sizes.iter()) {
@@ -426,7 +417,7 @@ pub fn create_thin_swap(
 /// Turn on swap devices. This function will respect any `swap-devices` setting in
 /// `research-settings.json`. If there are no such settings, then all unpartitioned, unmounted
 /// swap devices of the right size are used (according to `list_swapdevs`).
-pub fn turn_on_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+pub fn turn_on_swapdevs(shell: &SshShell) -> Result<(), failure::Error> {
     // Find out what swap devs are there
     let settings = crate::common::get_remote_research_settings(shell)?;
 
@@ -443,7 +434,7 @@ pub fn turn_on_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::
     {
         devs
     } else {
-        list_swapdevs(shell, dry_run)?
+        list_swapdevs(shell)?
     };
 
     // Turn on swap devs
@@ -459,7 +450,7 @@ pub fn turn_on_swapdevs(shell: &SshShell, dry_run: bool) -> Result<(), failure::
 /// Turn on swap devices and SSDSWAP. This function will respect any `swap-devices` setting in
 /// `research-settings.json`. If there are no such settings, then all unpartitioned, unmounted
 /// swap devices of the right size are used (according to `list_swapdevs`).
-pub fn turn_on_ssdswap(shell: &SshShell, dry_run: bool) -> Result<(), failure::Error> {
+pub fn turn_on_ssdswap(shell: &SshShell) -> Result<(), failure::Error> {
     // Find out what swap devs are there
     let settings = crate::common::get_remote_research_settings(shell)?;
     let devs = if let Some(dm_data) =
@@ -476,7 +467,7 @@ pub fn turn_on_ssdswap(shell: &SshShell, dry_run: bool) -> Result<(), failure::E
     {
         devs
     } else {
-        list_swapdevs(shell, dry_run)?
+        list_swapdevs(shell)?
     };
 
     // Use SSDSWAP
@@ -491,8 +482,8 @@ pub fn turn_on_ssdswap(shell: &SshShell, dry_run: bool) -> Result<(), failure::E
     }
 
     // Remount all swap devs
-    turn_off_swapdevs(shell, dry_run)?;
-    turn_on_swapdevs(shell, dry_run)?;
+    turn_off_swapdevs(shell)?;
+    turn_on_swapdevs(shell)?;
 
     shell.run(cmd!("lsblk -o NAME,ROTA"))?;
 

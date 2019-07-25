@@ -28,7 +28,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
     }
 }
 
-pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
+pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
         username: Username(sub_m.value_of("USERNAME").unwrap()),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
@@ -37,7 +37,7 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
 
     // Connect to the remote.
-    let (ushell, vshell) = connect_and_setup_host_and_vagrant(dry_run, &login, 20, 1)?;
+    let (ushell, vshell) = connect_and_setup_host_and_vagrant(&login, 20, 1)?;
 
     // Disable TSC offsetting so that setup runs faster
     ushell.run(
@@ -85,7 +85,6 @@ pub fn run(dry_run: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::E
     let guest_config_base_name = std::path::Path::new(guest_config).file_name().unwrap();
 
     crate::common::build_kernel(
-        dry_run,
         &ushell,
         KernelSrc::Git {
             repo_path: kernel_path.clone(),

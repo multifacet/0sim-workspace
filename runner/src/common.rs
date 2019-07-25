@@ -426,7 +426,6 @@ pub fn get_absolute_path(shell: &SshShell, path: &str) -> Result<String, failure
 /// `kernel_local_version` is the kernel `LOCALVERSION` string to pass to `make` for the RPM, if
 /// any.
 pub fn build_kernel(
-    _dry_run: bool,
     ushell: &SshShell,
     source: KernelSrc,
     config: KernelConfig<'_>,

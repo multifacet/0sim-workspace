@@ -42,11 +42,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
     }
 }
 
-pub fn run(
-    dry_run: bool,
-    print_results_path: bool,
-    sub_m: &clap::ArgMatches<'_>,
-) -> Result<(), failure::Error> {
+pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
         username: Username(sub_m.value_of("USERNAME").unwrap()),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
@@ -80,14 +76,13 @@ pub fn run(
         remote_research_settings: remote_research_settings,
     };
 
-    run_inner(dry_run, print_results_path, &login, settings)
+    run_inner(print_results_path, &login, settings)
 }
 
 /// Run the experiment using the settings passed. Note that because the only thing we are passed
 /// are the settings, we know that there is no information that is not recorded in the settings
 /// file.
 fn run_inner<A>(
-    dry_run: bool,
     print_results_path: bool,
     login: &Login<A>,
     settings: OutputManager,
@@ -106,10 +101,10 @@ where
         settings.get::<usize>("transparent_hugepage_khugepaged_scan_sleep_ms");
 
     // Reboot
-    initial_reboot(dry_run, &login)?;
+    initial_reboot(&login)?;
 
     // Connect
-    let ushell = connect_and_setup_host_only(dry_run, &login)?;
+    let ushell = connect_and_setup_host_only(&login)?;
 
     let user_home = &get_user_home_dir(&ushell)?;
     let zerosim_exp_path = &dir!(

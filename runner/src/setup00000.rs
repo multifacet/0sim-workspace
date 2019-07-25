@@ -511,7 +511,6 @@ where
         let git_hash = crate::common::research_workspace_git_hash(ushell)?;
 
         crate::common::build_kernel(
-            /* dry_run */ false,
             &ushell,
             KernelSrc::Git {
                 repo_path: kernel_path.clone(),
@@ -908,7 +907,6 @@ fn install_guest_kernel(
 
     ushell.run(cmd!("wget {}", KERNEL_RECENT_TARBALL))?;
     crate::common::build_kernel(
-        /* dry_run */ false,
         &ushell,
         KernelSrc::Tar {
             tarball_path: KERNEL_RECENT_TARBALL_NAME.into(),

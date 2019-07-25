@@ -63,7 +63,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
     }
 }
 
-pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
+pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
     // Read all flags/options
     let login = Login {
         username: Username(sub_m.value_of("USERNAME").unwrap()),
@@ -93,7 +93,7 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
 
     // Reboot
     if reboot {
-        initial_reboot(dry_run, &login)?;
+        initial_reboot(&login)?;
     }
 
     let mut ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
@@ -106,12 +106,12 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
 
     // Set up swap
     if swap {
-        setup_swapping(&ushell, dry_run)?;
+        setup_swapping(&ushell)?;
     }
 
     // Set scaling governor to "performance"
     if perfgov {
-        set_perf_scaling_gov(&ushell, dry_run)?;
+        set_perf_scaling_gov(&ushell)?;
     }
 
     // Set printk level for dmesg
@@ -121,7 +121,7 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
 
     // Turn on SSDSWAP
     if ssdswap {
-        turn_on_ssdswap(&ushell, dry_run)?;
+        turn_on_ssdswap(&ushell)?;
     }
 
     // disable Intel EPT if needed
@@ -157,7 +157,7 @@ pub fn run(dry_run: bool, sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> 
 
     // Turn on zswap
     if let Some(max_pool_percent) = zswap {
-        turn_on_zswap(&mut ushell, dry_run)?;
+        turn_on_zswap(&mut ushell)?;
 
         ushell.run(
             cmd!(

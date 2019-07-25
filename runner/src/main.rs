@@ -34,12 +34,6 @@ fn run() -> Result<(), failure::Error> {
              different command line arguments. certain routines require extra arguments.",
         )
         .arg(
-            clap::Arg::with_name("DRY")
-                .short("d")
-                .long("dry_run")
-                .help("Don't actually execute commands. Just print what would run and exit."),
-        )
-        .arg(
             clap::Arg::with_name("PRINT_RESULTS_PATH")
                 .long("print_results_path")
                 .help("(For experiments) Print the results path as the last line of output."),
@@ -61,26 +55,25 @@ fn run() -> Result<(), failure::Error> {
         .setting(clap::AppSettings::DisableVersion)
         .get_matches();
 
-    let dry_run = matches.is_present("DRY");
     let print_results_path = matches.is_present("PRINT_RESULTS_PATH");
 
     match matches.subcommand() {
         ("setup00000", Some(sub_m)) => setup00000::run(sub_m),
-        ("setup00001", Some(sub_m)) => setup00001::run(dry_run, sub_m),
+        ("setup00001", Some(sub_m)) => setup00001::run(sub_m),
 
-        ("manual", Some(sub_m)) => manual::run(dry_run, sub_m),
+        ("manual", Some(sub_m)) => manual::run(sub_m),
 
-        ("exptmp", Some(sub_m)) => exptmp::run(dry_run, print_results_path, sub_m),
+        ("exptmp", Some(sub_m)) => exptmp::run(print_results_path, sub_m),
 
-        ("exp00000", Some(sub_m)) => exp00000::run(dry_run, print_results_path, sub_m),
-        ("exp00002", Some(sub_m)) => exp00002::run(dry_run, print_results_path, sub_m),
-        ("exp00003", Some(sub_m)) => exp00003::run(dry_run, print_results_path, sub_m),
-        ("exp00004", Some(sub_m)) => exp00004::run(dry_run, print_results_path, sub_m),
-        ("exp00005", Some(sub_m)) => exp00005::run(dry_run, print_results_path, sub_m),
-        ("exp00006", Some(sub_m)) => exp00006::run(dry_run, print_results_path, sub_m),
-        ("exp00007", Some(sub_m)) => exp00007::run(dry_run, print_results_path, sub_m),
-        ("exp00008", Some(sub_m)) => exp00008::run(dry_run, print_results_path, sub_m),
-        ("exp00009", Some(sub_m)) => exp00009::run(dry_run, print_results_path, sub_m),
+        ("exp00000", Some(sub_m)) => exp00000::run(print_results_path, sub_m),
+        ("exp00002", Some(sub_m)) => exp00002::run(print_results_path, sub_m),
+        ("exp00003", Some(sub_m)) => exp00003::run(print_results_path, sub_m),
+        ("exp00004", Some(sub_m)) => exp00004::run(print_results_path, sub_m),
+        ("exp00005", Some(sub_m)) => exp00005::run(print_results_path, sub_m),
+        ("exp00006", Some(sub_m)) => exp00006::run(print_results_path, sub_m),
+        ("exp00007", Some(sub_m)) => exp00007::run(print_results_path, sub_m),
+        ("exp00008", Some(sub_m)) => exp00008::run(print_results_path, sub_m),
+        ("exp00009", Some(sub_m)) => exp00009::run(print_results_path, sub_m),
 
         _ => {
             unreachable!();
