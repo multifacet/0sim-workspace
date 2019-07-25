@@ -485,7 +485,7 @@ where
 
     // clone the research workspace and build/install the 0sim kernel.
     if let Some(git_branch) = cfg.git_branch {
-        const CONFIG_SET: &[(&str, bool)] = &[
+        let mut config_set = vec![
             // turn on 0sim
             ("CONFIG_ZSWAP", true),
             ("CONFIG_ZPOOL", true),
@@ -501,6 +501,12 @@ where
             // for `perf` stack traces
             ("CONFIG_FRAME_POINTER", true),
         ];
+
+        // On AWS we use actual RHEL, so we don't have the keys to build with.
+        if cfg.aws {
+            config_set.push(("CONFIG_SYSTEM_TRUSTED_KEYS", false));
+            config_set.push(("CONFIG_MODULE_SIG_KEY", false));
+        }
 
         let kernel_path = dir!(
             user_home.as_str(),
@@ -518,7 +524,7 @@ where
             },
             KernelConfig {
                 base_config: KernelBaseConfigSource::Current,
-                extra_options: CONFIG_SET,
+                extra_options: &config_set,
             },
             Some(&crate::common::gen_local_version(git_branch, &git_hash)),
             KernelPkgType::Rpm,
