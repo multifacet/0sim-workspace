@@ -465,7 +465,7 @@ pub fn build_kernel(
     ushell.run(cmd!("cp .config config.bak").cwd(kbuild_path).allow_error())?;
 
     // configure the new kernel we are about to build.
-    ushell.run(cmd!("make O={} defconfig", kbuild_path).cwd(source_path))?;
+    ushell.run(cmd!("make O={} defconfig", kbuild_path).cwd(&source_path))?;
 
     match config.base_config {
         // Nothing else to do
@@ -508,6 +508,10 @@ pub fn build_kernel(
     // Compile with as many processors as we have.
     //
     // NOTE: for some reason, this sometimes fails the first time, so just do it again.
+    //
+    // NOTE: we pipe `yes` into make because in some cases the build will request updating some
+    // aspects of the config in ways that `make oldconfig` does not address, such as to generate a
+    // signing key.
     let nprocess = get_num_cores(ushell)?;
 
     let make_target = match pkg_type {
@@ -517,7 +521,7 @@ pub fn build_kernel(
 
     ushell.run(
         cmd!(
-            "make -j {} {} {}",
+            "yes '' | make -j {} {} {}",
             nprocess,
             make_target,
             if let Some(kernel_local_version) = kernel_local_version {
