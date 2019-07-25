@@ -325,11 +325,13 @@ where
     with_shell! { ushell =>
         spurs_util::centos::yum_install(&[
             "vim",
+            "git",
             "libxslt-devel",
             "libxml2-devel",
             "libguestfs-tools-c",
             "gcc",
             "gcc-gfortran",
+            "gcc-c++",
             "ruby-devel",
             "bc",
             "openssl-devel",
@@ -353,6 +355,13 @@ where
             "pixman-devel",
             "zlib-devel",
             "fuse-devel",
+            "memcached",
+            "libcgroup",
+            "libcgroup-tools",
+            "java-1.8.0-openjdk",
+            "maven",
+            "redis",
+            "perf", // for debugging
         ]),
 
         // Add user to libvirt group after installing
