@@ -496,7 +496,8 @@ pub fn build_kernel(
             ))?;
         } else {
             ushell.run(cmd!(
-                "sed -i 's/{}=y/# {} is not set/' {}/.config",
+                "sed -i '/{}=/s/{}=.*$/# {} is not set/' {}/.config",
+                opt,
                 opt,
                 opt,
                 kbuild_path
