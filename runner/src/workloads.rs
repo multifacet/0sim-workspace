@@ -581,6 +581,8 @@ impl RedisWorkloadHandles {
 pub struct RedisWorkloadConfig<'s> {
     /// The path of the `0sim-experiments` submodule on the remote.
     exp_dir: &'s str,
+    /// The path of the `redis.conf` file on the remote.
+    redis_conf: &'s str,
 
     /// The size of `redis` server in MB.
     server_size_mb: usize,
@@ -606,6 +608,7 @@ impl Default for RedisWorkloadConfig<'_> {
     fn default() -> Self {
         Self {
             exp_dir: "",
+            redis_conf: "",
             server_size_mb: 0,
             wk_size_gb: 0,
             output_file: None,
@@ -620,6 +623,7 @@ impl Default for RedisWorkloadConfig<'_> {
 
 impl<'s> RedisWorkloadConfig<'s> {
     impl_conf! {exp_dir: &'s str}
+    impl_conf! {redis_conf: &'s str}
     impl_conf! {server_size_mb: usize}
     impl_conf! {wk_size_gb: usize}
     impl_conf! {output_file: Option<&'s str>}
@@ -635,8 +639,6 @@ impl<'s> RedisWorkloadConfig<'s> {
 ///
 /// In order for redis snapshots to work properly, we need to tell the kernel to overcommit memory.
 /// This requires `sudo` access.
-///
-/// The redis server is listening at port 7777.
 ///
 /// The caller should ensure that any previous RDB is deleted.
 ///
@@ -654,19 +656,23 @@ pub fn start_redis(
         vagrant_setup_apriori_paging_process(shell, "redis-server")?;
     }
 
+    // Delete any previous database
+    shell.run(cmd!("rm -f /tmp/dump.rdb"))?;
+
     // Start the redis server
     let handle = if let Some(server_pin_core) = cfg.server_pin_core {
         shell.spawn(cmd!(
-            "taskset -c {} redis-server --port 7777 --loglevel warning",
-            server_pin_core
+            "taskset -c {} redis-server {}",
+            server_pin_core,
+            cfg.redis_conf
         ))?
     } else {
-        shell.spawn(cmd!("redis-server --port 7777 --loglevel warning"))?
+        shell.spawn(cmd!("redis-server {}", cfg.redis_conf))?
     };
 
     // Wait for server to start
     loop {
-        let res = shell.run(cmd!("redis-cli -p 7777 INFO"));
+        let res = shell.run(cmd!("redis-cli -s /tmp/redis.sock INFO"));
         if res.is_ok() {
             break;
         }
@@ -678,12 +684,10 @@ pub fn start_redis(
     // - maxmemory amount + evict random keys when full
     // - save snapshots every 300 seconds if >= 1 key changed to the file /tmp/dump.rdb
     with_shell! { shell =>
-        cmd!("redis-cli -p 7777 CONFIG SET maxmemory-policy allkeys-random"),
-        cmd!("redis-cli -p 7777 CONFIG SET maxmemory {}mb", cfg.server_size_mb),
+        cmd!("redis-cli -s /tmp/redis.sock CONFIG SET maxmemory-policy allkeys-random"),
+        cmd!("redis-cli -s /tmp/redis.sock CONFIG SET maxmemory {}mb", cfg.server_size_mb),
 
-        cmd!("redis-cli -p 7777 CONFIG SET dir /tmp/"),
-        cmd!("redis-cli -p 7777 CONFIG SET dbfilename dump.rdb"),
-        cmd!("redis-cli -p 7777 CONFIG SET save \"{} 1\"", REDIS_SNAPSHOT_FREQ_SECS),
+        //cmd!("redis-cli -s /tmp/redis.sock CONFIG SET save \"{} 1\"", REDIS_SNAPSHOT_FREQ_SECS),
     }
 
     Ok(handle)
@@ -700,7 +704,8 @@ pub fn run_redis_gen_data(
     // Run workload
     let (client_shell, client_spawn_handle) = shell.spawn(
         cmd!(
-            "taskset -c {} ./target/release/redis_gen_data localhost:7777 {} {} {} | tee {} ; echo redis_gen_data done",
+            "taskset -c {} ./target/release/redis_gen_data unix:/tmp/redis.sock \
+             {} {} {} | tee {} ; echo redis_gen_data done",
             cfg.client_pin_core,
             cfg.wk_size_gb,
             if let Some(freq) = cfg.freq {
@@ -773,6 +778,7 @@ pub fn run_metis_matrix_mult(
 /// - `exp_dir` is the path of the `0sim-experiments` submodule on the remote.
 /// - `metis_dir` is the path to the `Metis` directory in the workspace on the remote.
 /// - `numactl_dir` is the path to the `numactl` directory in the workspace on the remote.
+/// - `redis_conf` is the path to the `redis.conf` file on the remote.
 /// - `freq` is the _host_ CPU frequency in MHz.
 /// - `size_gb` is the total amount of memory of the mix workload in GB.
 /// - `eager` indicates whether the workload should be run with eager paging.
@@ -781,6 +787,7 @@ pub fn run_mix(
     exp_dir: &str,
     metis_dir: &str,
     numactl_dir: &str,
+    redis_conf: &str,
     freq: usize,
     size_gb: usize,
     eager: bool,
@@ -797,7 +804,8 @@ pub fn run_mix(
             .output_file(None)
             .eager(true)
             .client_pin_core(tctx.next())
-            .server_pin_core(None),
+            .server_pin_core(None)
+            .redis_conf(redis_conf),
     )?;
 
     let matrix_dim = (((size_gb / 3) << 27) as f64).sqrt() as usize;

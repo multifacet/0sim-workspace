@@ -363,7 +363,8 @@ where
                         .output_file(None)
                         .eager(eager)
                         .client_pin_core(tctx.next())
-                        .server_pin_core(None),
+                        .server_pin_core(None)
+                        .redis_conf(&dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF))
                 )?
                 .wait_for_client()?
             );
@@ -419,6 +420,7 @@ where
                         RESEARCH_WORKSPACE_PATH,
                         ZEROSIM_MEMHOG_SUBMODULE
                     ),
+                    &dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF,),
                     freq,
                     size >> 20,
                     eager,
