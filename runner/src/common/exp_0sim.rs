@@ -729,7 +729,7 @@ pub fn gen_standard_sim_output(
     ushell.run(cmd!("sync"))?;
     vshell.run(cmd!(
         "echo -e '\nSimulation Stats (Guest)\n=====' >> {}",
-        host_sim_file
+        guest_sim_file
     ))?;
     vshell.run(cmd!("cat /proc/meminfo >> {}", guest_sim_file))?;
 
@@ -737,14 +737,14 @@ pub fn gen_standard_sim_output(
     ushell.run(cmd!("sync"))?;
 
     ushell.run(cmd!("echo -e '\ndmesg (Host)\n=====' >> {}", host_sim_file))?;
-    ushell.run(cmd!("dmesg >> {}", guest_sim_file))?;
+    ushell.run(cmd!("dmesg >> {}", host_sim_file))?;
 
     vshell.run(cmd!("sync"))?;
     ushell.run(cmd!("sync"))?;
 
     vshell.run(cmd!(
         "echo -e '\ndmesg (Guest)\n=====' >> {}",
-        host_sim_file
+        guest_sim_file
     ))?;
     vshell.run(cmd!("dmesg >> {}", guest_sim_file))?;
 
