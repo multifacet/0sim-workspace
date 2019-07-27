@@ -24,7 +24,7 @@ use crate::{
     settings,
     workloads::{
         run_memcached_gen_data, run_memhog, run_metis_matrix_mult, run_mix, run_nas_cg,
-        run_redis_gen_data, MemhogOptions, NasClass,
+        run_redis_gen_data, MemcachedWorkloadConfig, MemhogOptions, NasClass, RedisWorkloadConfig,
     },
 };
 
@@ -312,18 +312,19 @@ where
                 "Start and Workload",
                 run_memcached_gen_data(
                     &vshell,
-                    &crate::workloads::MemcachedWorkloadConfig::default()
-                        .user("vagrant")
-                        .exp_dir(zerosim_exp_path)
-                        .server_size_mb(size >> 10)
-                        .wk_size_gb(size >> 20)
-                        .freq(Some(freq))
-                        .allow_oom(true)
-                        .pf_time(None)
-                        .output_file(None)
-                        .eager(eager,)
-                        .client_pin_core(tctx.next())
-                        .server_pin_core(None)
+                    &MemcachedWorkloadConfig {
+                        user: "vagrant",
+                        exp_dir: zerosim_exp_path,
+                        server_size_mb: size >> 10,
+                        wk_size_gb: size >> 20,
+                        freq: Some(freq),
+                        allow_oom: true,
+                        pf_time: None,
+                        output_file: None,
+                        eager: eager,
+                        client_pin_core: tctx.next(),
+                        server_pin_core: None,
+                    }
                 )?
             );
         }
@@ -354,17 +355,18 @@ where
                 "Start and Workload",
                 run_redis_gen_data(
                     &vshell,
-                    &crate::workloads::RedisWorkloadConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .server_size_mb(size >> 10)
-                        .wk_size_gb(size >> 20)
-                        .freq(Some(freq))
-                        .pf_time(None)
-                        .output_file(None)
-                        .eager(eager)
-                        .client_pin_core(tctx.next())
-                        .server_pin_core(None)
-                        .redis_conf(&dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF))
+                    &RedisWorkloadConfig {
+                        exp_dir: zerosim_exp_path,
+                        server_size_mb: size >> 10,
+                        wk_size_gb: size >> 20,
+                        freq: Some(freq),
+                        pf_time: None,
+                        output_file: None,
+                        eager: eager,
+                        client_pin_core: tctx.next(),
+                        server_pin_core: None,
+                        redis_conf: &dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF)
+                    }
                 )?
                 .wait_for_client()?
             );

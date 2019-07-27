@@ -225,15 +225,16 @@ where
             "Warmup",
             run_time_mmap_touch(
                 &vshell,
-                &TimeMmapTouchConfig::default()
-                    .exp_dir(zerosim_exp_path)
-                    .pages((size << 30) >> 12)
-                    .pattern(WARM_UP_PATTERN,)
-                    .prefault(false)
-                    .pf_time(None)
-                    .output_file(None)
-                    .eager(false)
-                    .pin_core(tctx.next())
+                &TimeMmapTouchConfig {
+                    exp_dir: zerosim_exp_path,
+                    pages: (size << 30) >> 12,
+                    pattern: WARM_UP_PATTERN,
+                    prefault: false,
+                    pf_time: None,
+                    output_file: None,
+                    eager: false,
+                    pin_core: tctx.next(),
+                }
             )?
         );
     }
@@ -276,15 +277,16 @@ where
             "Workload",
             run_time_mmap_touch(
                 &vshell,
-                &TimeMmapTouchConfig::default()
-                    .exp_dir(zerosim_exp_path)
-                    .pages((size << 30) >> 12)
-                    .pattern(pattern)
-                    .prefault(prefault)
-                    .pf_time(None)
-                    .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, output_file)))
-                    .eager(false)
-                    .pin_core(tctx.next())
+                &TimeMmapTouchConfig {
+                    exp_dir: zerosim_exp_path,
+                    pages: (size << 30) >> 12,
+                    pattern: pattern,
+                    prefault: prefault,
+                    pf_time: None,
+                    output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                    eager: false,
+                    pin_core: tctx.next(),
+                }
             )?
         );
     } else {
@@ -293,18 +295,19 @@ where
             "Workload",
             run_memcached_gen_data(
                 &vshell,
-                &MemcachedWorkloadConfig::default()
-                    .user("vagrant")
-                    .exp_dir(zerosim_exp_path)
-                    .server_size_mb(size << 10)
-                    .wk_size_gb(size)
-                    .freq(Some(freq))
-                    .allow_oom(true)
-                    .pf_time(None)
-                    .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, output_file)))
-                    .eager(false)
-                    .client_pin_core(tctx.next())
-                    .server_pin_core(None)
+                &MemcachedWorkloadConfig {
+                    user: "vagrant",
+                    exp_dir: zerosim_exp_path,
+                    server_size_mb: size << 10,
+                    wk_size_gb: size,
+                    freq: Some(freq),
+                    allow_oom: true,
+                    pf_time: None,
+                    output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                    eager: false,
+                    client_pin_core: tctx.next(),
+                    server_pin_core: None,
+                }
             )?
         );
     }

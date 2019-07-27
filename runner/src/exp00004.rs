@@ -15,7 +15,7 @@ use spurs::{
 use crate::{
     common::{exp_0sim::*, get_user_home_dir, output::OutputManager, paths::*},
     settings,
-    workloads::run_memcached_and_capture_thp,
+    workloads::{run_memcached_and_capture_thp, MemcachedWorkloadConfig},
 };
 
 /// Interval at which to collect thp stats
@@ -148,16 +148,19 @@ where
         "Setup and Workload",
         run_memcached_and_capture_thp(
             &ushell,
-            &crate::workloads::MemcachedWorkloadConfig::default()
-                .user(login.username.as_str())
-                .exp_dir(zerosim_exp_path)
-                .server_size_mb(size << 10)
-                .wk_size_gb(size)
-                .allow_oom(true)
-                .output_file(None)
-                .eager(false)
-                .client_pin_core(tctx.next())
-                .server_pin_core(None),
+            &MemcachedWorkloadConfig {
+                user: login.username.as_str(),
+                exp_dir: zerosim_exp_path,
+                server_size_mb: size << 10,
+                wk_size_gb: size,
+                allow_oom: true,
+                output_file: None,
+                eager: false,
+                client_pin_core: tctx.next(),
+                server_pin_core: None,
+                freq: None,
+                pf_time: None,
+            },
             INTERVAL,
             /* continual_compaction */ None,
             &dir!(setup00000::HOSTNAME_SHARED_RESULTS_DIR, output_file),

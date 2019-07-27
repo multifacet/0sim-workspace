@@ -245,31 +245,33 @@ where
             time!(timers, "Workload", {
                 run_locality_mem_access(
                     &ushell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Local)
-                        .n(n)
-                        .threads(None)
-                        .output_file(&dir!(
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Local,
+                        n: n,
+                        threads: None,
+                        output_file: &dir!(
                             user_home.as_str(),
                             setup00000::HOSTNAME_SHARED_RESULTS_DIR,
                             local_file
-                        ))
-                        .eager(false),
+                        ),
+                        eager: false,
+                    },
                 )?;
                 run_locality_mem_access(
                     &ushell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Random)
-                        .n(n)
-                        .threads(None)
-                        .output_file(&dir!(
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Random,
+                        n: n,
+                        threads: None,
+                        output_file: &dir!(
                             user_home.as_str(),
                             setup00000::HOSTNAME_SHARED_RESULTS_DIR,
                             nonlocal_file
-                        ))
-                        .eager(false),
+                        ),
+                        eager: false,
+                    },
                 )?;
             });
         }
@@ -280,19 +282,20 @@ where
                 "Workload",
                 run_time_mmap_touch(
                     &ushell,
-                    &TimeMmapTouchConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .pages((size << 30) >> 12)
-                        .pattern(pattern)
-                        .prefault(false)
-                        .pf_time(None)
-                        .output_file(Some(&dir!(
+                    &TimeMmapTouchConfig {
+                        exp_dir: zerosim_exp_path,
+                        pages: (size << 30) >> 12,
+                        pattern: pattern,
+                        prefault: false,
+                        pf_time: None,
+                        output_file: Some(&dir!(
                             user_home.as_str(),
                             setup00000::HOSTNAME_SHARED_RESULTS_DIR,
                             output_file
-                        )))
-                        .eager(false)
-                        .pin_core(tctx.next())
+                        )),
+                        eager: false,
+                        pin_core: tctx.next(),
+                    }
                 )?
             );
         }
@@ -305,22 +308,23 @@ where
                 "Workload",
                 run_memcached_gen_data(
                     &ushell,
-                    &MemcachedWorkloadConfig::default()
-                        .user("vagrant")
-                        .exp_dir(zerosim_exp_path)
-                        .server_size_mb(size << 10)
-                        .wk_size_gb(size)
-                        .freq(Some(freq))
-                        .allow_oom(true)
-                        .pf_time(None)
-                        .output_file(Some(&dir!(
+                    &MemcachedWorkloadConfig {
+                        user: "vagrant",
+                        exp_dir: zerosim_exp_path,
+                        server_size_mb: size << 10,
+                        wk_size_gb: size,
+                        freq: Some(freq),
+                        allow_oom: true,
+                        pf_time: None,
+                        output_file: Some(&dir!(
                             user_home.as_str(),
                             setup00000::HOSTNAME_SHARED_RESULTS_DIR,
                             output_file
-                        )))
-                        .eager(false)
-                        .client_pin_core(tctx.next())
-                        .server_pin_core(None)
+                        )),
+                        eager: false,
+                        client_pin_core: tctx.next(),
+                        server_pin_core: None,
+                    }
                 )?
             );
         }

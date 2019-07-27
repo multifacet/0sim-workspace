@@ -26,7 +26,7 @@ use crate::{
     },
     settings,
     setup00001::GUEST_SWAP_GBS,
-    workloads::run_memcached_and_capture_thp,
+    workloads::{run_memcached_and_capture_thp, MemcachedWorkloadConfig},
 };
 
 /// Interval at which to collect thp stats
@@ -222,16 +222,19 @@ where
         "Start and Workload",
         run_memcached_and_capture_thp(
             &vshell,
-            &crate::workloads::MemcachedWorkloadConfig::default()
-                .user("vagrant")
-                .exp_dir(zerosim_exp_path)
-                .server_size_mb(size << 10)
-                .wk_size_gb(size)
-                .allow_oom(false)
-                .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, memcached_timing_file)))
-                .eager(false)
-                .client_pin_core(tctx.next())
-                .server_pin_core(None),
+            &MemcachedWorkloadConfig {
+                user: "vagrant",
+                exp_dir: zerosim_exp_path,
+                server_size_mb: size << 10,
+                wk_size_gb: size,
+                allow_oom: false,
+                output_file: Some(&dir!(VAGRANT_RESULTS_DIR, memcached_timing_file)),
+                eager: false,
+                client_pin_core: tctx.next(),
+                server_pin_core: None,
+                freq: None,
+                pf_time: None,
+            },
             INTERVAL,
             continual_compaction,
             &dir!(VAGRANT_RESULTS_DIR, output_file),

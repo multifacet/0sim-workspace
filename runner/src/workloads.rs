@@ -9,14 +9,6 @@ use spurs::{
     ssh::{Execute, SshShell, SshSpawnHandle},
 };
 
-macro_rules! impl_conf {
-    ($name:ident : $ty:ty) => {
-        pub fn $name(self, $name: $ty) -> Self {
-            Self { $name, ..self }
-        }
-    }
-}
-
 /// Set the apriori paging process using Swapnil's program. Requires `sudo`.
 ///
 /// This should be run only from a vagrant VM.
@@ -77,50 +69,24 @@ pub enum TimeMmapTouchPattern {
 /// Settings for a run of the `time_mmap_touch` workload.
 pub struct TimeMmapTouchConfig<'s> {
     /// The path of the `0sim-experiments` submodule on the remote.
-    exp_dir: &'s str,
+    pub exp_dir: &'s str,
 
     /// The number of _pages_ to touch.
-    pages: usize,
+    pub pages: usize,
     /// Specifies the pattern to write to the pages.
-    pattern: TimeMmapTouchPattern,
+    pub pattern: TimeMmapTouchPattern,
 
     /// The file to which the workload will write its output. If `None`, then `/dev/null` is used.
-    output_file: Option<&'s str>,
+    pub output_file: Option<&'s str>,
 
     /// The core to pin the workload to in the guest.
-    pin_core: usize,
+    pub pin_core: usize,
     /// Specifies whether to prefault memory or not (true = yes).
-    prefault: bool,
+    pub prefault: bool,
     /// Specifies the page fault time if TSC offsetting is to try to account for it.
-    pf_time: Option<u64>,
+    pub pf_time: Option<u64>,
     /// Indicates whether the workload should be run with eager paging (only in VM).
-    eager: bool,
-}
-
-impl Default for TimeMmapTouchConfig<'_> {
-    fn default() -> Self {
-        Self {
-            exp_dir: "",
-            pages: 0,
-            pattern: TimeMmapTouchPattern::Zeros,
-            output_file: None,
-            pin_core: 0,
-            prefault: false,
-            pf_time: None,
-            eager: false,
-        }
-    }
-}
-
-impl<'s> TimeMmapTouchConfig<'s> {
-    impl_conf!(exp_dir: &'s str);
-    impl_conf!(pages: usize);
-    impl_conf!(pattern: TimeMmapTouchPattern);
-    impl_conf!(prefault: bool);
-    impl_conf!(pf_time: Option<u64>);
-    impl_conf!(output_file: Option<&'s str>);
-    impl_conf!(eager: bool);
-    impl_conf!(pin_core: usize);
+    pub eager: bool,
 }
 
 /// Run the `time_mmap_touch` workload on the remote `shell`. Requires `sudo`.
@@ -161,63 +127,31 @@ pub fn run_time_mmap_touch(
 /// The configuration of a memcached workload.
 pub struct MemcachedWorkloadConfig<'s> {
     /// The path of the `0sim-experiments` submodule on the remote.
-    exp_dir: &'s str,
+    pub exp_dir: &'s str,
 
     /// The user to run the `memcached` server as.
-    user: &'s str,
+    pub user: &'s str,
     /// The size of `memcached` server in MB.
-    server_size_mb: usize,
+    pub server_size_mb: usize,
     /// Specifies whether the memcached server is allowed to OOM.
-    allow_oom: bool,
+    pub allow_oom: bool,
 
     /// The core number that the memcached server is pinned to, if any.
-    server_pin_core: Option<usize>,
+    pub server_pin_core: Option<usize>,
     /// The core number that the workload client is pinned to.
-    client_pin_core: usize,
+    pub client_pin_core: usize,
 
     /// The size of the workload in GB.
-    wk_size_gb: usize,
+    pub wk_size_gb: usize,
     /// The file to which the workload will write its output. If `None`, then `/dev/null` is used.
-    output_file: Option<&'s str>,
+    pub output_file: Option<&'s str>,
 
     /// The CPU frequency. If passed, the workload will use rdtsc for timing.
-    freq: Option<usize>,
+    pub freq: Option<usize>,
     /// Specifies the page fault time if TSC offsetting is to try to account for it.
-    pf_time: Option<u64>,
+    pub pf_time: Option<u64>,
     /// Indicates whether the workload should be run with eager paging.
-    eager: bool,
-}
-
-impl Default for MemcachedWorkloadConfig<'_> {
-    fn default() -> Self {
-        Self {
-            exp_dir: "",
-            user: "",
-            server_size_mb: 0,
-            allow_oom: false,
-            wk_size_gb: 0,
-            output_file: None,
-            server_pin_core: None,
-            client_pin_core: 0,
-            freq: None,
-            pf_time: None,
-            eager: false,
-        }
-    }
-}
-
-impl<'s> MemcachedWorkloadConfig<'s> {
-    impl_conf! {exp_dir: &'s str}
-    impl_conf! {user: &'s str}
-    impl_conf! {server_size_mb: usize}
-    impl_conf! {allow_oom: bool}
-    impl_conf! {wk_size_gb: usize}
-    impl_conf! {output_file: Option<&'s str>}
-    impl_conf! {server_pin_core: Option<usize>}
-    impl_conf! {client_pin_core: usize}
-    impl_conf! {freq: Option<usize>}
-    impl_conf! {pf_time: Option<u64>}
-    impl_conf! {eager: bool}
+    pub eager: bool,
 }
 
 /// Start a `memcached` server in daemon mode as the given user with the given amount of memory.
@@ -486,43 +420,21 @@ pub enum LocalityMemAccessMode {
 /// Settings for a single instance of the `locality_mem_access` workload.
 pub struct LocalityMemAccessConfig<'s> {
     /// The path of the 0sim-experiments submodule.
-    exp_dir: &'s str,
+    pub exp_dir: &'s str,
 
     /// Make local or non-local access patterns?
-    locality: LocalityMemAccessMode,
+    pub locality: LocalityMemAccessMode,
     /// Number of accesses.
-    n: usize,
+    pub n: usize,
     /// Turn on multithreading or not? And how many threads. Note that `None` is not the same as
     /// `Some(1)`, which has the main thread and 1 worker.
-    threads: Option<usize>,
+    pub threads: Option<usize>,
 
     /// The location to write the output for the workload.
-    output_file: &'s str,
+    pub output_file: &'s str,
 
     /// Turn on eager paging.
-    eager: bool,
-}
-
-impl Default for LocalityMemAccessConfig<'_> {
-    fn default() -> Self {
-        Self {
-            exp_dir: "",
-            locality: LocalityMemAccessMode::Local,
-            n: 0,
-            threads: None,
-            output_file: "",
-            eager: false,
-        }
-    }
-}
-
-impl<'s> LocalityMemAccessConfig<'s> {
-    impl_conf!(exp_dir: &'s str);
-    impl_conf!(locality: LocalityMemAccessMode);
-    impl_conf!(n: usize);
-    impl_conf!(threads: Option<usize>);
-    impl_conf!(output_file: &'s str);
-    impl_conf!(eager: bool);
+    pub eager: bool,
 }
 
 /// Run the `locality_mem_access` workload on the remote of the given number of iterations.
@@ -580,58 +492,28 @@ impl RedisWorkloadHandles {
 /// Every setting of the redis workload.
 pub struct RedisWorkloadConfig<'s> {
     /// The path of the `0sim-experiments` submodule on the remote.
-    exp_dir: &'s str,
+    pub exp_dir: &'s str,
     /// The path of the `redis.conf` file on the remote.
-    redis_conf: &'s str,
+    pub redis_conf: &'s str,
 
     /// The size of `redis` server in MB.
-    server_size_mb: usize,
+    pub server_size_mb: usize,
     /// The size of the workload in GB.
-    wk_size_gb: usize,
+    pub wk_size_gb: usize,
     /// The file to which the workload will write its output. If `None`, then `/dev/null` is used.
-    output_file: Option<&'s str>,
+    pub output_file: Option<&'s str>,
 
     /// The core number that the redis server is pinned to, if any.
-    server_pin_core: Option<usize>,
+    pub server_pin_core: Option<usize>,
     /// The core number that the workload client is pinned to.
-    client_pin_core: usize,
+    pub client_pin_core: usize,
 
     /// The CPU frequency. If passed, the workload will use rdtsc for timing.
-    freq: Option<usize>,
+    pub freq: Option<usize>,
     /// Specifies the page fault time if TSC offsetting is to try to account for it.
-    pf_time: Option<u64>,
+    pub pf_time: Option<u64>,
     /// Indicates whether the workload should be run with eager paging.
-    eager: bool,
-}
-
-impl Default for RedisWorkloadConfig<'_> {
-    fn default() -> Self {
-        Self {
-            exp_dir: "",
-            redis_conf: "",
-            server_size_mb: 0,
-            wk_size_gb: 0,
-            output_file: None,
-            server_pin_core: None,
-            client_pin_core: 0,
-            freq: None,
-            pf_time: None,
-            eager: false,
-        }
-    }
-}
-
-impl<'s> RedisWorkloadConfig<'s> {
-    impl_conf! {exp_dir: &'s str}
-    impl_conf! {redis_conf: &'s str}
-    impl_conf! {server_size_mb: usize}
-    impl_conf! {wk_size_gb: usize}
-    impl_conf! {output_file: Option<&'s str>}
-    impl_conf! {server_pin_core: Option<usize>}
-    impl_conf! {client_pin_core: usize}
-    impl_conf! {freq: Option<usize>}
-    impl_conf! {pf_time: Option<u64>}
-    impl_conf! {eager: bool}
+    pub eager: bool,
 }
 
 /// Spawn a `redis` server in a new shell with the given amount of memory and set some important
@@ -795,17 +677,18 @@ pub fn run_mix(
 ) -> Result<(), failure::Error> {
     let redis_handles = run_redis_gen_data(
         shell,
-        &RedisWorkloadConfig::default()
-            .exp_dir(exp_dir)
-            .server_size_mb((size_gb << 10) / 3)
-            .wk_size_gb(size_gb / 3)
-            .freq(Some(freq))
-            .pf_time(None)
-            .output_file(None)
-            .eager(true)
-            .client_pin_core(tctx.next())
-            .server_pin_core(None)
-            .redis_conf(redis_conf),
+        &RedisWorkloadConfig {
+            exp_dir,
+            server_size_mb: (size_gb << 10) / 3,
+            wk_size_gb: size_gb / 3,
+            freq: Some(freq),
+            pf_time: None,
+            output_file: None,
+            eager: true,
+            client_pin_core: tctx.next(),
+            server_pin_core: None,
+            redis_conf,
+        },
     )?;
 
     let matrix_dim = (((size_gb / 3) << 27) as f64).sqrt() as usize;

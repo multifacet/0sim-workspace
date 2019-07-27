@@ -18,7 +18,10 @@ use crate::{
         paths::{setup00000::*, setup00001::*, *},
     },
     settings,
-    workloads::{run_memcached_gen_data, run_memhog, run_nas_cg, MemhogOptions, NasClass},
+    workloads::{
+        run_memcached_gen_data, run_memhog, run_nas_cg, MemcachedWorkloadConfig, MemhogOptions,
+        NasClass,
+    },
 };
 
 /// The amount of time (in hours) to let the NAS CG workload run.
@@ -347,18 +350,19 @@ where
                 "Start and Workload",
                 run_memcached_gen_data(
                     &vshell,
-                    &crate::workloads::MemcachedWorkloadConfig::default()
-                        .user("vagrant",)
-                        .exp_dir(zerosim_exp_path,)
-                        .server_size_mb(size >> 10,)
-                        .wk_size_gb(size >> 20,)
-                        .freq(Some(freq),)
-                        .allow_oom(false)
-                        .pf_time(None)
-                        .output_file(None,)
-                        .eager(false)
-                        .client_pin_core(tctx.next())
-                        .server_pin_core(None)
+                    &MemcachedWorkloadConfig {
+                        user: "vagrant",
+                        exp_dir: zerosim_exp_path,
+                        server_size_mb: size >> 10,
+                        wk_size_gb: size >> 20,
+                        freq: Some(freq),
+                        allow_oom: false,
+                        pf_time: None,
+                        output_file: None,
+                        eager: false,
+                        client_pin_core: tctx.next(),
+                        server_pin_core: None,
+                    }
                 )?
             );
         }

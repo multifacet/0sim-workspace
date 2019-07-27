@@ -227,15 +227,16 @@ where
             "Warmup",
             run_time_mmap_touch(
                 &vshell,
-                &TimeMmapTouchConfig::default()
-                    .exp_dir(zerosim_exp_path)
-                    .pages(((vm_size << 30) >> 12) >> 1)
-                    .pattern(WARM_UP_PATTERN)
-                    .prefault(false)
-                    .pf_time(None)
-                    .output_file(None)
-                    .eager(false)
-                    .pin_core(tctx.next())
+                &TimeMmapTouchConfig {
+                    exp_dir: zerosim_exp_path,
+                    pages: ((vm_size << 30) >> 12) >> 1,
+                    pattern: WARM_UP_PATTERN,
+                    prefault: false,
+                    pf_time: None,
+                    output_file: None,
+                    eager: false,
+                    pin_core: tctx.next(),
+                }
             )?
         );
     }
@@ -264,23 +265,25 @@ where
             time!(timers, "Workload", {
                 run_locality_mem_access(
                     &vshell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Local)
-                        .n(n)
-                        .threads(None)
-                        .output_file(&dir!(VAGRANT_RESULTS_DIR, local_file))
-                        .eager(false),
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Local,
+                        n: n,
+                        threads: None,
+                        output_file: &dir!(VAGRANT_RESULTS_DIR, local_file),
+                        eager: false,
+                    },
                 )?;
                 run_locality_mem_access(
                     &vshell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Random)
-                        .n(n)
-                        .threads(None)
-                        .output_file(&dir!(VAGRANT_RESULTS_DIR, nonlocal_file))
-                        .eager(false),
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Random,
+                        n: n,
+                        threads: None,
+                        output_file: &dir!(VAGRANT_RESULTS_DIR, nonlocal_file),
+                        eager: false,
+                    },
                 )?;
             });
         }
@@ -292,23 +295,25 @@ where
             time!(timers, "Workload", {
                 run_locality_mem_access(
                     &vshell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Local)
-                        .n(n)
-                        .threads(Some(threads))
-                        .output_file(&dir!(VAGRANT_RESULTS_DIR, local_file))
-                        .eager(false),
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Local,
+                        n: n,
+                        threads: Some(threads),
+                        output_file: &dir!(VAGRANT_RESULTS_DIR, local_file),
+                        eager: false,
+                    },
                 )?;
                 run_locality_mem_access(
                     &vshell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Random)
-                        .n(n)
-                        .threads(Some(threads))
-                        .output_file(&dir!(VAGRANT_RESULTS_DIR, nonlocal_file))
-                        .eager(false),
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Random,
+                        n: n,
+                        threads: Some(threads),
+                        output_file: &dir!(VAGRANT_RESULTS_DIR, nonlocal_file),
+                        eager: false,
+                    },
                 )?;
             });
         }

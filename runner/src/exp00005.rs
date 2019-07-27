@@ -190,15 +190,16 @@ where
             "Warmup",
             run_time_mmap_touch(
                 &vshell,
-                &TimeMmapTouchConfig::default()
-                    .exp_dir(zerosim_exp_path)
-                    .pages((vm_size << 30) >> 12)
-                    .pattern(WARM_UP_PATTERN)
-                    .prefault(false)
-                    .pf_time(None)
-                    .output_file(None)
-                    .eager(false)
-                    .pin_core(tctx.next())
+                &TimeMmapTouchConfig {
+                    exp_dir: zerosim_exp_path,
+                    pages: (vm_size << 30) >> 12,
+                    pattern: WARM_UP_PATTERN,
+                    prefault: false,
+                    pf_time: None,
+                    output_file: None,
+                    eager: false,
+                    pin_core: tctx.next(),
+                }
             )?
         );
     }

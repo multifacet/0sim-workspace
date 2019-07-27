@@ -20,7 +20,8 @@ use crate::{
     settings,
     workloads::{
         run_locality_mem_access, run_memcached_gen_data, run_time_mmap_touch,
-        LocalityMemAccessConfig, LocalityMemAccessMode, TimeMmapTouchConfig, TimeMmapTouchPattern,
+        LocalityMemAccessConfig, LocalityMemAccessMode, MemcachedWorkloadConfig,
+        TimeMmapTouchConfig, TimeMmapTouchPattern,
     },
 };
 
@@ -255,15 +256,16 @@ where
             "Warmup",
             run_time_mmap_touch(
                 &vshell,
-                &TimeMmapTouchConfig::default()
-                    .exp_dir(zerosim_exp_path)
-                    .pages((size << 30) >> 12)
-                    .pattern(WARM_UP_PATTERN)
-                    .prefault(false)
-                    .pf_time(None)
-                    .output_file(None)
-                    .eager(false)
-                    .pin_core(tctx.next()),
+                &TimeMmapTouchConfig {
+                    exp_dir: zerosim_exp_path,
+                    pages: (size << 30) >> 12,
+                    pattern: WARM_UP_PATTERN,
+                    prefault: false,
+                    pf_time: None,
+                    output_file: None,
+                    eager: false,
+                    pin_core: tctx.next(),
+                }
             )?
         );
     }
@@ -294,15 +296,16 @@ where
                 "Workload",
                 run_time_mmap_touch(
                     &vshell,
-                    &TimeMmapTouchConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .pages((size << 30) >> 12)
-                        .pattern(pattern)
-                        .prefault(false)
-                        .pf_time(pf_time)
-                        .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, output_file)))
-                        .eager(false)
-                        .pin_core(tctx.next())
+                    &TimeMmapTouchConfig {
+                        exp_dir: zerosim_exp_path,
+                        pages: (size << 30) >> 12,
+                        pattern: pattern,
+                        prefault: false,
+                        pf_time: pf_time,
+                        output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                        eager: false,
+                        pin_core: tctx.next(),
+                    }
                 )?
             );
 
@@ -343,18 +346,19 @@ where
                 "Start and Workload",
                 run_memcached_gen_data(
                     &vshell,
-                    &crate::workloads::MemcachedWorkloadConfig::default()
-                        .user("vagrant")
-                        .exp_dir(zerosim_exp_path)
-                        .server_size_mb(size << 10)
-                        .wk_size_gb(size)
-                        .freq(Some(freq))
-                        .allow_oom(true)
-                        .pf_time(pf_time)
-                        .output_file(Some(&dir!(VAGRANT_RESULTS_DIR, output_file)))
-                        .eager(false)
-                        .client_pin_core(tctx.next())
-                        .server_pin_core(None)
+                    &MemcachedWorkloadConfig {
+                        user: "vagrant",
+                        exp_dir: zerosim_exp_path,
+                        server_size_mb: size << 10,
+                        wk_size_gb: size,
+                        freq: Some(freq),
+                        allow_oom: true,
+                        pf_time: pf_time,
+                        output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                        eager: false,
+                        client_pin_core: tctx.next(),
+                        server_pin_core: None,
+                    }
                 )?
             );
 
@@ -397,13 +401,14 @@ where
                 "Workload 1",
                 run_locality_mem_access(
                     &vshell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Local)
-                        .n(LOCALITY_N)
-                        .threads(None)
-                        .output_file(&dir!(VAGRANT_RESULTS_DIR, output_local))
-                        .eager(false)
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Local,
+                        n: LOCALITY_N,
+                        threads: None,
+                        output_file: &dir!(VAGRANT_RESULTS_DIR, output_local),
+                        eager: false,
+                    }
                 )?
             );
 
@@ -423,13 +428,14 @@ where
                 "Workload 2",
                 run_locality_mem_access(
                     &vshell,
-                    &LocalityMemAccessConfig::default()
-                        .exp_dir(zerosim_exp_path)
-                        .locality(LocalityMemAccessMode::Random)
-                        .n(LOCALITY_N)
-                        .threads(None)
-                        .output_file(&dir!(VAGRANT_RESULTS_DIR, output_nonlocal))
-                        .eager(false)
+                    &LocalityMemAccessConfig {
+                        exp_dir: zerosim_exp_path,
+                        locality: LocalityMemAccessMode::Random,
+                        n: LOCALITY_N,
+                        threads: None,
+                        output_file: &dir!(VAGRANT_RESULTS_DIR, output_nonlocal),
+                        eager: false,
+                    }
                 )?
             );
 
