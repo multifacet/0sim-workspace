@@ -151,6 +151,7 @@ where
             &MemcachedWorkloadConfig {
                 user: login.username.as_str(),
                 exp_dir: zerosim_exp_path,
+                memcached: &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMCACHED_SUBMODULE),
                 server_size_mb: size << 10,
                 wk_size_gb: size,
                 allow_oom: true,

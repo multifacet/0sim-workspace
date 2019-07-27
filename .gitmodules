@@ -16,3 +16,6 @@
 [submodule "bmks/Metis"]
 	path = bmks/Metis
 	url = ../Metis.git
+[submodule "bmks/memcached"]
+	path = bmks/memcached
+	url = https://github.com/memcached/memcached

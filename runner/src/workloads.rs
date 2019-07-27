@@ -128,6 +128,8 @@ pub fn run_time_mmap_touch(
 pub struct MemcachedWorkloadConfig<'s> {
     /// The path of the `0sim-experiments` submodule on the remote.
     pub exp_dir: &'s str,
+    /// The path to the `memcached` binary.
+    pub memcached: &'s str,
 
     /// The user to run the `memcached` server as.
     pub user: &'s str,
@@ -172,15 +174,17 @@ pub fn start_memcached(
 
     if let Some(server_pin_core) = cfg.server_pin_core {
         shell.run(cmd!(
-            "taskset -c {} memcached {} -m {} -d -u {} -f 1.11",
+            "taskset -c {} {} {} -m {} -d -u {} -f 1.11",
             server_pin_core,
+            cfg.memcached,
             if cfg.allow_oom { "-M" } else { "" },
             cfg.server_size_mb,
             cfg.user
         ))?
     } else {
         shell.run(cmd!(
-            "memcached {} -m {} -d -u {} -f 1.11",
+            "{} {} -m {} -d -u {} -f 1.11",
+            cfg.memcached,
             if cfg.allow_oom { "-M" } else { "" },
             cfg.server_size_mb,
             cfg.user

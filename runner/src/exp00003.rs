@@ -225,6 +225,11 @@ where
             &MemcachedWorkloadConfig {
                 user: "vagrant",
                 exp_dir: zerosim_exp_path,
+                memcached: &dir!(
+                    "/home/vagrant",
+                    RESEARCH_WORKSPACE_PATH,
+                    ZEROSIM_MEMCACHED_SUBMODULE
+                ),
                 server_size_mb: size << 10,
                 wk_size_gb: size,
                 allow_oom: false,

@@ -363,6 +363,8 @@ where
             "redis",
             "perf", // for debugging
             "wget",
+            "libevent",
+            "libevent-devel",
         ]),
 
         // Add user to libvirt group after installing
@@ -470,6 +472,7 @@ where
             ZEROSIM_HIBENCH_SUBMODULE,
             ZEROSIM_MEMHOG_SUBMODULE,
             ZEROSIM_METIS_SUBMODULE,
+            ZEROSIM_MEMCACHED_SUBMODULE,
         ];
 
         crate::common::clone_research_workspace(&ushell, token, SUBMODULES)?;
@@ -690,6 +693,12 @@ where
         cmd!("make"),
     }
 
+    // memcached
+    with_shell! { ushell in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMCACHED_SUBMODULE) =>
+        cmd!("./configure"),
+        cmd!("make"),
+    }
+
     // Eager paging scripts/programs
     ushell.run(cmd!("make").cwd(&dir!(
         RESEARCH_WORKSPACE_PATH,
@@ -886,6 +895,8 @@ fn install_guest_dependencies(
         "maven",
         "redis",
         "perf", // for debugging
+        "libevent",
+        "libevent-devel",
     ]))?;
 
     install_rust(vrshell)?;
