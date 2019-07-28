@@ -6,7 +6,7 @@ use std::net::{Shutdown, TcpStream};
 
 use clap::clap_app;
 
-use jobserver::{JobServerReq, JobServerResp, Status, SERVER_ADDR};
+use jobserver::{cmd_replace_vars, cmd_to_path, JobServerReq, JobServerResp, Status, SERVER_ADDR};
 
 use prettytable::{cell, row, Table};
 
@@ -93,6 +93,14 @@ fn main() {
             (@arg JID: +required {is_usize}
              "The job ID of the job to clone.")
         )
+
+        (@subcommand joblog =>
+            (about: "Print the path to the job log.")
+            (@arg JID: +required {is_usize}
+             "The job ID of the job for which to print the log.")
+            (@arg VARIABLES: +takes_value ...
+             "A space-separated list of KEY=VALUE pairs for replacing variables.")
+        )
     }
     .setting(clap::AppSettings::SubcommandRequired)
     .setting(clap::AppSettings::DisableVersion)
@@ -114,9 +122,57 @@ fn main() {
             print_avail(avail);
         }
 
+        ("joblog", Some(sub_m)) => {
+            let jid = sub_m.value_of("JID").unwrap();
+            let vars = sub_m
+                .values_of("VARIABLES")
+                .map(|vals| {
+                    vals.map(|val| {
+                        let mut spl = val.split("=");
+                        let key = spl.next().unwrap().to_string();
+                        let value = spl.next().unwrap().to_string();
+                        (key, value)
+                    })
+                    .collect()
+                })
+                .unwrap_or_else(|| HashMap::new());
+            get_job_log_path(addr, jid, &vars)
+        }
+
         (subcmd, Some(sub_m)) => request_from_subcommand(addr, subcmd, sub_m),
 
         _ => unreachable!(),
+    }
+}
+
+fn get_job_log_path(addr: &str, jid: &str, vars: &HashMap<String, String>) {
+    let req = JobServerReq::JobStatus {
+        jid: jid.parse().unwrap(),
+    };
+
+    let status = make_request(addr, req);
+
+    match status {
+        JobServerResp::JobStatus { cmd, status, .. } => match status {
+            Status::Done { machine, .. }
+            | Status::Failed {
+                machine: Some(machine),
+                ..
+            }
+            | Status::Running { machine } => {
+                let cmd = cmd_replace_vars(&cmd, &machine, vars);
+                let path = cmd_to_path(&cmd);
+                println!("{}", path);
+            }
+
+            _ => {
+                println!("/dev/null");
+            }
+        },
+
+        resp => {
+            println!("{:?}", resp);
+        }
     }
 }
 
@@ -371,12 +427,13 @@ fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
                 jid,
                 mut cmd,
                 class,
-                status: Status::Failed { error },
+                status: Status::Failed { error, machine },
             } => {
                 if !is_long {
                     cmd.truncate(TRUNC);
                 }
-                table.add_row(row![b->jid, Frbu->"Failed", class, cmd, "", error]);
+                table.add_row(row![b->jid, Frbu->"Failed", class, cmd,
+                              if let Some(machine) = machine { machine } else {"".into()}, error]);
             }
 
             JobInfo {

@@ -15,7 +15,7 @@ use clap::clap_app;
 
 use crossbeam::channel::{select, unbounded, Receiver, TryRecvError};
 
-use jobserver::{JobServerReq, JobServerResp, Status, SERVER_ADDR};
+use jobserver::{cmd_replace_vars, cmd_to_path, JobServerReq, JobServerResp, Status, SERVER_ADDR};
 
 use log::{debug, error, info, warn};
 
@@ -409,7 +409,7 @@ impl Server {
                     // Mark the machine and job as running.
                     machine.1.running = Some(*can_run.0);
                     can_run.1.status = Status::Running {
-                        machine: machine.0.into(),
+                        machine: machine.0.clone(),
                     };
 
                     let this = Arc::clone(&self);
@@ -665,6 +665,7 @@ impl Server {
                     let mut locked_jobs = self.jobs.lock().unwrap();
                     if let Some(job) = locked_jobs.get_mut(&jid) {
                         job.status = Status::Failed {
+                            machine: Some(machine.clone()),
                             error: format!("{}", e),
                         };
                     } else {
@@ -792,6 +793,7 @@ impl Server {
                         let mut locked_setup_tasks = self.setup_tasks.lock().unwrap();
                         if let Some(job) = locked_setup_tasks.get_mut(&jid) {
                             job.status = Status::Failed {
+                                machine: Some(setup_task.machine.clone()),
                                 error: format!("{}", e),
                             };
                         } else {
@@ -880,19 +882,10 @@ impl Server {
         cancel_chan: Receiver<()>,
         variables: &HashMap<String, String>,
     ) -> std::io::Result<Option<String>> {
-        let cmd = cmd.replace("{MACHINE}", &machine);
-        let cmd = variables.iter().fold(cmd.to_string(), |cmd, (key, value)| {
-            cmd.replace(&format!("{{{}}}", key), &value)
-        });
+        let cmd = cmd_replace_vars(cmd, machine, variables);
 
         // Open a tmp file for the cmd output
-        let tmp_file_name = format!(
-            "/tmp/{}",
-            cmd.replace(" ", "_")
-                .replace("{", "_")
-                .replace("}", "_")
-                .replace("/", "_")
-        );
+        let tmp_file_name = cmd_to_path(&cmd);
         let mut tmp_file = OpenOptions::new()
             .truncate(true)
             .write(true)

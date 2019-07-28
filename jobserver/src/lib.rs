@@ -146,5 +146,28 @@ pub enum Status {
     Cancelled,
 
     /// The job produced an error.
-    Failed { error: String },
+    Failed {
+        /// The machine where the job was running when the failure occured, if any.
+        machine: Option<String>,
+
+        /// The error that caused the failure.
+        error: String,
+    },
+}
+
+pub fn cmd_replace_vars(cmd: &str, machine: &str, vars: &HashMap<String, String>) -> String {
+    let cmd = cmd.replace("{MACHINE}", &machine);
+    vars.iter().fold(cmd.to_string(), |cmd, (key, value)| {
+        cmd.replace(&format!("{{{}}}", key), &value)
+    })
+}
+
+pub fn cmd_to_path(cmd: &str) -> String {
+    format!(
+        "/tmp/{}",
+        cmd.replace(" ", "_")
+            .replace("{", "_")
+            .replace("}", "_")
+            .replace("/", "_")
+    )
 }
