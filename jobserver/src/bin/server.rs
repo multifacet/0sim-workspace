@@ -43,6 +43,9 @@ struct Server {
 
     /// The next job ID to be assigned.
     next_jid: AtomicUsize,
+
+    /// The path to the runner. Never changes.
+    runner: String,
 }
 
 /// Information about a single job.
@@ -98,13 +101,14 @@ struct MachineStatus {
 
 impl Server {
     /// Creates a new server. Not listening yet.
-    pub fn new() -> Self {
+    pub fn new(runner: String) -> Self {
         Self {
             machines: Arc::new(Mutex::new(HashMap::new())),
             variables: Arc::new(Mutex::new(HashMap::new())),
             jobs: Arc::new(Mutex::new(HashMap::new())),
             setup_tasks: Arc::new(Mutex::new(HashMap::new())),
             next_jid: AtomicUsize::new(0),
+            runner,
         }
     }
 
@@ -578,7 +582,7 @@ impl Server {
 
         // Actually run the command now.
         let variables = self.variables.lock().unwrap().clone();
-        let result = Self::run_cmd(jid, &machine, &cmd, cancel_chan, &variables);
+        let result = Self::run_cmd(jid, &machine, &cmd, cancel_chan, &variables, &self.runner);
 
         // Check the results.
         match result {
@@ -768,6 +772,7 @@ impl Server {
                 cmd,
                 cancel_chan.clone(),
                 &variables,
+                &self.runner,
             );
 
             match result {
@@ -881,6 +886,7 @@ impl Server {
         cmd: &str,
         cancel_chan: Receiver<()>,
         variables: &HashMap<String, String>,
+        runner: &str,
     ) -> std::io::Result<Option<String>> {
         let cmd = cmd_replace_vars(cmd, machine, variables);
 
@@ -903,7 +909,7 @@ impl Server {
         let mut child = std::process::Command::new("cargo")
             .args(&["run", "--", "--print_results_path"])
             .args(&cmd.split_whitespace().collect::<Vec<_>>())
-            .current_dir(RUNNER)
+            .current_dir(runner)
             .stdout(Stdio::piped())
             .stderr(Stdio::from(stderr_file))
             .spawn()?;
@@ -1009,10 +1015,14 @@ fn main() {
         (@arg ADDR: --addr +takes_value
          "The IP:ADDR for the server to listen on for commands \
          (defaults to `localhost:3030`)")
+        (@arg RUNNER: --runner +takes_value
+         "Path to the runner cargo workspace \
+         (defaults to /nobackup/research-workspace/runner/)")
     }
     .get_matches();
 
     let addr = matches.value_of("ADDR").unwrap_or(SERVER_ADDR.into());
+    let runner = matches.value_of("RUNNER").unwrap_or(RUNNER);
 
     // Start logger
     env_logger::init();
@@ -1020,7 +1030,7 @@ fn main() {
     info!("Starting server at {}", addr);
 
     // Listen for client requests on the main thread, while we do work in the background.
-    let server = Arc::new(Server::new());
+    let server = Arc::new(Server::new(runner.into()));
     Arc::clone(&server).start_work_thread();
     server.listen(addr);
 }
