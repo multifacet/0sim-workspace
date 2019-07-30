@@ -310,7 +310,10 @@ where
     // Install a bunch of stuff
     ushell.run(cmd!("sudo yum group install -y 'Development Tools'"))?;
 
-    if !cfg.aws {
+    if cfg.aws {
+        // This installs the qemu-kvm package, which we don't want on machines where we will run VMs.
+        ushell.run(spurs_util::centos::yum_install(&["libguestfs-tools-c"]))?;
+    } else {
         with_shell! { ushell =>
             spurs_util::centos::yum_install(&[
                 "libunwind-devel",
@@ -328,7 +331,6 @@ where
             "git",
             "libxslt-devel",
             "libxml2-devel",
-            "libguestfs-tools-c",
             "gcc",
             "gcc-gfortran",
             "gcc-c++",
