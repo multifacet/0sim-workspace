@@ -163,11 +163,13 @@ pub fn cmd_replace_vars(cmd: &str, machine: &str, vars: &HashMap<String, String>
 }
 
 pub fn cmd_to_path(cmd: &str) -> String {
-    format!(
+    let mut name = format!(
         "/tmp/{}",
         cmd.replace(" ", "_")
             .replace("{", "_")
             .replace("}", "_")
             .replace("/", "_")
-    )
+    );
+    name.truncate(200);
+    name
 }
