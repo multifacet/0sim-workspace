@@ -154,7 +154,7 @@ pub fn timings_str(timings: &[(&str, std::time::Duration)]) -> String {
 /// Clone the research-workspace and checkout the given submodules. The given token is used as the
 /// Github personal access token.
 ///
-/// If the repository is already cloned, nothing is done.
+/// If the repository is already cloned, it is updated (along with submodules).
 ///
 /// Returns the git hash of the cloned repo.
 ///
@@ -165,16 +165,20 @@ pub fn clone_research_workspace(
     submodules: &[&str],
 ) -> Result<String, failure::Error> {
     // Check if the repo is already cloned.
-    if let Ok(hash) = research_workspace_git_hash(&ushell) {
-        return Ok(hash);
+    if let Ok(_hash) = research_workspace_git_hash(&ushell) {
+        // If so, just update it.
+        with_shell! { ushell in &dir!(RESEARCH_WORKSPACE_PATH) =>
+            cmd!("git pull"),
+            cmd!("git submodule update"),
+        }
+    } else {
+        // Clone the repo.
+        let repo = GitHubRepo::Https {
+            repo: RESEARCH_WORKSPACE_REPO.into(),
+            token: Some((GITHUB_CLONE_USERNAME.into(), token.into())),
+        };
+        ushell.run(cmd!("git clone {}", repo))?;
     }
-
-    // Clone the repo.
-    let repo = GitHubRepo::Https {
-        repo: RESEARCH_WORKSPACE_REPO.into(),
-        token: Some((GITHUB_CLONE_USERNAME.into(), token.into())),
-    };
-    ushell.run(cmd!("git clone {}", repo))?;
 
     // Checkout submodules.
     for submodule in submodules {

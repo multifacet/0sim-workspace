@@ -14,12 +14,13 @@ macro_rules! time {
 /// Given an ordered list of path components, combine them into a path string.
 macro_rules! dir {
     ($first:expr $(, $part:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
         let mut path = String::from($first);
 
         $(
             path.push('/');
             path.extend(String::from($part).chars());
-        )+
+        )*
 
         path
     }}

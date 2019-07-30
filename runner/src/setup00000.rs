@@ -695,6 +695,7 @@ where
 
     // memcached
     with_shell! { ushell in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_MEMCACHED_SUBMODULE) =>
+        cmd!("./autogen.sh"),
         cmd!("./configure"),
         cmd!("make"),
     }
