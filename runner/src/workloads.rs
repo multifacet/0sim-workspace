@@ -172,6 +172,10 @@ pub fn start_memcached(
         vagrant_setup_apriori_paging_process(shell, "memcached")?;
     }
 
+    // We need to update the system vma limit because malloc may cause it to be hit for
+    // large-memory systems.
+    shell.run(cmd!("sudo sysctl -w vm.max_map_count={}", 1_000_000_000))?;
+
     if let Some(server_pin_core) = cfg.server_pin_core {
         shell.run(cmd!(
             "taskset -c {} {}/memcached {} -m {} -d -u {} -f 1.11",
