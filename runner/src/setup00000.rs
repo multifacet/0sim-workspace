@@ -900,6 +900,7 @@ fn install_guest_dependencies(
         "perf", // for debugging
         "libevent",
         "libevent-devel",
+        "numactl-devel",
     ]))?;
 
     install_rust(vrshell)?;
