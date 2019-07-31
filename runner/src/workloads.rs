@@ -360,7 +360,7 @@ pub fn run_memhog(
 
     shell.spawn(cmd!(
         "{} ; do \
-         taskset -c {} {}/memhog -r1 {}k {} {} > /dev/null ; \
+         LD_LIBRARY_PATH={} taskset -c {} {}/memhog -r1 {}k {} {} > /dev/null ; \
          done; \
          echo memhog done ;",
         if let Some(r) = r {
@@ -368,6 +368,7 @@ pub fn run_memhog(
         } else {
             "while [ 1 ]".into()
         },
+        exp_dir,
         tctx.next(),
         exp_dir,
         size_kb,
