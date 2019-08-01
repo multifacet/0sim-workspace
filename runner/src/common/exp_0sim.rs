@@ -146,6 +146,9 @@ where
 
     dump_sys_info(&ushell)?;
 
+    // Force the VM off if it was left running. If there is no VM, then ignore errors.
+    let _ = vagrant_halt(&ushell);
+
     // Set up swapping
     setup_swapping(&ushell)?;
 
