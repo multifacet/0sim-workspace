@@ -309,10 +309,10 @@ where
                 run_memcached_gen_data(
                     &ushell,
                     &MemcachedWorkloadConfig {
-                        user: "vagrant",
+                        user: login.username.as_str(),
                         exp_dir: zerosim_exp_path,
                         memcached: &dir!(
-                            "/home/vagrant",
+                            user_home.as_str(),
                             RESEARCH_WORKSPACE_PATH,
                             ZEROSIM_MEMCACHED_SUBMODULE
                         ),
