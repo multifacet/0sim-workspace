@@ -100,6 +100,9 @@ pub mod paths {
     /// Path to the memcached submodule.
     pub const ZEROSIM_MEMCACHED_SUBMODULE: &str = "bmks/memcached";
 
+    /// Path the to nullfs submodule
+    pub const ZEROSIM_NULLFS_SUBMODULE: &str = "bmks/nullfs";
+
     /// Path to redis.conf.
     pub const REDIS_CONF: &str = "bmks/redis.conf";
 

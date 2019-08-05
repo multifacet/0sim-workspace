@@ -502,6 +502,8 @@ impl RedisWorkloadHandles {
 pub struct RedisWorkloadConfig<'s> {
     /// The path of the `0sim-experiments` submodule on the remote.
     pub exp_dir: &'s str,
+    /// The path to the nullfs submodule on the remote.
+    pub nullfs: &'s str,
     /// The path of the `redis.conf` file on the remote.
     pub redis_conf: &'s str,
 
@@ -531,7 +533,9 @@ pub struct RedisWorkloadConfig<'s> {
 /// In order for redis snapshots to work properly, we need to tell the kernel to overcommit memory.
 /// This requires `sudo` access.
 ///
-/// The caller should ensure that any previous RDB is deleted.
+/// We also
+///     - delete any existing RDB files.
+///     - set up a nullfs to use for the snapshot directory
 ///
 /// `eager` should only be used in a VM.
 ///
@@ -549,6 +553,9 @@ pub fn start_redis(
 
     // Delete any previous database
     shell.run(cmd!("rm -f /tmp/dump.rdb"))?;
+
+    // Start nullfs
+    shell.run(cmd!("sudo {}/nullfs /mnt/nullfs", cfg.nullfs))?;
 
     // Start the redis server
     let handle = if let Some(server_pin_core) = cfg.server_pin_core {
@@ -678,6 +685,7 @@ pub fn run_mix(
     exp_dir: &str,
     metis_dir: &str,
     numactl_dir: &str,
+    nullfs_dir: &str,
     redis_conf: &str,
     freq: usize,
     size_gb: usize,
@@ -688,6 +696,7 @@ pub fn run_mix(
         shell,
         &RedisWorkloadConfig {
             exp_dir,
+            nullfs: nullfs_dir,
             server_size_mb: (size_gb << 10) / 3,
             wk_size_gb: size_gb / 3,
             freq: Some(freq),

@@ -370,7 +370,12 @@ where
                         eager: eager,
                         client_pin_core: tctx.next(),
                         server_pin_core: None,
-                        redis_conf: &dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF)
+                        redis_conf: &dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF),
+                        nullfs: &dir!(
+                            "/home/vagrant",
+                            RESEARCH_WORKSPACE_PATH,
+                            ZEROSIM_NULLFS_SUBMODULE
+                        )
                     }
                 )?
                 .wait_for_client()?
@@ -426,6 +431,11 @@ where
                         "/home/vagrant",
                         RESEARCH_WORKSPACE_PATH,
                         ZEROSIM_MEMHOG_SUBMODULE
+                    ),
+                    &dir!(
+                        "/home/vagrant",
+                        RESEARCH_WORKSPACE_PATH,
+                        ZEROSIM_NULLFS_SUBMODULE
                     ),
                     &dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF,),
                     freq,

@@ -475,6 +475,7 @@ where
             ZEROSIM_MEMHOG_SUBMODULE,
             ZEROSIM_METIS_SUBMODULE,
             ZEROSIM_MEMCACHED_SUBMODULE,
+            ZEROSIM_NULLFS_SUBMODULE,
         ];
 
         crate::common::clone_research_workspace(&ushell, token, SUBMODULES)?;
@@ -702,6 +703,11 @@ where
         cmd!("make"),
     }
 
+    // nullfs (for redis bgsave)
+    with_shell! { ushell in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_NULLFS_SUBMODULE) =>
+        cmd!("make"),
+    }
+
     // Eager paging scripts/programs
     ushell.run(cmd!("make").cwd(&dir!(
         RESEARCH_WORKSPACE_PATH,
@@ -901,6 +907,7 @@ fn install_guest_dependencies(
         "libevent",
         "libevent-devel",
         "numactl-devel",
+        "fuse-devel",
     ]))?;
 
     install_rust(vrshell)?;
@@ -1029,6 +1036,9 @@ where
                 .use_bash(),
         )?;
     }
+
+    // Create a mountpoint for nullfs
+    vushell.run(cmd!("sudo mkdir -p /mnt/nullfs"))?;
 
     Ok(())
 }
