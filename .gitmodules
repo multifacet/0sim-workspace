@@ -19,3 +19,6 @@
 [submodule "bmks/memcached"]
 	path = bmks/memcached
 	url = https://github.com/memcached/memcached
+[submodule "bmks/nullfs"]
+	path = bmks/nullfs
+	url = https://github.com/xrgtn/nullfs.git
