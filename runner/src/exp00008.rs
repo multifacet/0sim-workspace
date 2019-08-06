@@ -227,7 +227,7 @@ where
     // Mount the guest swap file
     vshell.run(cmd!("sudo swapon {}", VAGRANT_GUEST_SWAPFILE))?;
 
-    // Get the amount of memory the guest thinks it has.
+    // Get the amount of memory the guest thinks it has. (KB)
     let mem_avail = {
         let mem_avail = vshell
             .run(cmd!("grep MemAvailable /proc/meminfo | awk '{{print $2}}'").use_bash())?
@@ -243,7 +243,7 @@ where
 
     // Compute a workload size that is large enough to cause reclamation but small enough to not
     // trigger OOM killer.
-    let size = mem_avail + (8 * swap_avail / 10);
+    let size = mem_avail + (8 * swap_avail / 10); // KB
 
     ushell.run(
         cmd!(
@@ -340,6 +340,23 @@ where
 
     let freq = crate::common::get_cpu_freq(&ushell)?;
     let mut tctx = crate::workloads::TasksetCtx::new(cores);
+
+    // Start the hog process and give it all memory... the hope is that this gets oom killed
+    // eventually, but not before some reclaim happens.
+    vshell.run(cmd!("rm -f /tmp/hog_ready"))?;
+
+    let _ = vshell.spawn(cmd!(
+        "/home/vagrant/{}/target/release/hog {}",
+        dir!(
+            "/home/vagrant",
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_EXPERIMENTS_SUBMODULE
+        ),
+        size / 4 // pages
+    ))?;
+
+    // Wait to make sure the hog has started
+    vshell.run(cmd!("while [ ! -e /tmp/hog_ready ] ; do sleep 1 ; done",).use_bash())?;
 
     // Run the actual workload
     match workload {
