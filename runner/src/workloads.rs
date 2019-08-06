@@ -555,7 +555,11 @@ pub fn start_redis(
     shell.run(cmd!("rm -f /tmp/dump.rdb"))?;
 
     // Start nullfs
-    shell.run(cmd!("sudo {}/nullfs /mnt/nullfs", cfg.nullfs))?;
+    shell.run(cmd!("sudo rm -rf /mnt/nullfs"))?;
+    shell.run(cmd!("sudo mkdir -p /mnt/nullfs"))?;
+    shell.run(cmd!("sudo chmod 777 /mnt/nullfs"))?;
+    shell.run(cmd!("nohup {}/nullfs /mnt/nullfs", cfg.nullfs))?;
+    shell.run(cmd!("sudo chmod 777 /mnt/nullfs"))?;
 
     // Start the redis server
     let handle = if let Some(server_pin_core) = cfg.server_pin_core {

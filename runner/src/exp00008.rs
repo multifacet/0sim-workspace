@@ -345,8 +345,8 @@ where
     // eventually, but not before some reclaim happens.
     vshell.run(cmd!("rm -f /tmp/hog_ready"))?;
 
-    let _ = vshell.spawn(cmd!(
-        "/home/vagrant/{}/target/release/hog {}",
+    vshell.run(cmd!(
+        "(nohup {}/target/release/hog {} &) ; ps",
         dir!(
             "/home/vagrant",
             RESEARCH_WORKSPACE_PATH,
@@ -354,6 +354,8 @@ where
         ),
         size / 4 // pages
     ))?;
+
+    vshell.run(cmd!("ps aux | grep hog"))?;
 
     // Wait to make sure the hog has started
     vshell.run(cmd!("while [ ! -e /tmp/hog_ready ] ; do sleep 1 ; done",).use_bash())?;
