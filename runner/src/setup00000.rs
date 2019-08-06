@@ -90,6 +90,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         (@arg GUEST_KERNEL: --guest_kernel
          "(Optional) Build and install a guest kernel")
 
+        (@arg GUEST_BMKS: --guest_bmks
+         "(Optional) Build and install a guest benchmarks")
         (@arg HADOOP: --hadoop
          "(Optional) set up hadoop stack on VM.")
     }
@@ -140,6 +142,8 @@ where
     /// Compile and install Linux 5.1.4 on the guest.
     guest_kernel: bool,
 
+    /// Compile and install guest bmks.
+    guest_bmks: bool,
     /// Set up the Hadoop on the guest.
     setup_hadoop: bool,
 }
@@ -180,6 +184,8 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
 
     let setup_hadoop = sub_m.is_present("HADOOP");
 
+    let guest_bmks = sub_m.is_present("GUEST_BMKS");
+
     let cfg = SetupConfig {
         login,
         aws,
@@ -196,6 +202,7 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         destroy_existing_vm,
         create_vm,
         guest_kernel,
+        guest_bmks,
         setup_hadoop,
     };
 
@@ -249,7 +256,7 @@ where
     let (vrshell, vushell) = if cfg.create_vm {
         // Create the VM and install dependencies for the benchmarks/simulator.
         init_vm(&mut ushell, &cfg)?
-    } else if cfg.guest_kernel || cfg.setup_hadoop {
+    } else if cfg.guest_kernel || cfg.setup_hadoop || cfg.guest_bmks {
         // Start vagrant (that already exists)
         let vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
         let vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
@@ -267,7 +274,9 @@ where
     }
 
     // Install benchmarks.
-    install_guest_benchmarks(&ushell, &vrshell, &cfg)?;
+    if cfg.guest_bmks || cfg.setup_hadoop {
+        install_guest_benchmarks(&ushell, &vrshell, &cfg)?;
+    }
 
     // Make sure the TSC is marked as a reliable clock source in the guest.
     set_kernel_boot_param(&vrshell, "tsc", Some("reliable"))?;
