@@ -1,8 +1,10 @@
-//! Run the time_mmap_touch or memcached_gen_data workload on the remote test machine.
+//! Run the given workload on the remote machine in simulation and record its results.
 //!
 //! Requires `setup00000`.
 
 use clap::clap_app;
+
+use serde::{Deserialize, Serialize};
 
 use spurs::{
     cmd,
@@ -20,10 +22,18 @@ use crate::{
     },
     settings,
     workloads::{
-        run_memcached_gen_data, run_time_mmap_touch, MemcachedWorkloadConfig, TimeMmapTouchConfig,
-        TimeMmapTouchPattern,
+        run_memcached_gen_data, run_metis_matrix_mult, run_redis_gen_data, run_time_mmap_touch,
+        MemcachedWorkloadConfig, RedisWorkloadConfig, TimeMmapTouchConfig, TimeMmapTouchPattern,
     },
 };
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+enum Workload {
+    Memcached,
+    Redis,
+    MatrixMult2,
+    TimeMmapTouch,
+}
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {
@@ -45,9 +55,11 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The number of cores of the VM")
         (@group PATTERN =>
             (@attributes +required)
-            (@arg zeros: -z "Fill pages with zeros")
-            (@arg counter: -c "Fill pages with counter values")
+            (@arg zeros: -z "Run the time_mmap_touch workload with zeros")
+            (@arg counter: -c "Run the time_mmap_touch workload with counter values")
             (@arg memcached: -m "Run a memcached workload")
+            (@arg redis: -r "Run a redis workload")
+            (@arg matrixmult: -M "Run the Metis matrix_mult2 workload")
         )
         (@arg WARMUP: -w --warmup
          "Pass this flag to warmup the VM before running the main workload.")
@@ -69,14 +81,28 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
     let vm_size = sub_m.value_of("VMSIZE").unwrap().parse::<usize>().unwrap();
     let cores = sub_m.value_of("CORES").unwrap().parse::<usize>().unwrap();
 
-    let pattern = if sub_m.is_present("memcached") {
-        None
+    let workload = if sub_m.is_present("memcached") {
+        Workload::Memcached
+    } else if sub_m.is_present("redis") {
+        Workload::Redis
+    } else if sub_m.is_present("matrixmult") {
+        Workload::MatrixMult2
+    } else if sub_m.is_present("zeros") {
+        Workload::TimeMmapTouch
+    } else if sub_m.is_present("counter") {
+        Workload::TimeMmapTouch
     } else {
+        unreachable!();
+    };
+
+    let pattern = if sub_m.is_present("zeros") || sub_m.is_present("counter") {
         Some(if sub_m.is_present("zeros") {
             TimeMmapTouchPattern::Zeros
         } else {
             TimeMmapTouchPattern::Counter
         })
+    } else {
+        None
     };
 
     let size = sub_m
@@ -91,7 +117,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
 
     let settings = settings! {
-        * workload: if pattern.is_some() { "time_mmap_touch" } else { "memcached_gen_data" },
+        * workload: "bmk",
+        * app: workload,
         exp: 0,
 
         * vm_size: vm_size,
@@ -130,6 +157,7 @@ where
 {
     let vm_size = settings.get::<usize>("vm_size");
     let cores = settings.get::<usize>("cores");
+    let workload = settings.get::<Workload>("app");
     let pattern = settings.get::<Option<TimeMmapTouchPattern>>("pattern");
     let size = settings.get::<Option<usize>>("size");
     let warmup = settings.get::<bool>("warmup");
@@ -230,50 +258,102 @@ where
     let freq = get_cpu_freq(&ushell)?;
 
     // Run memcached or time_touch_mmap
-    if let Some(pattern) = pattern {
-        time!(
-            timers,
-            "Workload",
-            run_time_mmap_touch(
-                &vshell,
-                &TimeMmapTouchConfig {
-                    exp_dir: zerosim_exp_path,
-                    pages: (size << 30) >> 12,
-                    pattern: pattern,
-                    prefault: prefault,
-                    pf_time: None,
-                    output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
-                    eager: false,
-                    pin_core: tctx.next(),
-                }
-            )?
-        );
-    } else {
-        time!(
-            timers,
-            "Workload",
-            run_memcached_gen_data(
-                &vshell,
-                &MemcachedWorkloadConfig {
-                    user: "vagrant",
-                    exp_dir: zerosim_exp_path,
-                    memcached: &dir!(
+    match workload {
+        Workload::TimeMmapTouch => {
+            time!(
+                timers,
+                "Workload",
+                run_time_mmap_touch(
+                    &vshell,
+                    &TimeMmapTouchConfig {
+                        exp_dir: zerosim_exp_path,
+                        pages: (size << 30) >> 12,
+                        pattern: pattern.unwrap(),
+                        prefault: prefault,
+                        pf_time: None,
+                        output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                        eager: false,
+                        pin_core: tctx.next(),
+                    }
+                )?
+            );
+        }
+
+        Workload::Memcached => {
+            time!(
+                timers,
+                "Workload",
+                run_memcached_gen_data(
+                    &vshell,
+                    &MemcachedWorkloadConfig {
+                        user: "vagrant",
+                        exp_dir: zerosim_exp_path,
+                        memcached: &dir!(
+                            "/home/vagrant",
+                            RESEARCH_WORKSPACE_PATH,
+                            ZEROSIM_MEMCACHED_SUBMODULE
+                        ),
+                        server_size_mb: size << 10,
+                        wk_size_gb: size,
+                        freq: Some(freq),
+                        allow_oom: true,
+                        pf_time: None,
+                        output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                        eager: false,
+                        client_pin_core: tctx.next(),
+                        server_pin_core: None,
+                    }
+                )?
+            );
+        }
+
+        Workload::Redis => {
+            time!(
+                timers,
+                "Start and Workload",
+                run_redis_gen_data(
+                    &vshell,
+                    &RedisWorkloadConfig {
+                        exp_dir: zerosim_exp_path,
+                        server_size_mb: size << 10,
+                        wk_size_gb: size,
+                        freq: Some(freq),
+                        pf_time: None,
+                        output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+                        eager: false,
+                        client_pin_core: tctx.next(),
+                        server_pin_core: None,
+                        redis_conf: &dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH, REDIS_CONF),
+                        nullfs: &dir!(
+                            "/home/vagrant",
+                            RESEARCH_WORKSPACE_PATH,
+                            ZEROSIM_NULLFS_SUBMODULE
+                        )
+                    }
+                )?
+                .wait_for_client()?
+            );
+        }
+
+        Workload::MatrixMult2 => {
+            time!(
+                timers,
+                "Workload",
+                run_metis_matrix_mult(
+                    &vshell,
+                    &dir!(
                         "/home/vagrant",
                         RESEARCH_WORKSPACE_PATH,
-                        ZEROSIM_MEMCACHED_SUBMODULE
+                        ZEROSIM_METIS_SUBMODULE
                     ),
-                    server_size_mb: size << 10,
-                    wk_size_gb: size,
-                    freq: Some(freq),
-                    allow_oom: true,
-                    pf_time: None,
-                    output_file: Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
-                    eager: false,
-                    client_pin_core: tctx.next(),
-                    server_pin_core: None,
-                }
-            )?
-        );
+                    ((size << 7) as f64).sqrt() as usize,
+                    /* eager */ false,
+                    &mut tctx,
+                )?
+                .1
+                .join()?
+            );
+        }
     }
 
     ushell.run(cmd!("date"))?;
