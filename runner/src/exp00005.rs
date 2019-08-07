@@ -23,7 +23,7 @@ use crate::{
     },
 };
 
-const NAS_CG_TIME: usize = 7200; // seconds
+const NAS_CG_TIME: u64 = 7200; // seconds
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {
@@ -239,6 +239,8 @@ where
         /* eager */ false,
         &mut tctx,
     )?;
+
+    std::thread::sleep(std::time::Duration::from_secs(NAS_CG_TIME));
 
     time!(
         timers,
