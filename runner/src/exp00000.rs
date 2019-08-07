@@ -346,7 +346,7 @@ where
                         RESEARCH_WORKSPACE_PATH,
                         ZEROSIM_METIS_SUBMODULE
                     ),
-                    ((size << 7) as f64).sqrt() as usize,
+                    ((size << 27) as f64).sqrt() as usize,
                     /* eager */ false,
                     &mut tctx,
                 )?
