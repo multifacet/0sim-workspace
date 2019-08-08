@@ -23,8 +23,6 @@ use crate::{
     },
 };
 
-const NAS_CG_TIME: u64 = 7200; // seconds
-
 pub fn cli_options() -> clap::App<'static, 'static> {
     fn is_usize(s: String) -> Result<(), String> {
         s.as_str()
@@ -39,6 +37,8 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
+        (@arg DURATION: +takes_value {is_usize} +required
+         "The length of time to run the workload in seconds.")
         (@arg WARMUP: -w --warmup
          "Pass this flag to warmup the VM before running the main workload.")
         (@arg VMSIZE: +takes_value {is_usize}
@@ -54,6 +54,13 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
+
+    let duration = sub_m
+        .value_of("DURATION")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
+
     let vm_size = sub_m
         .value_of("VMSIZE")
         .map(|value| value.parse::<usize>().unwrap());
@@ -90,6 +97,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         * vm_size: vm_size,
         * cores: cores,
 
+        duration: duration,
+
         zswap_max_pool_percent: 50,
 
         username: login.username.as_str(),
@@ -115,6 +124,7 @@ fn run_inner<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
+    let duration = settings.get::<usize>("duration");
     let vm_size = settings.get::<usize>("vm_size");
     let cores = settings.get::<usize>("cores");
     let warmup = settings.get::<bool>("warmup");
@@ -210,7 +220,7 @@ where
         cmd!(
             "for (( c=1 ; c<={} ; c++ )) ; do \
              cat /proc/vmstat >> {} ; sleep 1 ; done",
-            NAS_CG_TIME,
+            duration,
             dir!(VAGRANT_RESULTS_DIR, vmstat_file)
         )
         .use_bash(),
@@ -225,7 +235,7 @@ where
             "for (( c=1 ; c<={} ; c++ )) ; do \
              sudo tail `sudo find  /sys/kernel/debug/zswap/ -type f`\
              >> {} ; sleep 1 ; done",
-            NAS_CG_TIME,
+            duration,
             dir!(HOSTNAME_SHARED_RESULTS_DIR, zswapstats_file)
         )
         .use_bash(),
@@ -241,7 +251,7 @@ where
             &mut tctx,
         )?;
 
-        std::thread::sleep(std::time::Duration::from_secs(NAS_CG_TIME));
+        std::thread::sleep(std::time::Duration::from_secs(duration as u64));
 
         zswapstats_handle.join()?
     });
