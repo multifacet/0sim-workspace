@@ -231,22 +231,20 @@ where
         .use_bash(),
     )?;
 
-    let _ = run_nas_cg(
-        &vshell,
-        zerosim_bmk_path,
-        NasClass::E,
-        Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
-        /* eager */ false,
-        &mut tctx,
-    )?;
+    time!(timers, "Background stats collection", {
+        let _ = run_nas_cg(
+            &vshell,
+            zerosim_bmk_path,
+            NasClass::E,
+            Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
+            /* eager */ false,
+            &mut tctx,
+        )?;
 
-    std::thread::sleep(std::time::Duration::from_secs(NAS_CG_TIME));
+        std::thread::sleep(std::time::Duration::from_secs(NAS_CG_TIME));
 
-    time!(
-        timers,
-        "Background stats collection",
         zswapstats_handle.join()?
-    );
+    });
 
     ushell.run(cmd!("date"))?;
 
