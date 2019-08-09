@@ -1047,8 +1047,8 @@ where
     }
 
     // Create a mountpoint for nullfs
-    vushell.run(cmd!("sudo chmod 777 /mnt/nullfs"))?;
     vushell.run(cmd!("sudo mkdir -p /mnt/nullfs"))?;
+    vushell.run(cmd!("sudo chmod 777 /mnt/nullfs"))?;
 
     Ok(())
 }
