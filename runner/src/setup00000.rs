@@ -685,9 +685,23 @@ where
             "NPB3.4",
             "NPB3.4-OMP"
         )))?;
+        ushell.run(cmd!("make clean cg CLASS=F").cwd(&dir!(
+            RESEARCH_WORKSPACE_PATH,
+            ZEROSIM_BENCHMARKS_DIR,
+            "NPB3.4",
+            "NPB3.4-OMP"
+        )))?;
     } else {
         ushell.run(
             cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=E )").cwd(&dir!(
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_BENCHMARKS_DIR,
+                "NPB3.4",
+                "NPB3.4-OMP"
+            )),
+        )?;
+        ushell.run(
+            cmd!("(source /opt/rh/devtoolset-7/enable ; make clean cg CLASS=F )").cwd(&dir!(
                 RESEARCH_WORKSPACE_PATH,
                 ZEROSIM_BENCHMARKS_DIR,
                 "NPB3.4",

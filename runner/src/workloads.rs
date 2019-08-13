@@ -286,9 +286,11 @@ pub fn run_memcached_and_capture_thp(
     Ok(())
 }
 
+#[allow(dead_code)]
 /// NAS Parallel Benchmark workload size classes. See online documentation.
 pub enum NasClass {
     E,
+    F,
 }
 
 /// Start the NAS CG workload. It must already be compiled. This workload takes a really long time,
@@ -309,6 +311,7 @@ pub fn run_nas_cg(
 ) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
     let class = match class {
         NasClass::E => "E",
+        NasClass::F => "F",
     };
 
     if eager {

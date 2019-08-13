@@ -245,7 +245,7 @@ where
         let _ = run_nas_cg(
             &vshell,
             zerosim_bmk_path,
-            NasClass::E,
+            NasClass::F,
             Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
             /* eager */ false,
             &mut tctx,

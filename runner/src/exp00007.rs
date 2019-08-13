@@ -114,7 +114,7 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
     {
         vm_size
     } else {
-        // NAS class E is ~2TB
+        // NAS class F is ~2TB
         2048
     };
 
@@ -387,7 +387,7 @@ where
                 let _ = run_nas_cg(
                     &vshell,
                     zerosim_bmk_path,
-                    NasClass::E,
+                    NasClass::F,
                     Some(&dir!(VAGRANT_RESULTS_DIR, output_file)),
                     eager,
                     &mut tctx,
