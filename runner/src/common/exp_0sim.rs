@@ -164,12 +164,12 @@ where
 
 /// Set D for 0sim.
 pub fn set_zerosim_d(shell: &SshShell, d: usize) -> Result<(), failure::Error> {
-    shell.run(cmd!("echo {} > /proc/zerosim_d", d))?;
+    shell.run(cmd!("echo {} | sudo tee /proc/zerosim_d", d))?;
     Ok(())
 }
 
 pub fn set_zerosim_delta(shell: &SshShell, delta: usize) -> Result<(), failure::Error> {
-    shell.run(cmd!("echo {} > /proc/zerosim_delta", delta))?;
+    shell.run(cmd!("echo {} | sudo tee /proc/zerosim_delta", delta))?;
     Ok(())
 }
 
