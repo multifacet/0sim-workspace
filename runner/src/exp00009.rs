@@ -109,6 +109,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         warmup: warmup,
 
         zswap_max_pool_percent: 50,
+        zerosim_d: 10_000_000,
+        zerosim_delta: 0,
 
         username: login.username.as_str(),
         host: login.hostname,
@@ -141,6 +143,8 @@ where
     let prefault = settings.get::<bool>("prefault");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
+    let zerosim_d = settings.get::<usize>("zerosim_d");
+    let zerosim_delta = settings.get::<usize>("zerosim_delta");
 
     // Reboot
     initial_reboot(&login)?;
@@ -163,6 +167,8 @@ where
 
     // Environment
     turn_on_zswap(&mut ushell)?;
+    set_zerosim_d(&ushell, zerosim_d)?;
+    set_zerosim_delta(&ushell, zerosim_delta)?;
 
     ushell.run(
         cmd!(

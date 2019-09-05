@@ -162,6 +162,17 @@ where
     Ok(ushell)
 }
 
+/// Set D for 0sim.
+pub fn set_zerosim_d(shell: &SshShell, d: usize) -> Result<(), failure::Error> {
+    shell.run(cmd!("echo {} > /proc/zerosim_d", d))?;
+    Ok(())
+}
+
+pub fn set_zerosim_delta(shell: &SshShell, delta: usize) -> Result<(), failure::Error> {
+    shell.run(cmd!("echo {} > /proc/zerosim_delta", delta))?;
+    Ok(())
+}
+
 /// Turn on Zswap with some default parameters.
 pub fn turn_on_zswap(shell: &mut SshShell) -> Result<(), failure::Error> {
     // apparently permissions can get weird
