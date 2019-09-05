@@ -68,6 +68,10 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          (ignored for memcached).")
         (@arg SIZE: -s --size +takes_value {is_usize}
          "The number of GBs of the workload (e.g. 500)")
+        (@arg D: --d +takes_value {is_usize}
+         "(Optional) Set /proc/zerosim_d")
+        (@arg DELTA: --delta +takes_value {is_usize}
+         "(Optional) Set /proc/zerosim_delta")
     }
 }
 
@@ -111,6 +115,15 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
     let warmup = sub_m.is_present("WARMUP");
     let prefault = sub_m.is_present("PREFAULT");
 
+    let zerosim_d = sub_m
+        .value_of("D")
+        .map(|value| value.parse::<usize>().unwrap())
+        .unwrap_or(10_000_000);
+    let zerosim_delta = sub_m
+        .value_of("DELTA")
+        .map(|value| value.parse::<usize>().unwrap())
+        .unwrap_or(0);
+
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
@@ -131,8 +144,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         warmup: warmup,
 
         zswap_max_pool_percent: 50,
-        zerosim_d: 10_000_000,
-        zerosim_delta: 0,
+        zerosim_d: zerosim_d,
+        zerosim_delta: zerosim_delta,
 
         username: login.username.as_str(),
         host: login.hostname,
