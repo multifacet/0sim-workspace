@@ -77,9 +77,9 @@ fn main() {
         )
 
         (@subcommand canceljob =>
-            (about: "Cancel a running or scheduled job.")
-            (@arg JID: +required {is_usize}
-             "The job ID of the job to cancel")
+            (about: "Cancel a running/scheduled job OR delete a finished/failed job.")
+            (@arg JID: +required ... {is_usize}
+             "The job ID(s) of the job(s) to cancel")
         )
 
         (@subcommand statjob =>
@@ -137,6 +137,18 @@ fn main() {
                 })
                 .unwrap_or_else(|| HashMap::new());
             get_job_log_path(addr, jid, &vars)
+        }
+
+        ("canceljob", Some(sub_m)) => {
+            for jid in sub_m.values_of("JID").unwrap() {
+                let response = make_request(
+                    addr,
+                    JobServerReq::CancelJob {
+                        jid: jid.parse().unwrap(),
+                    },
+                );
+                println!("Server response: {:?}", response);
+            }
         }
 
         (subcmd, Some(sub_m)) => request_from_subcommand(addr, subcmd, sub_m),
@@ -243,10 +255,6 @@ fn form_request(subcmd: &str, sub_m: &clap::ArgMatches<'_>) -> JobServerReq {
         "lsvars" => JobServerReq::ListVars,
 
         "lsjobs" => JobServerReq::ListJobs,
-
-        "canceljob" => JobServerReq::CancelJob {
-            jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
-        },
 
         "statjob" => JobServerReq::JobStatus {
             jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
