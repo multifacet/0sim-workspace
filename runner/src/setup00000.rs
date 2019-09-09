@@ -118,7 +118,7 @@ where
     /// Set the device to be used with device mapper.
     mapper_device: Option<&'a str>,
     /// Set the devices to be used
-    swap_devs: Vec<&'a str>,
+    swap_devs: Option<Vec<&'a str>>,
 
     /// The token to clone the workspace with.
     clone_wkspc: Option<&'a str>,
@@ -163,10 +163,7 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
 
     let home_device = sub_m.value_of("HOME_DEVICE");
     let mapper_device = sub_m.value_of("MAPPER_DEVICE");
-    let swap_devs = sub_m
-        .values_of("SWAP_DEVS")
-        .map(|i| i.collect())
-        .unwrap_or_else(|| vec![]);
+    let swap_devs = sub_m.values_of("SWAP_DEVS").map(|i| i.collect());
 
     let clone_wkspc = sub_m.value_of("TOKEN");
 
@@ -216,7 +213,7 @@ fn validate_options<A>(cfg: &SetupConfig<'_, A>) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    assert!(cfg.mapper_device.is_none() || cfg.swap_devs.is_empty());
+    assert!(cfg.mapper_device.is_none() || cfg.swap_devs.is_none());
 
     Ok(())
 }
@@ -451,18 +448,20 @@ where
         // Save so that we can mount on reboot.
         crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
         crate::common::set_remote_research_setting(&ushell, "dm-data", mapper_device)?;
-    } else if cfg.swap_devs.is_empty() {
-        let unpartitioned =
-            spurs_util::util::get_unpartitioned_devs(ushell, /* dry_run */ false)?;
-        for dev in unpartitioned.iter() {
-            ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
-        }
-    } else {
-        for dev in cfg.swap_devs.iter() {
-            ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
-        }
+    } else if let Some(swap_devs) = &cfg.swap_devs {
+        if swap_devs.is_empty() {
+            let unpartitioned =
+                spurs_util::util::get_unpartitioned_devs(ushell, /* dry_run */ false)?;
+            for dev in unpartitioned.iter() {
+                ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+            }
+        } else {
+            for dev in swap_devs.iter() {
+                ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+            }
 
-        crate::common::set_remote_research_setting(&ushell, "swap-devices", &cfg.swap_devs)?;
+            crate::common::set_remote_research_setting(&ushell, "swap-devices", &cfg.swap_devs)?;
+        }
     }
 
     Ok(())
