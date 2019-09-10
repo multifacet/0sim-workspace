@@ -234,6 +234,12 @@ where
     set_up_host_devices(&ushell, &cfg)?;
     clone_research_workspace(&ushell, &cfg)?;
     install_host_kernel(&ushell, &cfg)?;
+
+    // disable Intel EPT if needed
+    if cfg.disable_ept {
+        disable_ept(&ushell)?;
+    }
+
     if cfg.host_dep {
         install_rust(&ushell)?;
     }
@@ -408,6 +414,37 @@ where
     // Need a new shell so that we get the new user group
     *ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
 
+    // Build and Install QEMU 4.0.0 from source
+    ushell.run(cmd!("wget {}", QEMU_TARBALL))?;
+    ushell.run(cmd!("tar xvf {}", QEMU_TARBALL_NAME))?;
+
+    let qemu_dir = QEMU_TARBALL_NAME.trim_end_matches(".tar.xz");
+    let ncores = crate::common::get_num_cores(&ushell)?;
+
+    with_shell! { ushell in qemu_dir =>
+        cmd!("./configure"),
+        cmd!("make -j {}", ncores),
+        cmd!("sudo make install"),
+    }
+
+    ushell.run(cmd!(
+        "sudo chown qemu:kvm /usr/local/bin/qemu-system-x86_64"
+    ))?;
+
+    // Make sure libvirtd can run the qemu binary
+    ushell.run(cmd!(
+        r#"sudo sed -i 's/#security_driver = "selinux"/security_driver = "none"/' \
+                        /etc/libvirt/qemu.conf"#
+    ))?;
+
+    // Make sure libvirtd can access kvm
+    ushell.run(cmd!(
+        r#"echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' |\
+                               sudo tee /lib/udev/rules.d/99-kvm.rules"#
+    ))?;
+
+    crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
+
     Ok(())
 }
 
@@ -569,56 +606,26 @@ where
         // Build cpupower
         ushell.run(cmd!("make").cwd(&format!("{}/tools/power/cpupower/", kernel_path)))?;
 
-        // disable Intel EPT if needed
-        if cfg.disable_ept {
-            ushell.run(
-                cmd!(
-                    r#"echo "options kvm-intel ept=0" | \
-                           sudo tee /etc/modprobe.d/kvm-intel.conf"#
-                )
-                .use_bash(),
-            )?;
-
-            ushell.run(cmd!("sudo rmmod kvm_intel"))?;
-            ushell.run(cmd!("sudo modprobe kvm_intel"))?;
-
-            ushell.run(cmd!("sudo tail /sys/module/kvm_intel/parameters/ept"))?;
-        }
-
-        // Build and Install QEMU 4.0.0 from source
-        ushell.run(cmd!("wget {}", QEMU_TARBALL))?;
-        ushell.run(cmd!("tar xvf {}", QEMU_TARBALL_NAME))?;
-
-        let qemu_dir = QEMU_TARBALL_NAME.trim_end_matches(".tar.xz");
-        let ncores = crate::common::get_num_cores(&ushell)?;
-
-        with_shell! { ushell in qemu_dir =>
-            cmd!("./configure"),
-            cmd!("make -j {}", ncores),
-            cmd!("sudo make install"),
-        }
-
-        ushell.run(cmd!(
-            "sudo chown qemu:kvm /usr/local/bin/qemu-system-x86_64"
-        ))?;
-
-        // Make sure libvirtd can run the qemu binary
-        ushell.run(cmd!(
-            r#"sudo sed -i 's/#security_driver = "selinux"/security_driver = "none"/' \
-                        /etc/libvirt/qemu.conf"#
-        ))?;
-
-        // Make sure libvirtd can access kvm
-        ushell.run(cmd!(
-            r#"echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666"' |\
-                               sudo tee /lib/udev/rules.d/99-kvm.rules"#
-        ))?;
-
-        crate::common::service(&ushell, "libvirtd", ServiceAction::Restart)?;
-
         // update grub to choose this entry (new kernel) by default
         ushell.run(cmd!("sudo grub2-set-default 0"))?;
     }
+
+    Ok(())
+}
+
+fn disable_ept(shell: &SshShell) -> Result<(), failure::Error> {
+    shell.run(
+        cmd!(
+            r#"echo "options kvm-intel ept=0" | \
+                           sudo tee /etc/modprobe.d/kvm-intel.conf"#
+        )
+        .use_bash(),
+    )?;
+
+    shell.run(cmd!("sudo rmmod kvm_intel"))?;
+    shell.run(cmd!("sudo modprobe kvm_intel"))?;
+
+    shell.run(cmd!("sudo tail /sys/module/kvm_intel/parameters/ept"))?;
 
     Ok(())
 }
