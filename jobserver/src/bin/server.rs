@@ -507,7 +507,7 @@ impl Server {
             }
 
             // Sleep a bit.
-            std::thread::sleep(Duration::from_secs(10));
+            std::thread::sleep(Duration::from_secs(1));
         }
     }
 
