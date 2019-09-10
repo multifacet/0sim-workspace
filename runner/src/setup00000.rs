@@ -839,6 +839,9 @@ where
 
     gen_vagrantfile(&ushell, 20, 1)?;
 
+    // Make sure to turn off skip_halt
+    ushell.run(cmd!("echo 0 | sudo tee /proc/zerosim_skip_halt"))?;
+
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
     ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
 

@@ -257,6 +257,9 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
 
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
+    // Make sure to turn off skip_halt, which breaks multi-core boot.
+    shell.run(cmd!("echo 0 | sudo tee /proc/zerosim_skip_halt"))?;
+
     if fast {
         shell.run(
             cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
@@ -290,6 +293,9 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
                 .use_bash(),
         )?;
     }
+
+    // Can turn skip_halt back on now.
+    shell.run(cmd!("echo 1 | sudo tee /proc/zerosim_skip_halt"))?;
 
     Ok(vshell)
 }
