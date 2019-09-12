@@ -458,6 +458,7 @@ pub fn build_kernel(
             git_branch,
         } => {
             ushell.run(cmd!("git checkout {}", git_branch).cwd(&repo_path))?;
+            ushell.run(cmd!("git pull").cwd(&repo_path))?;
 
             get_absolute_path(ushell, &repo_path)?
         }
