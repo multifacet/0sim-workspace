@@ -90,8 +90,8 @@ fn main() {
 
         (@subcommand clonejob =>
             (about: "Clone a job.")
-            (@arg JID: +required {is_usize}
-             "The job ID of the job to clone.")
+            (@arg JID: +required {is_usize} ...
+             "The job ID(s) of the job to clone.")
         )
 
         (@subcommand joblog =>
@@ -144,6 +144,18 @@ fn main() {
                 let response = make_request(
                     addr,
                     JobServerReq::CancelJob {
+                        jid: jid.parse().unwrap(),
+                    },
+                );
+                println!("Server response: {:?}", response);
+            }
+        }
+
+        ("clonejob", Some(sub_m)) => {
+            for jid in sub_m.values_of("JID").unwrap() {
+                let response = make_request(
+                    addr,
+                    JobServerReq::CloneJob {
                         jid: jid.parse().unwrap(),
                     },
                 );
@@ -257,10 +269,6 @@ fn form_request(subcmd: &str, sub_m: &clap::ArgMatches<'_>) -> JobServerReq {
         "lsjobs" => JobServerReq::ListJobs,
 
         "statjob" => JobServerReq::JobStatus {
-            jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
-        },
-
-        "clonejob" => JobServerReq::CloneJob {
             jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
         },
 
