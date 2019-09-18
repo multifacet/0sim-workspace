@@ -6,7 +6,10 @@ use std::net::{Shutdown, TcpStream};
 
 use clap::clap_app;
 
-use jobserver::{cmd_replace_vars, cmd_to_path, JobServerReq, JobServerResp, Status, SERVER_ADDR};
+use jobserver::{
+    cmd_replace_machine, cmd_replace_vars, cmd_to_path, JobServerReq, JobServerResp, Status,
+    SERVER_ADDR,
+};
 
 use prettytable::{cell, row, Table};
 
@@ -98,8 +101,26 @@ fn main() {
             (about: "Print the path to the job log.")
             (@arg JID: +required {is_usize}
              "The job ID of the job for which to print the log.")
-            (@arg VARIABLES: +takes_value ...
-             "A space-separated list of KEY=VALUE pairs for replacing variables.")
+        )
+
+        (@subcommand matrix =>
+            (about: "Create a matrix of jobs on the given class of machine.")
+            (@arg CLASS: +required
+             "The class of machine that can execute the jobs.")
+            (@arg CMD: +required
+             "The command template to execute with the variables filled in.")
+            (@arg CP_PATH: +required
+             "The location on this host to copy results to.")
+            (@arg VARIABLES: +takes_value +required ...
+             "A space-separated list of KEY=VALUE1,VALUE2,... pairs for replacing variables.")
+        )
+
+        (@subcommand statmatrix =>
+            (about: "Get information on the status of a matrix.")
+            (@arg ID: +required {is_usize}
+             "The matrix ID of the matrix")
+            (@arg LONG: --long
+             "Show all output")
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -124,19 +145,7 @@ fn main() {
 
         ("joblog", Some(sub_m)) => {
             let jid = sub_m.value_of("JID").unwrap();
-            let vars = sub_m
-                .values_of("VARIABLES")
-                .map(|vals| {
-                    vals.map(|val| {
-                        let mut spl = val.split("=");
-                        let key = spl.next().unwrap().to_string();
-                        let value = spl.next().unwrap().to_string();
-                        (key, value)
-                    })
-                    .collect()
-                })
-                .unwrap_or_else(|| HashMap::new());
-            get_job_log_path(addr, jid, &vars)
+            get_job_log_path(addr, jid)
         }
 
         ("canceljob", Some(sub_m)) => {
@@ -163,13 +172,32 @@ fn main() {
             }
         }
 
+        ("statmatrix", Some(sub_m)) => {
+            let is_long = sub_m.is_present("LONG");
+
+            let response = make_request(
+                addr,
+                JobServerReq::StatMatrix {
+                    id: sub_m.value_of("ID").unwrap().parse().unwrap(),
+                },
+            );
+
+            match response {
+                JobServerResp::MatrixStatus { mut jobs, .. } => {
+                    let jobs = stat_jobs(addr, &mut jobs);
+                    print_jobs(jobs, is_long);
+                }
+                _ => println!("Server response: {:?}", response),
+            }
+        }
+
         (subcmd, Some(sub_m)) => request_from_subcommand(addr, subcmd, sub_m),
 
         _ => unreachable!(),
     }
 }
 
-fn get_job_log_path(addr: &str, jid: &str, vars: &HashMap<String, String>) {
+fn get_job_log_path(addr: &str, jid: &str) {
     let req = JobServerReq::JobStatus {
         jid: jid.parse().unwrap(),
     };
@@ -177,14 +205,19 @@ fn get_job_log_path(addr: &str, jid: &str, vars: &HashMap<String, String>) {
     let status = make_request(addr, req);
 
     match status {
-        JobServerResp::JobStatus { cmd, status, .. } => match status {
+        JobServerResp::JobStatus {
+            cmd,
+            status,
+            variables,
+            ..
+        } => match status {
             Status::Done { machine, .. }
             | Status::Failed {
                 machine: Some(machine),
                 ..
             }
             | Status::Running { machine } => {
-                let cmd = cmd_replace_vars(&cmd, &machine, vars);
+                let cmd = cmd_replace_machine(&cmd_replace_vars(&cmd, &variables), &machine);
                 let path = cmd_to_path(&cmd);
                 println!("{}", path);
             }
@@ -272,6 +305,29 @@ fn form_request(subcmd: &str, sub_m: &clap::ArgMatches<'_>) -> JobServerReq {
             jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
         },
 
+        "matrix" => JobServerReq::AddMatrix {
+            vars: sub_m
+                .values_of("VARIABLES")
+                .map(|vals| {
+                    vals.map(|val| {
+                        let mut spl = val.split("=");
+                        let key = spl.next().unwrap().to_string();
+                        let value = spl
+                            .next()
+                            .unwrap()
+                            .split(",")
+                            .map(|s| s.to_string())
+                            .collect();
+                        (key, value)
+                    })
+                    .collect()
+                })
+                .unwrap_or_else(|| HashMap::new()),
+            class: sub_m.value_of("CLASS").unwrap().into(),
+            cmd: sub_m.value_of("CMD").unwrap().into(),
+            cp_results: sub_m.value_of("CP_PATH").map(Into::into),
+        },
+
         _ => unreachable!(),
     }
 }
@@ -281,41 +337,47 @@ struct JobInfo {
     cmd: String,
     jid: usize,
     status: Status,
+    variables: HashMap<String, String>,
 }
 
 fn list_jobs(addr: &str) -> Vec<JobInfo> {
     let job_ids = make_request(addr, JobServerReq::ListJobs);
 
     if let JobServerResp::Jobs(mut job_ids) = job_ids {
-        // Sort by jid
-        job_ids.sort();
+        stat_jobs(addr, &mut job_ids)
+    } else {
+        unreachable!();
+    }
+}
 
-        job_ids
-            .into_iter()
-            .map(|jid| {
-                let status = make_request(addr, JobServerReq::JobStatus { jid });
+fn stat_jobs(addr: &str, jids: &mut Vec<usize>) -> Vec<JobInfo> {
+    // Sort by jid
+    jids.sort();
 
-                if let JobServerResp::JobStatus {
+    jids.iter()
+        .map(|jid| {
+            let status = make_request(addr, JobServerReq::JobStatus { jid: *jid });
+
+            if let JobServerResp::JobStatus {
+                class,
+                cmd,
+                jid,
+                status,
+                variables,
+            } = status
+            {
+                JobInfo {
                     class,
                     cmd,
                     jid,
                     status,
-                } = status
-                {
-                    JobInfo {
-                        class,
-                        cmd,
-                        jid,
-                        status,
-                    }
-                } else {
-                    unreachable!();
+                    variables,
                 }
-            })
-            .collect()
-    } else {
-        unreachable!();
-    }
+            } else {
+                unreachable!();
+            }
+        })
+        .collect()
 }
 
 struct MachineInfo {
@@ -387,6 +449,7 @@ fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
                 mut cmd,
                 class,
                 status: Status::Cancelled,
+                variables: _variables,
             } => {
                 if !is_long {
                     cmd.truncate(TRUNC);
@@ -399,6 +462,7 @@ fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
                 mut cmd,
                 class,
                 status: Status::Waiting,
+                variables: _variables,
             } => {
                 if !is_long {
                     cmd.truncate(TRUNC);
@@ -415,6 +479,7 @@ fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
                         machine,
                         output: None,
                     },
+                variables: _variables,
             } => {
                 if !is_long {
                     cmd.truncate(TRUNC);
@@ -431,6 +496,7 @@ fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
                         machine,
                         output: Some(path),
                     },
+                variables: _variables,
             } => {
                 if !is_long {
                     cmd.truncate(TRUNC);
@@ -444,6 +510,7 @@ fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
                 mut cmd,
                 class,
                 status: Status::Failed { error, machine },
+                variables: _variables,
             } => {
                 if !is_long {
                     cmd.truncate(TRUNC);
@@ -457,6 +524,7 @@ fn print_jobs(jobs: Vec<JobInfo>, is_long: bool) {
                 mut cmd,
                 class,
                 status: Status::Running { machine },
+                variables: _variables,
             } => {
                 if !is_long {
                     cmd.truncate(TRUNC);

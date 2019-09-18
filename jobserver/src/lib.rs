@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 
+use itertools::Itertools;
+
 use serde::{Deserialize, Serialize};
 
 /// The address where the server listens.
@@ -86,6 +88,29 @@ pub enum JobServerReq {
         /// The job ID of the job to cancel.
         jid: usize,
     },
+
+    /// Start a matrix with the given variables and command template.
+    AddMatrix {
+        /// The variables and their values, which we take the Cartesian Product over.
+        vars: HashMap<String, Vec<String>>,
+
+        /// The command of the job.
+        ///
+        /// The command may use any existing variables known to the server and variables from the
+        /// set above.
+        cmd: String,
+
+        /// The class of machine allowed to run this job.
+        class: String,
+
+        /// The location to copy results, if any.
+        cp_results: Option<String>,
+    },
+
+    StatMatrix {
+        /// The ID of the matrix.
+        id: usize,
+    },
 }
 
 /// A response to the client.
@@ -106,12 +131,37 @@ pub enum JobServerResp {
     /// Succeeded. The job ID of a created job.
     JobId(usize),
 
+    /// Succeeded. The matrix ID of a created matrix.
+    MatrixId(usize),
+
     /// Succeeded. The status of a job.
     JobStatus {
         class: String,
         cmd: String,
         jid: usize,
         status: Status,
+        variables: HashMap<String, String>,
+    },
+
+    /// Succeeded. The status of a matrix.
+    MatrixStatus {
+        /// The command template.
+        cmd: String,
+
+        /// The class of machine allowed to run this job.
+        class: String,
+
+        /// The location to copy results, if any.
+        cp_results: Option<String>,
+
+        /// The matrix ID
+        id: usize,
+
+        /// The job IDs that comprise the matrix.
+        jobs: Vec<usize>,
+
+        /// The variables in the matrix
+        variables: HashMap<String, Vec<String>>,
     },
 
     /// Error. The requested machine does not exist.
@@ -119,6 +169,9 @@ pub enum JobServerResp {
 
     /// Error. No such job.
     NoSuchJob,
+
+    /// Error. No such matrix.
+    NoSuchMatrix,
 }
 
 /// The status of a job.
@@ -155,11 +208,14 @@ pub enum Status {
     },
 }
 
-pub fn cmd_replace_vars(cmd: &str, machine: &str, vars: &HashMap<String, String>) -> String {
-    let cmd = cmd.replace("{MACHINE}", &machine);
+pub fn cmd_replace_vars(cmd: &str, vars: &HashMap<String, String>) -> String {
     vars.iter().fold(cmd.to_string(), |cmd, (key, value)| {
         cmd.replace(&format!("{{{}}}", key), &value)
     })
+}
+
+pub fn cmd_replace_machine(cmd: &str, machine: &str) -> String {
+    cmd.replace("{MACHINE}", &machine)
 }
 
 pub fn cmd_to_path(cmd: &str) -> String {
@@ -172,4 +228,14 @@ pub fn cmd_to_path(cmd: &str) -> String {
     );
     name.truncate(200);
     name
+}
+
+// Gets the cartesian product of the given set of variables and their sets of possible values.
+pub fn cartesian_product<'v>(
+    vars: &'v HashMap<String, Vec<String>>,
+) -> impl Iterator<Item = HashMap<String, String>> + 'v {
+    vars.iter()
+        .map(|(k, vs)| vs.iter().map(move |v| (k.clone(), v.clone())))
+        .multi_cartesian_product()
+        .map(|config: Vec<(String, String)>| config.into_iter().collect())
 }

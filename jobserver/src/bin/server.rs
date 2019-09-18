@@ -15,7 +15,10 @@ use clap::clap_app;
 
 use crossbeam::channel::{select, unbounded, Receiver, TryRecvError};
 
-use jobserver::{cmd_replace_vars, cmd_to_path, JobServerReq, JobServerResp, Status, SERVER_ADDR};
+use jobserver::{
+    cmd_replace_machine, cmd_replace_vars, cmd_to_path, JobServerReq, JobServerResp, Status,
+    SERVER_ADDR,
+};
 
 use log::{debug, error, info, warn};
 
@@ -36,6 +39,9 @@ struct Server {
 
     /// Information about jobs, by job ID.
     jobs: Arc<Mutex<HashMap<usize, Job>>>,
+
+    /// Information about matrices, by ID.
+    matrices: Arc<Mutex<HashMap<usize, Matrix>>>,
 
     /// Setup tasks. They are assigned a job ID, but are kind of weird because they can have
     /// multiple commands and are assigned a machine at creation time.
@@ -65,6 +71,9 @@ struct Job {
 
     /// The current status of the job.
     status: Status,
+
+    /// The mapping of variables at the time the job was created.
+    variables: HashMap<String, String>,
 }
 
 /// Information about a single setup task.
@@ -87,6 +96,31 @@ struct SetupTask {
 
     /// The current status of the job.
     status: Status,
+
+    /// The mapping of variables at the time the job was created.
+    variables: HashMap<String, String>,
+}
+
+/// A collection of jobs that run over the cartesian product of some set of variables.
+#[derive(Clone, Debug)]
+struct Matrix {
+    /// This matrix's ID.
+    id: usize,
+
+    /// The command (without replacements).
+    cmd: String,
+
+    /// The class of the machines that can run this job.
+    class: String,
+
+    /// The location to copy results, if any.
+    cp_results: Option<String>,
+
+    /// The variables and their possible values.
+    variables: HashMap<String, Vec<String>>,
+
+    /// A list of jobs in this matrix.
+    jids: Vec<usize>,
 }
 
 /// Information about a single machine.
@@ -107,6 +141,7 @@ impl Server {
             variables: Arc::new(Mutex::new(HashMap::new())),
             jobs: Arc::new(Mutex::new(HashMap::new())),
             setup_tasks: Arc::new(Mutex::new(HashMap::new())),
+            matrices: Arc::new(Mutex::new(HashMap::new())),
             next_jid: AtomicUsize::new(0),
             runner,
         }
@@ -236,6 +271,8 @@ impl Server {
                     jid, addr, cmds
                 );
 
+                let variables = self.variables.lock().unwrap().clone();
+
                 self.setup_tasks.lock().unwrap().insert(
                     jid,
                     SetupTask {
@@ -245,6 +282,7 @@ impl Server {
                         current_cmd: 0,
                         machine: addr,
                         status: Status::Waiting,
+                        variables,
                     },
                 );
 
@@ -280,6 +318,8 @@ impl Server {
 
                 info!("Added job {} with class {}: {}", jid, class, cmd);
 
+                let variables = self.variables.lock().unwrap().clone();
+
                 self.jobs.lock().unwrap().insert(
                     jid,
                     Job {
@@ -288,6 +328,7 @@ impl Server {
                         class,
                         cp_results,
                         status: Status::Waiting,
+                        variables,
                     },
                 );
 
@@ -314,6 +355,7 @@ impl Server {
                         class: job.class.clone(),
                         cmd: job.cmd.clone(),
                         status: job.status.clone(),
+                        variables: job.variables.clone(),
                     }
                 } else if let Some(setup_task) = self.setup_tasks.lock().unwrap().get(&jid) {
                     info!("Stating setup task {}, {:?}", jid, setup_task);
@@ -327,6 +369,7 @@ impl Server {
                             .unwrap_or("".into()),
                         cmd: setup_task.cmds[setup_task.current_cmd].clone(),
                         status: setup_task.status.clone(),
+                        variables: setup_task.variables.clone(),
                     }
                 } else {
                     error!("No such job: {}", jid);
@@ -350,6 +393,7 @@ impl Server {
                             class: job.class.clone(),
                             cp_results: job.cp_results.clone(),
                             status: Status::Waiting,
+                            variables: job.variables.clone(),
                         },
                     );
 
@@ -357,6 +401,91 @@ impl Server {
                 } else {
                     error!("No such job: {}", jid);
                     JobServerResp::NoSuchJob
+                }
+            }
+
+            AddMatrix {
+                mut vars,
+                cmd,
+                class,
+                cp_results,
+            } => {
+                let id = self.next_jid.fetch_add(1, Ordering::Relaxed);
+
+                // Get the set of base variables, some of which may be overridden by the matrix
+                // variables in the template.
+                vars.extend(
+                    self.variables
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .map(|(k, v)| (k.to_owned(), vec![v.to_owned()])),
+                );
+
+                info!(
+                    "Create matrix with ID {}. Cmd: {:?}, Vars: {:?}",
+                    id, cmd, vars
+                );
+
+                let mut jids = vec![];
+
+                // Create a new job for every element in the cartesian product of the variables.
+                for config in jobserver::cartesian_product(&vars) {
+                    let jid = self.next_jid.fetch_add(1, Ordering::Relaxed);
+                    jids.push(jid);
+
+                    let cmd = cmd_replace_vars(&cmd, &config);
+
+                    info!(
+                        "[Matrix {}] Added job {} with class {}: {}",
+                        id, jid, class, cmd
+                    );
+
+                    let variables = self.variables.lock().unwrap().clone();
+
+                    self.jobs.lock().unwrap().insert(
+                        jid,
+                        Job {
+                            jid,
+                            cmd,
+                            class: class.clone(),
+                            cp_results: cp_results.clone(),
+                            status: Status::Waiting,
+                            variables,
+                        },
+                    );
+                }
+
+                self.matrices.lock().unwrap().insert(
+                    id,
+                    Matrix {
+                        id,
+                        cmd,
+                        class,
+                        cp_results,
+                        variables: vars,
+                        jids,
+                    },
+                );
+
+                JobServerResp::MatrixId(id)
+            }
+
+            StatMatrix { id } => {
+                if let Some(matrix) = self.matrices.lock().unwrap().get(&id) {
+                    info!("Stating matrix {}, {:?}", id, matrix);
+
+                    JobServerResp::MatrixStatus {
+                        id,
+                        class: matrix.class.clone(),
+                        cp_results: matrix.cp_results.clone(),
+                        cmd: matrix.cmd.clone(),
+                        jobs: matrix.jids.clone(),
+                        variables: matrix.variables.clone(),
+                    }
+                } else {
+                    error!("No such matrix: {}", id);
+                    JobServerResp::NoSuchMatrix
                 }
             }
         };
@@ -537,7 +666,7 @@ impl Server {
     fn job_thread(self: Arc<Self>, jid: usize, cancel_chan: Receiver<()>) {
         // Find the command and machine to use. We do a lot of checking whether the job is
         // cancelled.
-        let (cmd, machine, cp_results) = {
+        let (cmd, machine, cp_results, variables) = {
             let locked_jobs = self.jobs.lock().unwrap();
             if let Some(job) = locked_jobs.get(&jid) {
                 (
@@ -552,6 +681,7 @@ impl Server {
                         return;
                     },
                     job.cp_results.clone(),
+                    job.variables.clone(),
                 )
             } else {
                 match cancel_chan.try_recv() {
@@ -581,7 +711,6 @@ impl Server {
         }
 
         // Actually run the command now.
-        let variables = self.variables.lock().unwrap().clone();
         let result = Self::run_cmd(jid, &machine, &cmd, cancel_chan, &variables, &self.runner);
 
         // Check the results.
@@ -888,7 +1017,7 @@ impl Server {
         variables: &HashMap<String, String>,
         runner: &str,
     ) -> std::io::Result<Option<String>> {
-        let cmd = cmd_replace_vars(cmd, machine, variables);
+        let cmd = cmd_replace_machine(&cmd_replace_vars(&cmd, variables), &machine);
 
         // Open a tmp file for the cmd output
         let tmp_file_name = cmd_to_path(&cmd);
