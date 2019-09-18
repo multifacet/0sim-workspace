@@ -69,8 +69,8 @@ fn main() {
              "The class of machine that can execute the job")
             (@arg CMD: +required
              "The command to execute")
-            (@arg CP_PATH:
-             "(Optional) The location on this host to copy results to")
+            (@arg CP_PATH: +required
+             "The location on this host to copy results to")
         )
 
         (@subcommand lsjobs =>
@@ -79,19 +79,19 @@ fn main() {
              "Show all output")
         )
 
-        (@subcommand canceljob =>
+        (@subcommand jobcancel =>
             (about: "Cancel a running/scheduled job OR delete a finished/failed job.")
             (@arg JID: +required ... {is_usize}
              "The job ID(s) of the job(s) to cancel")
         )
 
-        (@subcommand statjob =>
+        (@subcommand jobstat =>
             (about: "Get information on the status of a job.")
             (@arg JID: +required {is_usize}
              "The job ID of the job")
         )
 
-        (@subcommand clonejob =>
+        (@subcommand jobclone =>
             (about: "Clone a job.")
             (@arg JID: +required {is_usize} ...
              "The job ID(s) of the job to clone.")
@@ -148,7 +148,7 @@ fn main() {
             get_job_log_path(addr, jid)
         }
 
-        ("canceljob", Some(sub_m)) => {
+        ("jobcancel", Some(sub_m)) => {
             for jid in sub_m.values_of("JID").unwrap() {
                 let response = make_request(
                     addr,
@@ -160,7 +160,7 @@ fn main() {
             }
         }
 
-        ("clonejob", Some(sub_m)) => {
+        ("jobclone", Some(sub_m)) => {
             for jid in sub_m.values_of("JID").unwrap() {
                 let response = make_request(
                     addr,
