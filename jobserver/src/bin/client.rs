@@ -422,7 +422,7 @@ fn stat_jobs(addr: &str, jids: &mut Vec<usize>) -> Vec<JobInfo> {
     jids.sort();
 
     jids.iter()
-        .map(|jid| {
+        .filter_map(|jid| {
             let status = make_request(addr, JobServerReq::JobStatus { jid: *jid });
 
             if let JobServerResp::JobStatus {
@@ -433,15 +433,16 @@ fn stat_jobs(addr: &str, jids: &mut Vec<usize>) -> Vec<JobInfo> {
                 variables,
             } = status
             {
-                JobInfo {
+                Some(JobInfo {
                     class,
                     cmd,
                     jid,
                     status,
                     variables,
-                }
+                })
             } else {
-                unreachable!();
+                println!("Unable to find job {}", jid);
+                None
             }
         })
         .collect()
