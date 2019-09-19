@@ -210,7 +210,15 @@ where
     let vshell = time!(
         timers,
         "Start VM",
-        start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?
+        start_vagrant(
+            &ushell,
+            &login.host,
+            vm_size,
+            cores,
+            /* fast */ true,
+            ZEROSIM_SKIP_HALT,
+            ZEROSIM_LAPIC_ADJUST
+        )?
     );
 
     // Get the amount of memory the guest thinks it has (in KB).

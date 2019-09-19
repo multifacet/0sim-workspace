@@ -261,7 +261,15 @@ where
         init_vm(&mut ushell, &cfg)?
     } else if cfg.guest_kernel || cfg.setup_hadoop || cfg.guest_bmks {
         // Start vagrant (that already exists)
-        let vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
+        let vrshell = start_vagrant(
+            &ushell,
+            &cfg.login.host,
+            20,
+            1,
+            /* fast */ true,
+            /* skip_halt */ false,
+            /* lapic_adjust */ false,
+        )?;
         let vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
 
         (vrshell, vushell)
@@ -839,8 +847,9 @@ where
 
     gen_vagrantfile(&ushell, 20, 1)?;
 
-    // Make sure to turn off skip_halt
+    // Make sure to turn off skip_halt and lapic_adjust
     ushell.run(cmd!("echo 0 | sudo tee /proc/zerosim_skip_halt"))?;
+    ushell.run(cmd!("echo 0 | sudo tee /proc/zerosim_lapic_adjust"))?;
 
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
     ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
@@ -869,7 +878,15 @@ where
         .unwrap();
 
     // Start vagrant
-    let mut vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
+    let mut vrshell = start_vagrant(
+        &ushell,
+        &cfg.login.host,
+        20,
+        1,
+        /* fast */ true,
+        /* skip_halt */ false,
+        /* lapic_adjust */ false,
+    )?;
     let mut vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
 
     // Sometimes on adsl, networking is kind of messed up until a host restart. Check for
@@ -879,7 +896,15 @@ where
         ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
         spurs::util::reboot(ushell, /* dry_run */ false)?;
 
-        vrshell = start_vagrant(&ushell, &cfg.login.host, 20, 1, /* fast */ true)?;
+        vrshell = start_vagrant(
+            &ushell,
+            &cfg.login.host,
+            20,
+            1,
+            /* fast */ true,
+            /* skip_halt */ false,
+            /* lapic_adjust */ false,
+        )?;
         vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
     }
 

@@ -164,7 +164,13 @@ where
     let (mut ushell, vshell) = time!(
         timers,
         "Setup host and start VM",
-        connect_and_setup_host_and_vagrant(&login, vm_size, cores)?
+        connect_and_setup_host_and_vagrant(
+            &login,
+            vm_size,
+            cores,
+            ZEROSIM_SKIP_HALT,
+            ZEROSIM_LAPIC_ADJUST
+        )?
     );
 
     // Environment

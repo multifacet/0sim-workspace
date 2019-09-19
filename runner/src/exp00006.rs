@@ -111,7 +111,9 @@ where
                 &login.host,
                 /* RAM */ 10,
                 /* cores */ 1,
-                /* fast */ true
+                /* fast */ true,
+                /* skip_halt */ false,
+                /* lapic_adjust */ false,
             )?
         );
 
@@ -134,7 +136,15 @@ where
     let vshell = time!(
         timers,
         "Start VM",
-        start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ false)?
+        start_vagrant(
+            &ushell,
+            &login.host,
+            vm_size,
+            cores,
+            /* fast */ false,
+            /* skip_halt */ false,
+            /* lapic_adjust */ false,
+        )?
     );
 
     let (output_file, params_file, time_file, sim_file) = settings.gen_standard_names();

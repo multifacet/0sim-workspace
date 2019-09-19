@@ -16,7 +16,7 @@ use crate::common::{
     exp_0sim::{
         initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, set_zerosim_d,
         set_zerosim_delta, setup_swapping, start_vagrant, turn_on_ssdswap, turn_on_zswap,
-        VAGRANT_CORES, VAGRANT_MEM,
+        VAGRANT_CORES, VAGRANT_MEM, ZEROSIM_LAPIC_ADJUST, ZEROSIM_SKIP_HALT,
     },
     paths::*,
     Login, Username,
@@ -163,7 +163,15 @@ pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
         };
 
         // Start and connect to VM
-        let _ = start_vagrant(&ushell, &login.host, vm_size, vm_cores, disable_tsc)?;
+        let _ = start_vagrant(
+            &ushell,
+            &login.host,
+            vm_size,
+            vm_cores,
+            disable_tsc,
+            ZEROSIM_SKIP_HALT,
+            ZEROSIM_LAPIC_ADJUST,
+        )?;
     }
 
     // Turn on zswap

@@ -20,6 +20,12 @@ pub const VAGRANT_MEM: usize = 1024;
 /// The default number of cores of the VM.
 pub const VAGRANT_CORES: usize = 1;
 
+/// The default value for /proc/zerosim_skip_halt.
+pub const ZEROSIM_SKIP_HALT: bool = false;
+
+/// The default value for /proc/zerosim_lapic_adjust.
+pub const ZEROSIM_LAPIC_ADJUST: bool = false;
+
 /// Shut off any virtual machine and reboot the machine and do nothing else. Useful for getting the
 /// machine into a clean state.
 pub fn initial_reboot<A>(login: &Login<A>) -> Result<(), failure::Error>
@@ -72,12 +78,22 @@ pub fn connect_and_setup_host_and_vagrant<A>(
     login: &Login<A>,
     vm_size: usize,
     cores: usize,
+    skip_halt: bool,
+    lapic_adjust: bool,
 ) -> Result<(SshShell, SshShell), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     let ushell = connect_and_setup_host_only(&login)?;
-    let vshell = start_vagrant(&ushell, &login.host, vm_size, cores, /* fast */ true)?;
+    let vshell = start_vagrant(
+        &ushell,
+        &login.host,
+        vm_size,
+        cores,
+        /* fast */ true,
+        skip_halt,
+        lapic_adjust,
+    )?;
 
     Ok((ushell, vshell))
 }
@@ -239,6 +255,8 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     memgb: usize,
     cores: usize,
     fast: bool,
+    skip_halt: bool,
+    lapic_adjust: bool,
 ) -> Result<SshShell, failure::Error> {
     shell.run(cmd!("sudo systemctl stop firewalld"))?;
     shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
@@ -259,6 +277,13 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
 
     // Make sure to turn off skip_halt, which breaks multi-core boot.
     shell.run(cmd!("echo 0 | sudo tee /proc/zerosim_skip_halt"))?;
+
+    // Make sure to leave LAPIC adjust off.
+    if lapic_adjust {
+        shell.run(cmd!("echo 1 | sudo tee /proc/zerosim_lapic_adjust"))?;
+    } else {
+        shell.run(cmd!("echo 0 | sudo tee /proc/zerosim_lapic_adjust"))?;
+    }
 
     if fast {
         shell.run(
@@ -295,7 +320,9 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     }
 
     // Can turn skip_halt back on now.
-    shell.run(cmd!("echo 1 | sudo tee /proc/zerosim_skip_halt"))?;
+    if skip_halt {
+        shell.run(cmd!("echo 1 | sudo tee /proc/zerosim_skip_halt"))?;
+    }
 
     Ok(vshell)
 }

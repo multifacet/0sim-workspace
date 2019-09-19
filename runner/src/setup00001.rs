@@ -37,7 +37,9 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
 
     // Connect to the remote.
-    let (ushell, vshell) = connect_and_setup_host_and_vagrant(&login, 20, 1)?;
+    let (ushell, vshell) = connect_and_setup_host_and_vagrant(
+        &login, 20, 1, /* skip_halt */ false, /* lapic_adjust */ false,
+    )?;
 
     // Disable TSC offsetting so that setup runs faster
     ushell.run(
