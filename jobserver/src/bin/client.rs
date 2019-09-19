@@ -23,104 +23,120 @@ fn main() {
             (about: "Ping the server")
         )
 
-        (@subcommand mkavail =>
-            (about: "Make the given machine available with the given class.")
-            (@arg ADDR: +required
-             "The IP:PORT of the machine")
-            (@arg CLASS: +required
-             "The class of the machine")
+        (@subcommand machine =>
+            (about: "Operations on the available pool of machines.")
+
+            (@subcommand add =>
+                (about: "Make the given machine available with the given class.")
+                (@arg ADDR: +required
+                 "The IP:PORT of the machine")
+                (@arg CLASS: +required
+                 "The class of the machine")
+            )
+
+            (@subcommand rm =>
+                (about: "Remove the given machine from the available pool.")
+                (@arg ADDR: +required
+                 "The IP:PORT of the machine")
+            )
+
+            (@subcommand ls =>
+                (about: "List available machines.")
+            )
+
+            (@subcommand setup =>
+                (about: "Set up the given machine using the given command")
+                (@arg ADDR: +required
+                 "The IP:PORT of the machine")
+                (@arg CMD: +required ...
+                 "The setup commands, each as a single string")
+                (@arg CLASS: --class +takes_value
+                 "If passed, the machine is added to the class after setup.")
+            )
         )
 
-        (@subcommand rmavail =>
-            (about: "Remove the given machine from the available pool.")
-            (@arg ADDR: +required
-             "The IP:PORT of the machine")
+        (@subcommand var =>
+            (about: "Operations on variables.")
+
+            (@subcommand ls =>
+                (about: "List variables and their values.")
+            )
+
+            (@subcommand set =>
+                (about: "Set the given variable to be substituted in commands")
+                (@arg NAME: +required
+                 "The variable name")
+                (@arg VALUE: +required
+                 "The class of the machine")
+            )
         )
 
-        (@subcommand lsavail =>
-            (about: "List available machines.")
-        )
+        (@subcommand job =>
+            (about: "Operations on jobs.")
 
-        (@subcommand setup =>
-            (about: "Set up the given machine using the given command")
-            (@arg ADDR: +required
-             "The IP:PORT of the machine")
-            (@arg CMD: +required ...
-             "The setup commands, each as a single string")
-            (@arg CLASS: --class +takes_value
-             "If passed, the machine is added to the class after setup.")
-        )
+            (@subcommand add =>
+                (about: "Add a job to be run on the given class of machine.")
+                (@arg CLASS: +required
+                 "The class of machine that can execute the job")
+                (@arg CMD: +required
+                 "The command to execute")
+                (@arg CP_PATH: +required
+                 "The location on this host to copy results to")
+            )
 
-        (@subcommand lsvars =>
-            (about: "List variables and their values.")
-        )
+            (@subcommand ls =>
+                (about: "List all jobs.")
+                (@arg LONG: --long
+                 "Show all output")
+            )
 
-        (@subcommand setvar =>
-            (about: "Set the given variable to be substituted in commands")
-            (@arg NAME: +required
-             "The variable name")
-            (@arg VALUE: +required
-             "The class of the machine")
-        )
+            (@subcommand rm =>
+                (about: "Cancel a running/scheduled job OR delete a finished/failed job.")
+                (@arg JID: +required ... {is_usize}
+                 "The job ID(s) of the job(s) to cancel")
+            )
 
-        (@subcommand addjob =>
-            (about: "Add a job to be run on the given class of machine.")
-            (@arg CLASS: +required
-             "The class of machine that can execute the job")
-            (@arg CMD: +required
-             "The command to execute")
-            (@arg CP_PATH: +required
-             "The location on this host to copy results to")
-        )
+            (@subcommand stat =>
+                (about: "Get information on the status of a job.")
+                (@arg JID: +required {is_usize}
+                 "The job ID of the job")
+            )
 
-        (@subcommand lsjobs =>
-            (about: "List all jobs.")
-            (@arg LONG: --long
-             "Show all output")
-        )
+            (@subcommand clone =>
+                (about: "Clone a job.")
+                (@arg JID: +required {is_usize} ...
+                 "The job ID(s) of the job to clone.")
+            )
 
-        (@subcommand jobcancel =>
-            (about: "Cancel a running/scheduled job OR delete a finished/failed job.")
-            (@arg JID: +required ... {is_usize}
-             "The job ID(s) of the job(s) to cancel")
-        )
+            (@subcommand log =>
+                (about: "Print the path to the job log.")
+                (@arg JID: +required {is_usize}
+                 "The job ID of the job for which to print the log.")
+            )
 
-        (@subcommand jobstat =>
-            (about: "Get information on the status of a job.")
-            (@arg JID: +required {is_usize}
-             "The job ID of the job")
-        )
+            (@subcommand matrix =>
+                (about: "Operations with job matrices")
 
-        (@subcommand jobclone =>
-            (about: "Clone a job.")
-            (@arg JID: +required {is_usize} ...
-             "The job ID(s) of the job to clone.")
-        )
+                (@subcommand add =>
+                    (about: "Create a matrix of jobs on the given class of machine.")
+                    (@arg CLASS: +required
+                     "The class of machine that can execute the jobs.")
+                    (@arg CMD: +required
+                     "The command template to execute with the variables filled in.")
+                    (@arg CP_PATH: +required
+                     "The location on this host to copy results to.")
+                    (@arg VARIABLES: +takes_value +required ...
+                     "A space-separated list of KEY=VALUE1,VALUE2,... pairs for replacing variables.")
+                )
 
-        (@subcommand joblog =>
-            (about: "Print the path to the job log.")
-            (@arg JID: +required {is_usize}
-             "The job ID of the job for which to print the log.")
-        )
-
-        (@subcommand matrix =>
-            (about: "Create a matrix of jobs on the given class of machine.")
-            (@arg CLASS: +required
-             "The class of machine that can execute the jobs.")
-            (@arg CMD: +required
-             "The command template to execute with the variables filled in.")
-            (@arg CP_PATH: +required
-             "The location on this host to copy results to.")
-            (@arg VARIABLES: +takes_value +required ...
-             "A space-separated list of KEY=VALUE1,VALUE2,... pairs for replacing variables.")
-        )
-
-        (@subcommand statmatrix =>
-            (about: "Get information on the status of a matrix.")
-            (@arg ID: +required {is_usize}
-             "The matrix ID of the matrix")
-            (@arg LONG: --long
-             "Show all output")
+                (@subcommand stat =>
+                    (about: "Get information on the status of a matrix.")
+                    (@arg ID: +required {is_usize}
+                     "The matrix ID of the matrix")
+                    (@arg LONG: --long
+                     "Show all output")
+                )
+            )
         )
     }
     .setting(clap::AppSettings::SubcommandRequired)
@@ -129,26 +145,123 @@ fn main() {
 
     let addr = matches.value_of("ADDR").unwrap_or(SERVER_ADDR);
 
-    match matches.subcommand() {
-        ("lsjobs", Some(sub_m)) => {
-            let is_long = sub_m.is_present("LONG");
+    run_inner(addr, &matches)
+}
 
-            let jobs = list_jobs(addr);
-            print_jobs(jobs, is_long);
+fn run_inner(addr: &str, matches: &clap::ArgMatches<'_>) {
+    match matches.subcommand() {
+        ("ping", _) => {
+            let response = make_request(addr, JobServerReq::Ping);
+            println!("Server response: {:?}", response);
         }
 
-        ("lsavail", Some(_sub_m)) => {
+        ("machine", Some(sub_m)) => handle_machine_cmd(addr, sub_m),
+
+        ("var", Some(sub_m)) => handle_var_cmd(addr, sub_m),
+
+        ("job", Some(sub_m)) => handle_job_cmd(addr, sub_m),
+
+        _ => unreachable!(),
+    }
+}
+
+fn handle_machine_cmd(addr: &str, matches: &clap::ArgMatches<'_>) {
+    match matches.subcommand() {
+        ("ls", Some(_sub_m)) => {
             let jobs = list_jobs(addr);
             let avail = list_avail(addr, jobs);
             print_avail(avail);
         }
 
-        ("joblog", Some(sub_m)) => {
+        ("add", Some(sub_m)) => {
+            let req = JobServerReq::MakeAvailable {
+                addr: sub_m.value_of("ADDR").unwrap().into(),
+                class: sub_m.value_of("CLASS").unwrap().into(),
+            };
+
+            let response = make_request(addr, req);
+            println!("Server response: {:?}", response);
+        }
+
+        ("rm", Some(sub_m)) => {
+            let req = JobServerReq::RemoveAvailable {
+                addr: sub_m.value_of("ADDR").unwrap().into(),
+            };
+
+            let response = make_request(addr, req);
+            println!("Server response: {:?}", response);
+        }
+
+        ("setup", Some(sub_m)) => {
+            let req = JobServerReq::SetUpMachine {
+                addr: sub_m.value_of("ADDR").unwrap().into(),
+                cmds: sub_m.values_of("CMD").unwrap().map(String::from).collect(),
+                class: sub_m.value_of("CLASS").map(Into::into),
+            };
+
+            let response = make_request(addr, req);
+            println!("Server response: {:?}", response);
+        }
+
+        _ => unreachable!(),
+    }
+}
+
+fn handle_var_cmd(addr: &str, matches: &clap::ArgMatches<'_>) {
+    match matches.subcommand() {
+        ("ls", Some(_sub_m)) => {
+            let response = make_request(addr, JobServerReq::ListVars);
+            println!("Server response: {:?}", response);
+        }
+
+        ("set", Some(sub_m)) => {
+            let req = JobServerReq::SetVar {
+                name: sub_m.value_of("NAME").unwrap().into(),
+                value: sub_m.value_of("VALUE").unwrap().into(),
+            };
+
+            let response = make_request(addr, req);
+            println!("Server response: {:?}", response);
+        }
+
+        _ => unreachable!(),
+    }
+}
+
+fn handle_job_cmd(addr: &str, matches: &clap::ArgMatches<'_>) {
+    match matches.subcommand() {
+        ("ls", Some(sub_m)) => {
+            let is_long = sub_m.is_present("LONG");
+            let jobs = list_jobs(addr);
+            print_jobs(jobs, is_long);
+        }
+
+        ("stat", Some(sub_m)) => {
+            let req = JobServerReq::JobStatus {
+                jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
+            };
+
+            let response = make_request(addr, req);
+            println!("Server response: {:?}", response);
+        }
+
+        ("log", Some(sub_m)) => {
             let jid = sub_m.value_of("JID").unwrap();
             get_job_log_path(addr, jid)
         }
 
-        ("jobcancel", Some(sub_m)) => {
+        ("add", Some(sub_m)) => {
+            let req = JobServerReq::AddJob {
+                class: sub_m.value_of("CLASS").unwrap().into(),
+                cmd: sub_m.value_of("CMD").unwrap().into(),
+                cp_results: sub_m.value_of("CP_PATH").map(Into::into),
+            };
+
+            let response = make_request(addr, req);
+            println!("Server response: {:?}", response);
+        }
+
+        ("rm", Some(sub_m)) => {
             for jid in sub_m.values_of("JID").unwrap() {
                 let response = make_request(
                     addr,
@@ -160,7 +273,7 @@ fn main() {
             }
         }
 
-        ("jobclone", Some(sub_m)) => {
+        ("clone", Some(sub_m)) => {
             for jid in sub_m.values_of("JID").unwrap() {
                 let response = make_request(
                     addr,
@@ -172,7 +285,43 @@ fn main() {
             }
         }
 
-        ("statmatrix", Some(sub_m)) => {
+        ("matrix", Some(sub_m)) => handle_matrix_cmd(addr, sub_m),
+
+        _ => unreachable!(),
+    }
+}
+
+fn handle_matrix_cmd(addr: &str, matches: &clap::ArgMatches<'_>) {
+    match matches.subcommand() {
+        ("add", Some(sub_m)) => {
+            let req = JobServerReq::AddMatrix {
+                vars: sub_m
+                    .values_of("VARIABLES")
+                    .map(|vals| {
+                        vals.map(|val| {
+                            let mut spl = val.split("=");
+                            let key = spl.next().unwrap().to_string();
+                            let value = spl
+                                .next()
+                                .unwrap()
+                                .split(",")
+                                .map(|s| s.to_string())
+                                .collect();
+                            (key, value)
+                        })
+                        .collect()
+                    })
+                    .unwrap_or_else(|| HashMap::new()),
+                class: sub_m.value_of("CLASS").unwrap().into(),
+                cmd: sub_m.value_of("CMD").unwrap().into(),
+                cp_results: sub_m.value_of("CP_PATH").map(Into::into),
+            };
+
+            let response = make_request(addr, req);
+            println!("Server response: {:?}", response);
+        }
+
+        ("stat", Some(sub_m)) => {
             let is_long = sub_m.is_present("LONG");
 
             let response = make_request(
@@ -190,8 +339,6 @@ fn main() {
                 _ => println!("Server response: {:?}", response),
             }
         }
-
-        (subcmd, Some(sub_m)) => request_from_subcommand(addr, subcmd, sub_m),
 
         _ => unreachable!(),
     }
@@ -233,14 +380,6 @@ fn get_job_log_path(addr: &str, jid: &str) {
     }
 }
 
-fn request_from_subcommand(addr: &str, subcmd: &str, sub_m: &clap::ArgMatches<'_>) {
-    // Form the request
-    let request = form_request(subcmd, sub_m);
-
-    let response = make_request(addr, request);
-    println!("Server response: {:?}", response);
-}
-
 fn make_request(server_addr: &str, request: JobServerReq) -> JobServerResp {
     // Connect to server
     let mut tcp_stream = TcpStream::connect(server_addr).expect("Unable to connect to server");
@@ -263,73 +402,6 @@ fn make_request(server_addr: &str, request: JobServerReq) -> JobServerResp {
         .expect("Unable to read server response");
 
     serde_json::from_str(&response).expect("Unable to deserialize server response")
-}
-
-fn form_request(subcmd: &str, sub_m: &clap::ArgMatches<'_>) -> JobServerReq {
-    match subcmd {
-        "ping" => JobServerReq::Ping,
-
-        "mkavail" => JobServerReq::MakeAvailable {
-            addr: sub_m.value_of("ADDR").unwrap().into(),
-            class: sub_m.value_of("CLASS").unwrap().into(),
-        },
-
-        "rmavail" => JobServerReq::RemoveAvailable {
-            addr: sub_m.value_of("ADDR").unwrap().into(),
-        },
-
-        "lsavail" => JobServerReq::ListAvailable,
-
-        "setup" => JobServerReq::SetUpMachine {
-            addr: sub_m.value_of("ADDR").unwrap().into(),
-            cmds: sub_m.values_of("CMD").unwrap().map(String::from).collect(),
-            class: sub_m.value_of("CLASS").map(Into::into),
-        },
-
-        "setvar" => JobServerReq::SetVar {
-            name: sub_m.value_of("NAME").unwrap().into(),
-            value: sub_m.value_of("VALUE").unwrap().into(),
-        },
-
-        "addjob" => JobServerReq::AddJob {
-            class: sub_m.value_of("CLASS").unwrap().into(),
-            cmd: sub_m.value_of("CMD").unwrap().into(),
-            cp_results: sub_m.value_of("CP_PATH").map(Into::into),
-        },
-
-        "lsvars" => JobServerReq::ListVars,
-
-        "lsjobs" => JobServerReq::ListJobs,
-
-        "statjob" => JobServerReq::JobStatus {
-            jid: sub_m.value_of("JID").unwrap().parse().unwrap(),
-        },
-
-        "matrix" => JobServerReq::AddMatrix {
-            vars: sub_m
-                .values_of("VARIABLES")
-                .map(|vals| {
-                    vals.map(|val| {
-                        let mut spl = val.split("=");
-                        let key = spl.next().unwrap().to_string();
-                        let value = spl
-                            .next()
-                            .unwrap()
-                            .split(",")
-                            .map(|s| s.to_string())
-                            .collect();
-                        (key, value)
-                    })
-                    .collect()
-                })
-                .unwrap_or_else(|| HashMap::new()),
-            class: sub_m.value_of("CLASS").unwrap().into(),
-            cmd: sub_m.value_of("CMD").unwrap().into(),
-            cp_results: sub_m.value_of("CP_PATH").map(Into::into),
-        },
-
-        _ => unreachable!(),
-    }
 }
 
 struct JobInfo {
