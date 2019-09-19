@@ -441,8 +441,6 @@ impl Server {
                         id, jid, class, cmd
                     );
 
-                    let variables = self.variables.lock().unwrap().clone();
-
                     self.jobs.lock().unwrap().insert(
                         jid,
                         Job {
@@ -451,7 +449,7 @@ impl Server {
                             class: class.clone(),
                             cp_results: cp_results.clone(),
                             status: Status::Waiting,
-                            variables,
+                            variables: config,
                         },
                     );
                 }
