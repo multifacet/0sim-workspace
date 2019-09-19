@@ -301,7 +301,7 @@ fn handle_matrix_cmd(addr: &str, matches: &clap::ArgMatches<'_>) {
                         vals.map(|val| {
                             let spli = val.find("=").expect("Variables: KEY=VALUE1,VALUE2,...");
                             let (key, values) = val.split_at(spli);
-                            let values = values.split(",").map(|s| s.to_string()).collect();
+                            let values = values[1..].split(",").map(|s| s.to_string()).collect();
                             (key.to_owned(), values)
                         })
                         .collect()
