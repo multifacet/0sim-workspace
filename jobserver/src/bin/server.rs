@@ -22,8 +22,6 @@ use jobserver::{
 
 use log::{debug, error, info, warn};
 
-const RUNNER: &str = "/nobackup/research-workspace/runner/";
-
 /// The server's state.
 #[derive(Debug)]
 struct Server {
@@ -1139,17 +1137,16 @@ impl Server {
 fn main() {
     let matches = clap_app! { jobserver =>
         (about: "Serves jobs to machines")
+        (@arg RUNNER: +required
+         "Path to the runner cargo workspace")
         (@arg ADDR: --addr +takes_value
          "The IP:ADDR for the server to listen on for commands \
          (defaults to `localhost:3030`)")
-        (@arg RUNNER: --runner +takes_value
-         "Path to the runner cargo workspace \
-         (defaults to /nobackup/research-workspace/runner/)")
     }
     .get_matches();
 
     let addr = matches.value_of("ADDR").unwrap_or(SERVER_ADDR.into());
-    let runner = matches.value_of("RUNNER").unwrap_or(RUNNER);
+    let runner = matches.value_of("RUNNER").unwrap();
 
     // Start logger
     env_logger::init();
