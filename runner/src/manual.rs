@@ -15,7 +15,7 @@ use spurs::{
 use crate::common::{
     exp_0sim::{
         initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, set_zerosim_d,
-        set_zerosim_delta, setup_swapping, start_vagrant, turn_on_ssdswap, turn_on_zswap,
+        set_zerosim_delay, setup_swapping, start_vagrant, turn_on_ssdswap, turn_on_zswap,
         VAGRANT_CORES, VAGRANT_MEM, ZEROSIM_LAPIC_ADJUST, ZEROSIM_SKIP_HALT,
     },
     paths::*,
@@ -57,10 +57,10 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Only valid with --vm) Disable TSC offsetting during boot to speed it up.")
         (@arg ZSWAP: --zswap +takes_value {is_usize}
          "(Optional) Turn on zswap with the given `max_pool_percent`")
-        (@arg D: --d +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_d")
-        (@arg DELTA: --delta +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_delta")
+        (@arg DRIFT_THRESHOLD: --drift_thresh +takes_value {is_usize}
+         "(Optional) Set /proc/zerosim_drift_threshold")
+        (@arg DELAY: --delay +takes_value {is_usize}
+         "(Optional) Set /proc/zerosim_delay")
         (@arg DISABLE_EPT: --disable_ept
          "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
         (@arg UPDATE_EXP: --update_exp
@@ -93,11 +93,11 @@ pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
     let zswap = sub_m
         .value_of("ZSWAP")
         .map(|value| value.parse::<usize>().unwrap());
-    let zerosim_d = sub_m
-        .value_of("D")
+    let zerosim_drift_threshold = sub_m
+        .value_of("DRIFT_THRESHOLD")
         .map(|value| value.parse::<usize>().unwrap());
-    let zerosim_delta = sub_m
-        .value_of("DELTA")
+    let zerosim_delay = sub_m
+        .value_of("DELAY")
         .map(|value| value.parse::<usize>().unwrap());
     let disable_ept = sub_m.is_present("DISABLE_EPT");
     let update_exp = sub_m.is_present("UPDATE_EXP");
@@ -188,11 +188,11 @@ pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
     }
 
     // Set D and delta
-    if let Some(zerosim_d) = zerosim_d {
-        set_zerosim_d(&ushell, zerosim_d)?;
+    if let Some(zerosim_drift_threshold) = zerosim_drift_threshold {
+        set_zerosim_d(&ushell, zerosim_drift_threshold)?;
     }
-    if let Some(zerosim_delta) = zerosim_delta {
-        set_zerosim_delta(&ushell, zerosim_delta)?;
+    if let Some(zerosim_delay) = zerosim_delay {
+        set_zerosim_delay(&ushell, zerosim_delay)?;
     }
 
     // Update 0sim-experiments

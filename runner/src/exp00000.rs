@@ -68,10 +68,10 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          (ignored for memcached).")
         (@arg SIZE: -s --size +takes_value {is_usize}
          "The number of GBs of the workload (e.g. 500)")
-        (@arg D: --d +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_d")
-        (@arg DELTA: --delta +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_delta")
+        (@arg DRIFT_THRESHOLD: --drift_thresh +takes_value {is_usize}
+         "(Optional) Set /proc/zerosim_drift_threshold")
+        (@arg DELTA: --delay +takes_value {is_usize}
+         "(Optional) Set /proc/zerosim_delay")
         (@arg SKIP_HALT: --skip_halt
          "(Optional) Set /proc/zerosim_skip_halt")
         (@arg LAPIC_ADJUST: --lapic_adjust
@@ -119,12 +119,12 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
     let warmup = sub_m.is_present("WARMUP");
     let prefault = sub_m.is_present("PREFAULT");
 
-    let zerosim_d = sub_m
-        .value_of("D")
+    let zerosim_drift_threshold = sub_m
+        .value_of("DRIFT_THRESHOLD")
         .map(|value| value.parse::<usize>().unwrap())
         .unwrap_or(10_000_000);
-    let zerosim_delta = sub_m
-        .value_of("DELTA")
+    let zerosim_delay = sub_m
+        .value_of("DELAY")
         .map(|value| value.parse::<usize>().unwrap())
         .unwrap_or(0);
     let zerosim_skip_halt = sub_m.is_present("SKIP_HALT");
@@ -150,8 +150,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         warmup: warmup,
 
         zswap_max_pool_percent: 50,
-        zerosim_d: zerosim_d,
-        zerosim_delta: zerosim_delta,
+        zerosim_drift_threshold: zerosim_drift_threshold,
+        zerosim_delay: zerosim_delay,
         zerosim_skip_halt: zerosim_skip_halt,
         zerosim_lapic_adjust: zerosim_lapic_adjust,
 
@@ -187,8 +187,8 @@ where
     let prefault = settings.get::<bool>("prefault");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
-    let zerosim_d = settings.get::<usize>("zerosim_d");
-    let zerosim_delta = settings.get::<usize>("zerosim_delta");
+    let zerosim_drift_threshold = settings.get::<usize>("zerosim_drift_threshold");
+    let zerosim_delay = settings.get::<usize>("zerosim_delay");
     let zerosim_skip_halt = settings.get::<bool>("zerosim_skip_halt");
     let zerosim_lapic_adjust = settings.get::<bool>("zerosim_lapic_adjust");
 
@@ -221,8 +221,8 @@ where
 
     // Environment
     turn_on_zswap(&mut ushell)?;
-    set_zerosim_d(&ushell, zerosim_d)?;
-    set_zerosim_delta(&ushell, zerosim_delta)?;
+    set_zerosim_d(&ushell, zerosim_drift_threshold)?;
+    set_zerosim_delay(&ushell, zerosim_delay)?;
 
     ushell.run(
         cmd!(

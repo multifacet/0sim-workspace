@@ -105,8 +105,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         cores: cores,
 
         zswap_max_pool_percent: 50,
-        zerosim_d: 10_000_000,
-        zerosim_delta: 0,
+        zerosim_drift_threshold: 10_000_000,
+        zerosim_delay: 0,
 
         transparent_hugepage_enabled: "always",
         transparent_hugepage_defrag: "always",
@@ -142,8 +142,8 @@ where
     let cores = settings.get::<usize>("cores");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
-    let zerosim_d = settings.get::<usize>("zerosim_d");
-    let zerosim_delta = settings.get::<usize>("zerosim_delta");
+    let zerosim_drift_threshold = settings.get::<usize>("zerosim_drift_threshold");
+    let zerosim_delay = settings.get::<usize>("zerosim_delay");
     let transparent_hugepage_enabled = settings.get::<&str>("transparent_hugepage_enabled");
     let transparent_hugepage_defrag = settings.get::<&str>("transparent_hugepage_defrag");
     let transparent_hugepage_khugepaged_defrag =
@@ -175,8 +175,8 @@ where
 
     // Environment
     turn_on_zswap(&mut ushell)?;
-    set_zerosim_d(&ushell, zerosim_d)?;
-    set_zerosim_delta(&ushell, zerosim_delta)?;
+    set_zerosim_d(&ushell, zerosim_drift_threshold)?;
+    set_zerosim_delay(&ushell, zerosim_delay)?;
 
     ushell.run(
         cmd!(

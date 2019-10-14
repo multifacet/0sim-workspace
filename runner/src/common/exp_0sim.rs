@@ -180,12 +180,12 @@ where
 
 /// Set D for 0sim.
 pub fn set_zerosim_d(shell: &SshShell, d: usize) -> Result<(), failure::Error> {
-    shell.run(cmd!("echo {} | sudo tee /proc/zerosim_d", d))?;
+    shell.run(cmd!("echo {} | sudo tee /proc/zerosim_drift_threshold", d))?;
     Ok(())
 }
 
-pub fn set_zerosim_delta(shell: &SshShell, delta: usize) -> Result<(), failure::Error> {
-    shell.run(cmd!("echo {} | sudo tee /proc/zerosim_delta", delta))?;
+pub fn set_zerosim_delay(shell: &SshShell, delay: usize) -> Result<(), failure::Error> {
+    shell.run(cmd!("echo {} | sudo tee /proc/zerosim_delay", delay))?;
     Ok(())
 }
 
