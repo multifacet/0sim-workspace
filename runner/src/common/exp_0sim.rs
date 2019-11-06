@@ -249,6 +249,9 @@ pub fn vagrant_halt(shell: &SshShell) -> Result<(), failure::Error> {
 
 /// Start the VM with the given amount of memory and core. If `fast` is `true`, TSC offsetting
 /// is disabled during the VM boot (and re-enabled afterwards), which is much faster.
+///
+/// After starting the VM, we attempt to disable soft lockup detectors in the guest because they
+/// can produce timing anomalies.
 pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     shell: &SshShell,
     hostname: A,
@@ -310,6 +313,8 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     shell.run(cmd!("sudo lsof -i -P -n | grep LISTEN").use_bash())?;
     let vshell = connect_to_vagrant_as_root(hostname)?;
 
+    turn_off_watchdogs(&vshell)?;
+
     dump_sys_info(&vshell)?;
 
     if fast {
@@ -325,6 +330,17 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     }
 
     Ok(vshell)
+}
+
+/// Turn off soft lockup and NMI watchdogs if possible in the shell.
+pub fn turn_off_watchdogs(shell: &SshShell) -> Result<(), failure::Error> {
+    shell.run(cmd!(
+        "echo 0 | sudo tee /proc/sys/kernel/hung_task_timeout_secs"
+    ))?;
+    shell.run(cmd!("echo 0 | sudo tee /proc/sys/kernel/soft_watchdog"))?;
+
+    shell.run(cmd!("echo 0 | sudo tee /proc/sys/kernel/watchdog").allow_error())?;
+    Ok(())
 }
 
 pub fn turn_off_swapdevs(shell: &SshShell) -> Result<(), failure::Error> {
