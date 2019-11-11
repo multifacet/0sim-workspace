@@ -5,10 +5,10 @@ authors = ["Mark Mansi <markm@cs.wisc.edu>"]
 edition = "2018"
 
 [dependencies]
-#spurs = { git = "https://github.com/mark-i-m/spurs.git" }
-#spurs = { path = "/nobackup/spurs" }
-spurs = "0.5.0"
-spurs-util = "0.1.0"
+#spurs = { path = "/nobackup/spurs/spurs" }
+#spurs-util = { path = "/nobackup/spurs/spurs-util" }
+spurs = "0.6.0"
+spurs-util = "0.2.0"
 clap = { version = "2.32.0", features = [ "color" ] }
 failure = "0.1.5"
 failure_derive = "0.1.5"

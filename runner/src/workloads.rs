@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use spurs::{
     cmd,
+    errors::SshError,
     ssh::{Execute, SshShell, SshSpawnHandle},
 };
 
@@ -18,10 +19,7 @@ use spurs::{
 /// ```rust,ignore
 /// vagrant_setup_apriori_paging_process(&shell, "ls")?;
 /// ```
-pub fn vagrant_setup_apriori_paging_process(
-    shell: &SshShell,
-    prog: &str,
-) -> Result<(), failure::Error> {
+pub fn vagrant_setup_apriori_paging_process(shell: &SshShell, prog: &str) -> Result<(), SshError> {
     shell.run(cmd!(
         "{}/apriori_paging_set_process {}",
         dir![
@@ -356,7 +354,7 @@ pub fn run_memhog(
     opts: MemhogOptions,
     eager: bool,
     tctx: &mut TasksetCtx,
-) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+) -> Result<(SshShell, SshSpawnHandle), SshError> {
     if eager {
         vagrant_setup_apriori_paging_process(shell, "memhog")?;
     }
@@ -655,7 +653,7 @@ pub fn run_metis_matrix_mult(
     dim: usize,
     eager: bool,
     tctx: &mut TasksetCtx,
-) -> Result<(SshShell, SshSpawnHandle), failure::Error> {
+) -> Result<(SshShell, SshSpawnHandle), SshError> {
     if eager {
         vagrant_setup_apriori_paging_process(shell, "matrix_mult2")?;
     }

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use spurs::{
     cmd,
+    errors::SshError,
     ssh::{Execute, SshShell},
 };
 
@@ -219,20 +220,20 @@ pub fn turn_on_zswap(shell: &mut SshShell) -> Result<(), failure::Error> {
 pub fn connect_to_vagrant_user<A: std::net::ToSocketAddrs + std::fmt::Display>(
     hostname: A,
     user: &str,
-) -> Result<SshShell, failure::Error> {
+) -> Result<SshShell, SshError> {
     let (host, _) = spurs::util::get_host_ip(hostname);
     SshShell::with_default_key(user, (host, VAGRANT_PORT))
 }
 
 pub fn connect_to_vagrant_as_root<A: std::net::ToSocketAddrs + std::fmt::Display>(
     hostname: A,
-) -> Result<SshShell, failure::Error> {
+) -> Result<SshShell, SshError> {
     connect_to_vagrant_user(hostname, "root")
 }
 
 pub fn connect_to_vagrant_as_user<A: std::net::ToSocketAddrs + std::fmt::Display>(
     hostname: A,
-) -> Result<SshShell, failure::Error> {
+) -> Result<SshShell, SshError> {
     connect_to_vagrant_user(hostname, "vagrant")
 }
 
