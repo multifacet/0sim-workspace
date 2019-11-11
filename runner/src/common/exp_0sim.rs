@@ -21,10 +21,12 @@ pub const VAGRANT_MEM: usize = 1024;
 pub const VAGRANT_CORES: usize = 1;
 
 /// The default value for /proc/zerosim_skip_halt.
+///
+/// Turning this on breaks the x86 ISA contract. Don't do that.
 pub const ZEROSIM_SKIP_HALT: bool = false;
 
 /// The default value for /proc/zerosim_lapic_adjust.
-pub const ZEROSIM_LAPIC_ADJUST: bool = false;
+pub const ZEROSIM_LAPIC_ADJUST: bool = true;
 
 /// Shut off any virtual machine and reboot the machine and do nothing else. Useful for getting the
 /// machine into a clean state.

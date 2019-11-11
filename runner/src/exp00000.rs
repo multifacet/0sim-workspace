@@ -72,10 +72,6 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) Set /proc/zerosim_drift_threshold")
         (@arg DELTA: --delay +takes_value {is_usize}
          "(Optional) Set /proc/zerosim_delay")
-        (@arg SKIP_HALT: --skip_halt
-         "(Optional) Set /proc/zerosim_skip_halt")
-        (@arg LAPIC_ADJUST: --lapic_adjust
-         "(Optional) Set /proc/zerosim_lapic_adjust")
     }
 }
 
@@ -127,8 +123,6 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         .value_of("DELAY")
         .map(|value| value.parse::<usize>().unwrap())
         .unwrap_or(0);
-    let zerosim_skip_halt = sub_m.is_present("SKIP_HALT");
-    let zerosim_lapic_adjust = sub_m.is_present("LAPIC_ADJUST");
 
     let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
@@ -152,8 +146,6 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         zswap_max_pool_percent: 50,
         zerosim_drift_threshold: zerosim_drift_threshold,
         zerosim_delay: zerosim_delay,
-        zerosim_skip_halt: zerosim_skip_halt,
-        zerosim_lapic_adjust: zerosim_lapic_adjust,
 
         username: login.username.as_str(),
         host: login.hostname,
@@ -189,8 +181,6 @@ where
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
     let zerosim_drift_threshold = settings.get::<usize>("zerosim_drift_threshold");
     let zerosim_delay = settings.get::<usize>("zerosim_delay");
-    let zerosim_skip_halt = settings.get::<bool>("zerosim_skip_halt");
-    let zerosim_lapic_adjust = settings.get::<bool>("zerosim_lapic_adjust");
 
     // Reboot
     initial_reboot(&login)?;
@@ -214,8 +204,8 @@ where
             vm_size,
             cores,
             /* fast */ true,
-            zerosim_skip_halt,
-            zerosim_lapic_adjust,
+            ZEROSIM_SKIP_HALT,
+            ZEROSIM_LAPIC_ADJUST,
         )?
     );
 

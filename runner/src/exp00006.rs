@@ -142,8 +142,8 @@ where
             vm_size,
             cores,
             /* fast */ false,
-            /* skip_halt */ false,
-            /* lapic_adjust */ false,
+            /* skip_halt */ ZEROSIM_SKIP_HALT,
+            /* lapic_adjust */ ZEROSIM_LAPIC_ADJUST,
         )?
     );
 
