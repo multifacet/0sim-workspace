@@ -4,11 +4,7 @@ use bitflags::bitflags;
 
 use serde::{Deserialize, Serialize};
 
-use spurs::{
-    cmd,
-    errors::SshError,
-    ssh::{Execute, SshShell, SshSpawnHandle},
-};
+use spurs::{cmd, Execute, SshError, SshShell, SshSpawnHandle};
 
 /// Set the apriori paging process using Swapnil's program. Requires `sudo`.
 ///

@@ -5,11 +5,8 @@
 
 use clap::{clap_app, ArgMatches};
 
-use spurs::{
-    cmd,
-    ssh::{Execute, SshShell},
-    util::escape_for_bash,
-};
+use spurs::{cmd, Execute, SshShell};
+use spurs_util::escape_for_bash;
 
 use crate::{
     common::{

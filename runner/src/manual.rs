@@ -7,10 +7,7 @@
 
 use clap::{clap_app, ArgMatches};
 
-use spurs::{
-    cmd,
-    ssh::{Execute, SshShell},
-};
+use spurs::{cmd, Execute, SshShell};
 
 use crate::common::{
     exp_0sim::{

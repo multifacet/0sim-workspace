@@ -5,7 +5,7 @@
 
 use clap::clap_app;
 
-use spurs::{cmd, ssh::Execute};
+use spurs::{cmd, Execute};
 
 use crate::common::{
     exp_0sim::*,

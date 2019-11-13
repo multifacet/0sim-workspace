@@ -12,11 +12,8 @@
 
 use clap::clap_app;
 
-use spurs::{
-    cmd,
-    ssh::{Execute, SshShell},
-    util::escape_for_bash,
-};
+use spurs::{cmd, Execute, SshShell};
+use spurs_util::escape_for_bash;
 
 use crate::{
     common::{

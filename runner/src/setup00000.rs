@@ -7,10 +7,7 @@ use std::process::Command;
 
 use clap::clap_app;
 
-use spurs::{
-    cmd,
-    ssh::{Execute, SshShell},
-};
+use spurs::{cmd, Execute, SshShell};
 
 use crate::common::{
     exp_0sim::*,
@@ -390,7 +387,7 @@ where
         ]),
 
         // Add user to libvirt group after installing
-        spurs_util::util::add_to_group("libvirt"),
+        spurs_util::add_to_group("libvirt"),
     }
 
     let installed = ushell
@@ -467,9 +464,9 @@ where
         // - format the device and create a partition
         // - mkfs on the partition
         // - copy data to new partition and mount as home dir
-        ushell.run(spurs_util::util::write_gpt(device))?;
-        ushell.run(spurs_util::util::create_partition(device))?;
-        spurs_util::util::format_partition_as_ext4(
+        ushell.run(spurs_util::write_gpt(device))?;
+        ushell.run(spurs_util::create_partition(device))?;
+        spurs_util::format_partition_as_ext4(
             ushell,
             /* dry_run */ false,
             &format!("{}1", device), // assume it is the first device partition
@@ -496,7 +493,7 @@ where
     } else if let Some(swap_devs) = &cfg.swap_devs {
         if swap_devs.is_empty() {
             let unpartitioned =
-                spurs_util::util::get_unpartitioned_devs(ushell, /* dry_run */ false)?;
+                spurs_util::get_unpartitioned_devs(ushell, /* dry_run */ false)?;
             for dev in unpartitioned.iter() {
                 ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
             }
@@ -793,7 +790,7 @@ where
     ushell.run(cmd!("sudo virsh pool-list"))?;
 
     // Reboot the host.
-    spurs::util::reboot(ushell, /* dry_run */ false)?;
+    spurs_util::reboot(ushell, /* dry_run */ false)?;
 
     // Disable TSC offsetting so that setup runs faster
     ushell.run(
@@ -866,7 +863,7 @@ where
     ushell.run(cmd!("vagrant ssh -- sudo cp -r /home/vagrant/.ssh /root/").cwd(vagrant_path))?;
 
     // Old key will be cached for the VM, but it is likely to have changed
-    let (host, _) = spurs::util::get_host_ip(&cfg.login.host);
+    let (host, _) = spurs_util::get_host_ip(&cfg.login.host);
     let _ = Command::new("ssh-keygen")
         .args(&[
             "-f",
@@ -894,7 +891,7 @@ where
     let pub_net = vushell.run(cmd!("ping -c 1 -W 10 1.1.1.1")).is_ok();
     if !pub_net {
         ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
-        spurs::util::reboot(ushell, /* dry_run */ false)?;
+        spurs_util::reboot(ushell, /* dry_run */ false)?;
 
         vrshell = start_vagrant(
             &ushell,

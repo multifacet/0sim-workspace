@@ -18,10 +18,7 @@ pub mod exp_0sim;
 
 use serde::{Deserialize, Serialize};
 
-use spurs::{
-    cmd,
-    ssh::{Execute, SshShell},
-};
+use spurs::{cmd, Execute, SshShell};
 
 use paths::*;
 

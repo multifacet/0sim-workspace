@@ -2,11 +2,7 @@
 
 use std::collections::HashMap;
 
-use spurs::{
-    cmd,
-    errors::SshError,
-    ssh::{Execute, SshShell},
-};
+use spurs::{cmd, Execute, SshError, SshShell};
 
 use super::paths::*;
 
@@ -41,7 +37,7 @@ where
     vagrant_halt(&ushell)?;
 
     // Reboot the remote to make sure we have a clean slate
-    spurs::util::reboot(&mut ushell, /* dry_run */ false)?;
+    spurs_util::reboot(&mut ushell, /* dry_run */ false)?;
 
     Ok(())
 }
@@ -59,7 +55,7 @@ where
     let _ = vagrant_halt(&ushell);
 
     // Reboot the remote to make sure we have a clean slate
-    spurs::util::reboot(&mut ushell, /* dry_run */ false)?;
+    spurs_util::reboot(&mut ushell, /* dry_run */ false)?;
 
     Ok(())
 }
@@ -221,7 +217,7 @@ pub fn connect_to_vagrant_user<A: std::net::ToSocketAddrs + std::fmt::Display>(
     hostname: A,
     user: &str,
 ) -> Result<SshShell, SshError> {
-    let (host, _) = spurs::util::get_host_ip(hostname);
+    let (host, _) = spurs_util::get_host_ip(hostname);
     SshShell::with_default_key(user, (host, VAGRANT_PORT))
 }
 
@@ -347,7 +343,7 @@ pub fn turn_off_watchdogs(shell: &SshShell) -> Result<(), failure::Error> {
 }
 
 pub fn turn_off_swapdevs(shell: &SshShell) -> Result<(), failure::Error> {
-    let devs = spurs_util::util::get_mounted_devs(shell, /* dry_run */ false)?;
+    let devs = spurs_util::get_mounted_devs(shell, /* dry_run */ false)?;
 
     // Turn off all swap devs
     for (dev, mount) in devs {
@@ -364,10 +360,10 @@ pub fn list_swapdevs(shell: &SshShell) -> Result<Vec<String>, failure::Error> {
     let mut swapdevs = vec![];
 
     // Find out what swap devs are there
-    let devs = spurs_util::util::get_unpartitioned_devs(shell, /* dry_run */ false)?;
+    let devs = spurs_util::get_unpartitioned_devs(shell, /* dry_run */ false)?;
 
     // Get the size of each one
-    let sizes = spurs_util::util::get_dev_sizes(
+    let sizes = spurs_util::get_dev_sizes(
         shell,
         devs.iter().map(String::as_str).collect(),
         /* dry_run */ false,

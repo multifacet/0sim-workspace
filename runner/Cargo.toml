@@ -7,8 +7,8 @@ edition = "2018"
 [dependencies]
 #spurs = { path = "/nobackup/spurs/spurs" }
 #spurs-util = { path = "/nobackup/spurs/spurs-util" }
-spurs = "0.6.0"
-spurs-util = "0.2.0"
+spurs = "0.8.1"
+spurs-util = "0.2.1"
 clap = { version = "2.32.0", features = [ "color" ] }
 failure = "0.1.5"
 failure_derive = "0.1.5"
