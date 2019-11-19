@@ -51,7 +51,7 @@ Cloudlab machines satisfy all of these properties.
 - You will need a [GitHub Personal Access Token][pat] to run `setup00000`,
   which is the main setup routine.
 
-- You will need access to the `mark-i-m/research-workspace` repo and its
+- You will need access to the `multifacet/0sim-workspace` repo and its
   submodules because they will be cloned to the remote machine.
 
 [pat]: https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line

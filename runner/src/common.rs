@@ -45,7 +45,7 @@ pub enum GitHubRepo {
         repo: String,
     },
     Https {
-        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`)
+        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`). Note the lack of `https://`!
         repo: String,
         /// (Username, OAuth token) for authentication, if needed
         token: Option<(String, String)>,
@@ -69,12 +69,12 @@ impl std::fmt::Display for GitHubRepo {
 pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
 
 /// The github repo URL for the research workspace.
-pub const RESEARCH_WORKSPACE_REPO: &str = "github.com/mark-i-m/research-workspace";
+pub const RESEARCH_WORKSPACE_REPO: &str = "github.com/multifacet/0sim-workspace";
 
 /// Common paths.
 pub mod paths {
     /// The path at which `clone_research_workspace` clones the workspace.
-    pub const RESEARCH_WORKSPACE_PATH: &str = "research-workspace";
+    pub const RESEARCH_WORKSPACE_PATH: &str = "0sim-workspace";
 
     /// Path to the 0sim submodule.
     pub const ZEROSIM_KERNEL_SUBMODULE: &str = "0sim";
@@ -151,7 +151,7 @@ pub fn timings_str(timings: &[(&str, std::time::Duration)]) -> String {
     s
 }
 
-/// Clone the research-workspace and checkout the given submodules. The given token is used as the
+/// Clone the 0sim-workspace and checkout the given submodules. The given token is used as the
 /// Github personal access token.
 ///
 /// If the repository is already cloned, it is updated (along with submodules).

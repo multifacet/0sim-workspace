@@ -291,7 +291,7 @@ pub enum NasClass {
 /// so we start it in a spawned shell and return the join handle rather than waiting for the
 /// workload to return.
 ///
-/// - `zerosim_bmk_path` is the path to the `bmks` directory of `research-workspace`.
+/// - `zerosim_bmk_path` is the path to the `bmks` directory of `0sim-workspace`.
 /// - `output_file` is the file to which the workload will write its output. If `None`, then
 ///   `/dev/null` is used.
 /// - `eager` indicates whether the workload should be run with eager paging (only in VM).
