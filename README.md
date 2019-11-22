@@ -14,7 +14,7 @@ README of the 0sim repo.
 > associated tools are intended to be used. Feel free to skip if you already
 > know.
 
-![Design Diagram][design.jpg]
+![Design Diagram](design.jpg)
 
 # Getting Started
 
