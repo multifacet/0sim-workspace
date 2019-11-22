@@ -315,3 +315,10 @@ README](https://github.com/mark-i-m/jobserver).
     - [Here is a link to the repo](https://github.com/multifacet/0sim-experiments)
 - `0sim-trace` is a git submodule that contains the tracer.
     - [Here is a link to the repo](https://github.com/multifacet/0sim-trace)
+
+# Licensing
+
+0sim itself is implemented as a modified Linux kernel, so it maintains the GPL
+license of the Linux kernel.
+
+The tools in this repository are licensed under the Apache v2 open-source license.
