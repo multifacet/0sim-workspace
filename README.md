@@ -11,8 +11,8 @@ README of the 0sim repo.
 # Design Overview
 
 > This section is intended to give a quick overview of how 0sim and the
-> associated tools are intended to be used. Feel free to skip to `Getting
-> Started` if you already know.
+> associated tools are intended to be used. Feel free to skip to [`Getting
+> Started`](#getting-started) if you already know.
 
 ![Design Diagram](design.jpg)
 
@@ -30,8 +30,11 @@ repository: `runner` and `jobserver`.
 
 - `jobserver`: makes it easy to run a large number of experiments on one or
   more machines with possibly different parameters, collecting the results and
-  logs in one place on the local machine for processing.
+  logs in one place on the local machine for processing. The `jobserver` is
+  more like a bookkeeping program that just forks off instances of `runner` to
+  do the real work.
 
+<a name="getting-started"></a>
 # Getting Started
 
 The workspace contains a bunch of tools, described in the contents section. The
@@ -41,11 +44,11 @@ There is an emphasis on reproducibility and ergonomic usage.
 
 This section contains instructions for
 
-0. [Ensure requirements (see below). Don't skip this or things will break.](#reqs)
+0. [Ensuring requirements (see below). Don't skip this or things will break.](#reqs)
 0. [Cloning and building the runner](#runner)
 0. [Using the runner to set up another machine with 0sim](#install-sim)
 1. [Using the runner to run a simulation with 0sim](#run-exp)
-2. [Optionally using the jobserver to run a large number of experiments with the runner](#jobserver)
+2. [(Optional) Using the jobserver to run a large number of experiments with the runner](#jobserver)
 
 <a name="reqs"></a>
 ## Requirements
