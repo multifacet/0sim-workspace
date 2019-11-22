@@ -235,6 +235,26 @@ inefficient. The jobserver does this for you.
 For more info on how to use the jobserver, please see the [jobserver
 README](https://github.com/mark-i-m/jobserver).
 
+# Cloudlab tips
+
+These are suggestions; use as needed.
+
+1. Use the `c220g2` instance type. This has two spare drives: a SSD (usually
+   `/dev/sdc`) and a HDD (usually `/dev/sdb`). Use the SSD for the `mapper
+   device`, which is a thinly-provisioned swap space to back the simulator. Use
+   the HDD for the home device, which is formatted and used as the home
+   directory (since Cloudlab machines by default only have a 16GB root volume).
+
+2. On occasion, there is a Mellanox RDMA driver that conflicts with KVM/QEMU's
+   install dependencies. You will get an error while running `setup00000`.
+   Uninstall the Mellanox driver; we don't need it. The restart the script.
+
+3. There is a bug in the `spurs` library that I have yet to debug. Often the
+   script will crash with the unhelpful error `no other error listed`. Usually
+   this happens just after we finish setting up the host and rebooting it in
+   `setup00000`. In this case, just restart the script. You can use the `-v`
+   flag to set up only the VM, which is what we want.
+
 # Repository Contents
 
 - `runner/` is a self-contained program that is capable of setting up any
