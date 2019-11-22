@@ -8,6 +8,14 @@ tooling and of 0sim.
 For more information about 0sim, see our ASPLOS 2020 paper (TODO: link) or the
 README of the 0sim repo.
 
+# Design Overview
+
+> This section is intended to give a quick overview of how 0sim and the
+> associated tools are intended to be used. Feel free to skip if you already
+> know.
+
+![Design Diagram][design.jpg]
+
 # Getting Started
 
 The workspace contains a bunch of tools, described in the contents section. The
@@ -20,8 +28,8 @@ This section contains instructions for
 0. [Ensure requirements (see below). Don't skip this or things will break.](#reqs)
 0. [Cloning and building the runner](#runner)
 0. [Using the runner to set up another machine with 0sim](#install-sim)
-1. Using the runner to run a simulation with 0sim
-2. Optionally using the jobserver to run a large number of experiments with the runner
+1. [Using the runner to run a simulation with 0sim](#run-exp)
+2. [Optionally using the jobserver to run a large number of experiments with the runner](#jobserver)
 
 <a name="reqs"></a>
 ## Requirements
@@ -154,14 +162,61 @@ In our experiments, we used Cloudlab. Cloudlab machines satisfy all of these pro
 <a name="run-exp"></a>
 ## Using the Runner to run experiments on a remote machine.
 
-TODO
+Experiment scripts are implemented as modules of the `runner` program. Each one
+exports a subcommand. You can see all of the available experiments by passing
+the `--help` flag to the runner:
+
+```
+./target/debug/runner --help
+```
+
+`runner` is extensible and contains a library of useful function for adding new
+experiments in the form of new modules/subcommands.
+
+`runner` also contains infrastructure for recording parameters and code
+versions of the experiments to improve reproducibility.
+
+0. Implement your experiment as a subcommand of the `runner` or choose one of
+   the existing experiments.
+
+1. Choose the parameters you want to use for experiment. Pass `--help` to the
+   experiment subcommand to see available parameters.
+
+2. Run the following command on the _local_ machine:
+
+   ```
+   ./target/debug/runner expXXXXX $ADDR $ME ARG1 ARG2...
+   ```
+
+   where $ADDR is the IP:PORT of the remote SSH server, $ME is the remote user
+   that will be used to run the experiments, and ARG1, ARG2, etc are the
+   arguments to the experiment. For example, one might run the following:
+
+   ```
+   ./target/debug/runner exp00000 marks-machine.cs.wisc.edu:22 markm 4096 1 -m
+   ```
+
+3. Wait for the experiment to terminate.
+
+4. Most experiments output results to a directory on the remote:
+   `$HOME/vm_shared/results/`. These results can then be moved to wherever they
+   will be consumed.
 
 <a name="jobserver"></a>
 ## Using the jobserver to run many experiments.
 
-TODO
+The jobserver exists to solve a problem that we often ran into while developing 0sim:
+- One has multiple machines to run experiments on (e.g. multiple cloudlab instances).
+- One has many experiments to run.
+- The experiments need to be rerun with a bunch of different combinations of the parameters.
 
-# Contents
+Trying to manage this all by hand is extremely tedious, time consuming, and
+inefficient. The jobserver does this for you.
+
+For more info on how to use the jobserver, please see the [jobserver
+README](https://github.com/mark-i-m/jobserver).
+
+# Repository Contents
 
 - `runner/` is a self-contained program that is capable of setting up any
   experiment for the project and running it.
@@ -181,20 +236,3 @@ TODO
     - [Here is a link to the repo](https://github.com/multifacet/0sim-experiments)
 - `0sim-trace` is a git submodule that contains the tracer.
     - [Here is a link to the repo](https://github.com/multifacet/0sim-trace)
-
-# Building
-
-The `runner` and a lot of the other things are built in rust. These can be
-built and run using the standard `cargo` commands.
-
-You can install rust via [rustup.rs](https://rustup.rs). The following versions
-should work:
-
-- `runner`: stable rust 1.34
-- `0sim-trace`: stable rust 1.34
-- `jobserver`: stable rust 1.37
-- `0sim-experiments`: nightly rust 1.37
-    - we use inline `asm`, which alas is still unstable :'(
-
-Generally, `runner` is the only one that needs to be built or run on your local
-machine. These others only need to run on test machines.
