@@ -1,14 +1,40 @@
-# 0sim workspace
+# 0sim Simulator + Tooling
 
-While 0sim is usable as a standalone project, it is _a lot_ more ergonomic to
+This repository contains the 0sim Simulator plus a bunch of tooling that we
+recommend for ergonomic use of 0sim.
+
+While 0sim is usable on its own, it is _a lot_ more ergonomic to
 use the tooling we have built around it, which is contained in this repository.
 This README documents some basic workflow and features for the use of this
 tooling and of 0sim.
 
-For more information about 0sim, see our ASPLOS 2020 paper (TODO: link) or the
-README of the 0sim repo.
+[Jump to Getting Started](#getting-started)
 
-# Design Overview
+## What is 0sim?
+
+0sim simulates the behavior of system software (e.g. kernels) on huge-memory
+systems (e.g. terabytes of RAM):
+
+> Recent advances in memory technologies mean that com-
+> modity machines may soon have terabytes of memory; however,
+> such machines remain expensive and uncommon today. As a
+> result, only a fraction of programmers and researchers can
+> debug and prototype fixes for scalability problems or explore
+> new system behavior caused by terabyte-scale memories.
+>
+> To enable rapid and early prototyping and exploration of
+> system software for such machines, we built the 0sim simu-
+> lator. 0sim uses virtualization to simulate the execution of
+> huge workloads on modest machines. The key observation
+> behind 0sim is that many workloads follow the same control
+> flow regardless of their input. We call such workloads data-
+> oblivious. 0sim takes advantage of data-obliviousness to make
+> huge simulations feasible and fast via memory compression.
+
+Mark Mansi and Michael M. Swift. 0sim: Preparing System Software for a World with Terabyte-scale Memories. ASPLOS 2020.
+(TODO: link)
+
+## What is this repo?
 
 > This section is intended to give a quick overview of how 0sim and the
 > associated tools are intended to be used. Feel free to skip to [`Getting
@@ -34,34 +60,18 @@ repository: `runner` and `jobserver`.
   more like a bookkeeping program that just forks off instances of `runner` to
   do the real work.
 
-<a name="getting-started"></a>
-# Getting Started
-
-The workspace contains a bunch of tools, described in the contents section. The
-most important are the `runner` and `0sim` itself. The runner drives
-experiments and contains a library for writing and driving other experiments.
-There is an emphasis on reproducibility and ergonomic usage.
-
-This section contains instructions for
-
-0. [Ensuring requirements (see below). Don't skip this or things will break.](#reqs)
-0. [Cloning and building the runner](#runner)
-0. [Using the runner to set up another machine with 0sim](#install-sim)
-1. [Using the runner to run a simulation with 0sim](#run-exp)
-2. [(Optional) Using the jobserver to run a large number of experiments with the runner](#jobserver)
-
 <a name="reqs"></a>
-## Requirements
+# Requirements
 
 You will need two machines:
-- one to run 0sim (since 0sim is a modified Linux kernel + KVM). I call this
+- one to run 0sim (since 0sim is a modified Linux kernel + KVM). We call this
   machine the `remote`.
 - one to run the runner. This machine should have a persistent network
-  connection, so I would recommend some lab machine.
+  connection, so we would recommend some lab machine.
 
-### Local machine requirements
+## Local machine requirements
 
-- You will need stable rust on your local machine to build and run `runner`. I
+- You will need stable rust on your local machine to build and run `runner`. We
 use 1.35, but slightly older versions should also work, and any newer version
 will work. You can get rust [here](https://rustup.rs).
 
@@ -70,26 +80,31 @@ will work. You can get rust [here](https://rustup.rs).
 - You will need _passphrase-less_ SSH access to the remote machine from the
   local machine.
 
-- `runner` should compile and run on Linux, MacOS, or Windows, but I have only
+- `runner` should compile and run on Linux, MacOS, or Windows, but we have only
   tried Linux.
 
-### Remote machine requirements
+## Remote machine requirements
 
-- The remote machine should be running CentOS 7. Newer versions may work, but I
+- The remote machine should be running CentOS 7. Newer versions may work, but we
   have not tested them.
 
 - The remote machine should have your SSH key installed in `authorized_keys`.
 
 - You must have password-less `sudo` access on the remote machine.
 
-- The remote machine must be an Intel `x86_64` machine.
+- The remote machine must be an Intel `x86_64` machine (AMD virtualization
+  extensions are not supported yet).
 
 - The remote machine must have an unused drive or partition that can be used
   for the swap space to back the simulator.
 
-In our experiments, we used Cloudlab. Cloudlab machines satisfy all of these properties.
+**Recommendations**
 
-### Other requirements
+- >= 32GB RAM
+- 1-2TB of swap space, preferably SSD
+- See [this section](#cloudlab) for recommendations of CloudLab instances.
+
+## Other requirements
 
 - You will need a [GitHub Personal Access Token][pat] to run `setup00000`,
   which is the main setup routine.
@@ -98,6 +113,22 @@ In our experiments, we used Cloudlab. Cloudlab machines satisfy all of these pro
   submodules because they will be cloned to the remote machine.
 
 [pat]: https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line
+
+<a name="getting-started"></a>
+# Getting Started
+
+The workspace contains a bunch of tools, described in the contents section. The
+most important are the `runner` and `0sim` itself. The runner drives
+experiments and contains a library for writing and driving other experiments.
+There is an emphasis on reproducibility and ergonomic usage. `jobserver` is
+useful for running large numbers of experiments on one or more remotes with one
+or more variations of parameters.
+
+0. [Ensuring requirements (see below). Don't skip this or things will break.](#reqs)
+0. [Cloning and building the runner](#runner)
+0. [Using the runner to set up another machine with 0sim](#install-sim)
+1. [Using the runner to run a simulation with 0sim](#run-exp)
+2. [(Optional) Using the jobserver to run a large number of experiments with the runner](#jobserver)
 
 <a name="runner"></a>
 ## Cloning and Building the runner
@@ -235,21 +266,30 @@ inefficient. The jobserver does this for you.
 For more info on how to use the jobserver, please see the [jobserver
 README](https://github.com/mark-i-m/jobserver).
 
-# Cloudlab tips
+<a name="cloudlab"></a>
+# Cloudlab
 
-These are suggestions; use as needed.
+## Recommended Hardware/Profile
 
-1. Use the `c220g2` instance type. This has two spare drives: a SSD (usually
-   `/dev/sdc`) and a HDD (usually `/dev/sdb`). Use the SSD for the `mapper
-   device`, which is a thinly-provisioned swap space to back the simulator. Use
-   the HDD for the home device, which is formatted and used as the home
-   directory (since Cloudlab machines by default only have a 16GB root volume).
+0. The following profile allows for easy creation of one or more Centos 7 instances:
+   https://www.cloudlab.us/p/SuperPages/centos-n-bare-metal
 
-2. On occasion, there is a Mellanox RDMA driver that conflicts with KVM/QEMU's
+1. The `c220g2` instance type is well-suited for 0sim.
+    - There are two spare drives: a smaller SSD (usually `/dev/sdc`) and a
+      large HDD (usually `/dev/sdb`). Depending on how data-oblivious your
+      workload is, you may want to make the HDD your swap space because it is
+      larger, even though it is slower.
+    - You can use the `--mapper_device`, `--swap`, and `--home_device` options
+      of the `runner` with setup00000 to setup a cloudlab machine. See the
+      usage message.
+
+## Cloudlab Troubleshooting
+
+0. On occasion, there is a Mellanox RDMA driver that conflicts with KVM/QEMU's
    install dependencies. You will get an error while running `setup00000`.
    Uninstall the Mellanox driver; we don't need it. The restart the script.
 
-3. There is a bug in the `spurs` library that I have yet to debug. Often the
+1. There is a bug in the `spurs` library that we have yet to debug. Often the
    script will crash with the unhelpful error `no other error listed`. Usually
    this happens just after we finish setting up the host and rebooting it in
    `setup00000`. In this case, just restart the script. You can use the `-v`
