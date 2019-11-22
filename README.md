@@ -31,7 +31,7 @@ systems (e.g. terabytes of RAM):
 > oblivious. 0sim takes advantage of data-obliviousness to make
 > huge simulations feasible and fast via memory compression.
 
-Mark Mansi and Michael M. Swift. 0sim: Preparing System Software for a World with Terabyte-scale Memories. ASPLOS 2020.
+Mark Mansi and Michael M. Swift. _0sim: Preparing System Software for a World with Terabyte-scale Memories_. ASPLOS 2020.
 (TODO: link)
 
 ## What is this repo?
@@ -124,7 +124,7 @@ There is an emphasis on reproducibility and ergonomic usage. `jobserver` is
 useful for running large numbers of experiments on one or more remotes with one
 or more variations of parameters.
 
-0. [Ensuring requirements (see below). Don't skip this or things will break.](#reqs)
+0. [Ensuring requirements (see above). Don't skip this or things will break.](#reqs)
 0. [Cloning and building the runner](#runner)
 0. [Using the runner to set up another machine with 0sim](#install-sim)
 1. [Using the runner to run a simulation with 0sim](#run-exp)
