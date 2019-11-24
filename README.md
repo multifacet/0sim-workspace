@@ -144,11 +144,21 @@ or more variations of parameters.
    Note, you only need to clone this repository, not all of the submodules. In
    particular, you do _not_ need to clone 0sim, which would take a long time.
 
-1. Edit the constant `GITHUB_CLONE_USERNAME` in [`./runner/src/common.rs`][user].
-    - Set it to the username matching the GitHub Personal Access Token
-      described above.
-    - TODO: This is mostly used to clone private repos on the remote. After we
-      make the repo public, we can just clone over HTTPS.
+1. Edit the constant `RESEARCH_WORKSPACE_REPO` at the top of
+   [`./runner/src/common.rs`][user]. This specifies the location and access
+   method of the workspace repo (this repo). **NOTE**: this is the access
+   method that is used to clone the repo on the _remote_, so make sure that it
+   works there. For example, make sure that necessary private keys are
+   installed there if using SSH.
+
+    - **NOTE to Bijan, Deepak**: the repo is still private at the moment, so
+      please use the private repo instructions. But when we make it public, the
+      first instructions should apply. TODO(markm): remove this note...
+
+    - If you are just using our public repository from github, you can leave it as is.
+    - If you are using a private fork of our repository, you should change the constant to `GitRepo::HttpsPrivate`.
+    - If you are using SSH to access the repo, you should change the constant to `GitRepo::Ssh`.
+    - See the documentation comments on the `GitRepo` type just below the constant.
 
 2. Build the runner. This may take a few minutes. This requires rust + cargo,
    as the runner is written in rust. You can install rust from [here](https://rustup.rs).
@@ -162,7 +172,7 @@ or more variations of parameters.
    can pass the `--help` flag to see usage. It has a bunch of possible
    subcommands. They do various setup operations or run experiments.
 
-[user]: https://github.com/multifacet/0sim-workspace/blob/master/runner/src/common.rs#L69
+[user]: https://github.com/multifacet/0sim-workspace/blob/master/runner/src/common.rs#L29
 
 <a name="install-sim"></a>
 ## Using the Runner to install 0sim on a remote machine.

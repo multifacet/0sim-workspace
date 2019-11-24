@@ -25,7 +25,9 @@ use paths::*;
 ///////////////////////////////////////////////////////////////////////////////
 // Location of the workspace repo.
 
-/// The access method to use to clone the workspace repo to the remote.
+/// The access method to use to clone the workspace repo to the _remote_. Make sure that the access
+/// method works on the remote (e.g. the applicable private keys need to be installed on the remote
+/// if using SSH).
 pub const RESEARCH_WORKSPACE_REPO: GitRepo<'_, '_> = GitRepo::HttpsPrivate {
     repo: "github.com/multifacet/0sim-workspace",
     username: "robo-mark-i-m",
@@ -37,23 +39,24 @@ pub const RESEARCH_WORKSPACE_REPO: GitRepo<'_, '_> = GitRepo::HttpsPrivate {
 pub enum GitRepo<'a, 's> {
     /// Use HTTPS to clone a public repo (no access control).
     HttpsPublic {
-        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`). Note the lack of `https://`!
+        /// Repo https URL (e.g. `github.com/multifacet/0sim-workspace`). Note the lack of `https://`!
         repo: &'a str,
     },
 
     /// Use HTTPS to clone a private repo. A password or personal access token must be provided at
     /// the time of the clone.
     HttpsPrivate {
-        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`). Note the lack of `https://`!
+        /// Repo https URL (e.g. `github.com/multifacet/0sim-workspace`). Note the lack of `https://`!
         repo: &'a str,
 
-        /// The username to use when cloning the repository.
+        /// The username to use when cloning the repository (e.g. `robo-mark-i-m` is the github
+        /// username we use).
         username: &'s str,
     },
 
     /// Use SSH. Not PAT is needed, and this works for public and private repos.
     Ssh {
-        /// Repo git URL (e.g. `git@github.com:mark-i-m/spurs`)
+        /// Repo git URL (e.g. `git@github.com:multifacet/0sim-workspace`)
         repo: String,
     },
 }
