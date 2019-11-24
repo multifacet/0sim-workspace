@@ -67,7 +67,8 @@ You will need two machines:
 - one to run 0sim (since 0sim is a modified Linux kernel + KVM). We call this
   machine the `remote`.
 - one to run the runner. This machine should have a persistent network
-  connection, so we would recommend some lab machine.
+  connection, so we would recommend some lab machine or a desktop machine. We
+  call this machine the `local`.
 
 ## Local machine requirements
 
@@ -100,7 +101,7 @@ will work. You can get rust [here](https://rustup.rs).
 
 **Recommendations**
 
-- >= 32GB RAM
+- 32GB RAM or more
 - 1-2TB of swap space, preferably SSD
 - See [this section](#cloudlab) for recommendations of CloudLab instances.
 
