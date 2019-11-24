@@ -45,7 +45,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
 
 pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
-        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        username: sub_m.value_of("USERNAME").unwrap(),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
@@ -53,7 +53,7 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
     let cores = sub_m.value_of("CORES").unwrap().parse::<usize>().unwrap();
     let ktask_div = sub_m.value_of("DIV").map(|s| s.parse::<usize>().unwrap());
 
-    let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
+    let ushell = SshShell::with_default_key(&login.username, &login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
@@ -67,7 +67,7 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
 
         (ktask_div.is_some()) ktask_div: ktask_div,
 
-        username: login.username.as_str(),
+        username: login.username,
         host: login.hostname,
 
         local_git_hash: local_git_hash,
@@ -99,7 +99,7 @@ where
 
     // We first need to set the guest kernel boot param.
     if let Some(ktask_div) = ktask_div {
-        let ushell = SshShell::with_default_key(login.username.as_str(), login.hostname)?;
+        let ushell = SshShell::with_default_key(login.username, login.hostname)?;
         let vshell = time!(
             timers,
             "Start VM (for boot param setting)",

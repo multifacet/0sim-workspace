@@ -13,7 +13,7 @@ use crate::common::{
     exp_0sim::*,
     get_user_home_dir,
     paths::{setup00000::*, *},
-    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction, Username,
+    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, ServiceAction,
 };
 
 const VAGRANT_RPM_URL: &str =
@@ -147,7 +147,7 @@ where
 
 pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
-        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        username: sub_m.value_of("USERNAME").unwrap(),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
@@ -221,7 +221,7 @@ where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     // Connect to the remote
-    let mut ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
+    let mut ushell = SshShell::with_default_key(cfg.login.username, &cfg.login.host)?;
 
     // Set up the host
     if cfg.host_dep {
@@ -417,7 +417,7 @@ where
     }
 
     // Need a new shell so that we get the new user group
-    *ushell = SshShell::with_default_key(cfg.login.username.as_str(), &cfg.login.host)?;
+    *ushell = SshShell::with_default_key(cfg.login.username, &cfg.login.host)?;
 
     // Build and Install QEMU 4.0.0 from source
     ushell.run(cmd!("wget {}", QEMU_TARBALL))?;
@@ -471,7 +471,7 @@ where
             /* dry_run */ false,
             &format!("{}1", device), // assume it is the first device partition
             user_home,
-            cfg.login.username.as_str(),
+            cfg.login.username,
         )?;
     }
 
@@ -766,10 +766,7 @@ where
     ushell.run(cmd!("mkdir -p images/"))?;
     ushell.run(cmd!("chmod +x ."))?;
     ushell.run(cmd!("chmod +x images/"))?;
-    ushell.run(cmd!(
-        "sudo chown {}:qemu images/",
-        cfg.login.username.as_str()
-    ))?;
+    ushell.run(cmd!("sudo chown {}:qemu images/", cfg.login.username))?;
 
     crate::common::service(&ushell, "libvirtd", ServiceAction::Start)?;
 

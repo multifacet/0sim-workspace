@@ -96,7 +96,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
 
 pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
-        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        username: sub_m.value_of("USERNAME").unwrap(),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
@@ -146,7 +146,7 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
 
     let warmup = sub_m.is_present("WARMUP");
 
-    let ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
+    let ushell = SshShell::with_default_key(login.username, login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
     let remote_research_settings = crate::common::get_remote_research_settings(&ushell)?;
@@ -169,7 +169,7 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         zerosim_drift_threshold: 10_000_000,
         zerosim_delay: 0,
 
-        username: login.username.as_str(),
+        username: login.username,
         host: login.hostname,
 
         local_git_hash: local_git_hash,

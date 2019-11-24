@@ -6,7 +6,7 @@ use spurs::{cmd, Execute, SshError, SshShell};
 
 use super::paths::*;
 
-pub use super::{Login, Username};
+pub use super::Login;
 
 /// The port that vagrant VMs forward from.
 pub const VAGRANT_PORT: u16 = 5555;
@@ -32,7 +32,7 @@ where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     // Connect to the remote
-    let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
+    let mut ushell = SshShell::with_default_key(login.username, &login.host)?;
 
     vagrant_halt(&ushell)?;
 
@@ -50,7 +50,7 @@ where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
     // Connect to the remote
-    let mut ushell = SshShell::with_default_key(login.username.as_str(), &login.host)?;
+    let mut ushell = SshShell::with_default_key(login.username, &login.host)?;
 
     let _ = vagrant_halt(&ushell);
 
@@ -140,7 +140,7 @@ where
     let ushell = {
         let mut shell;
         loop {
-            shell = match SshShell::with_default_key(login.username.as_str(), &login.host) {
+            shell = match SshShell::with_default_key(login.username, &login.host) {
                 Ok(shell) => shell,
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_secs(10));

@@ -11,7 +11,7 @@ use crate::common::{
     exp_0sim::*,
     get_user_home_dir,
     paths::{setup00000::*, setup00001::*, *},
-    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login, Username,
+    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login,
 };
 
 pub const GUEST_SWAP_GBS: usize = 10;
@@ -30,7 +30,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
 
 pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let login = Login {
-        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        username: sub_m.value_of("USERNAME").unwrap(),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };

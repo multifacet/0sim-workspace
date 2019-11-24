@@ -16,7 +16,7 @@ use crate::common::{
         VAGRANT_CORES, VAGRANT_MEM, ZEROSIM_LAPIC_ADJUST, ZEROSIM_SKIP_HALT,
     },
     paths::*,
-    Login, Username,
+    Login,
 };
 
 pub fn cli_options() -> clap::App<'static, 'static> {
@@ -68,7 +68,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
 pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
     // Read all flags/options
     let login = Login {
-        username: Username(sub_m.value_of("USERNAME").unwrap()),
+        username: sub_m.value_of("USERNAME").unwrap(),
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
@@ -104,7 +104,7 @@ pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
         initial_reboot(&login)?;
     }
 
-    let mut ushell = SshShell::with_default_key(&login.username.as_str(), &login.host)?;
+    let mut ushell = SshShell::with_default_key(login.username, login.host)?;
 
     let user_home = crate::common::get_user_home_dir(&ushell)?;
     let zerosim_exp_path_host = &format!(

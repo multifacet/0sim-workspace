@@ -22,54 +22,75 @@ use spurs::{cmd, Execute, SshShell};
 
 use paths::*;
 
-#[derive(Copy, Clone, Debug)]
-pub struct Username<'u>(pub &'u str);
+///////////////////////////////////////////////////////////////////////////////
+// Location of the workspace repo.
 
-impl Username<'_> {
-    pub fn as_str(&self) -> &str {
-        self.0
-    }
-}
+/// The access method to use to clone the workspace repo to the remote.
+pub const RESEARCH_WORKSPACE_REPO: GitRepo<'_, '_> = GitRepo::HttpsPrivate {
+    repo: "github.com/multifacet/0sim-workspace",
+    username: "robo-mark-i-m",
+};
 
+/// A git repository.
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
-pub struct Login<'u, 'h, A: std::net::ToSocketAddrs + std::fmt::Display + Clone> {
-    pub host: A,
-    pub hostname: &'h str,
-    pub username: Username<'u>,
-}
+pub enum GitRepo<'a, 's> {
+    /// Use HTTPS to clone a public repo (no access control).
+    HttpsPublic {
+        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`). Note the lack of `https://`!
+        repo: &'a str,
+    },
 
-pub enum GitHubRepo {
-    #[allow(dead_code)]
+    /// Use HTTPS to clone a private repo. A password or personal access token must be provided at
+    /// the time of the clone.
+    HttpsPrivate {
+        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`). Note the lack of `https://`!
+        repo: &'a str,
+
+        /// The username to use when cloning the repository.
+        username: &'s str,
+    },
+
+    /// Use SSH. Not PAT is needed, and this works for public and private repos.
     Ssh {
         /// Repo git URL (e.g. `git@github.com:mark-i-m/spurs`)
         repo: String,
     },
-    Https {
-        /// Repo https URL (e.g. `github.com/mark-i-m/spurs`). Note the lack of `https://`!
-        repo: String,
-        /// (Username, OAuth token) for authentication, if needed
-        token: Option<(String, String)>,
-    },
 }
 
-impl std::fmt::Display for GitHubRepo {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            GitHubRepo::Ssh { repo } => write!(f, "{}", repo),
-            GitHubRepo::Https {
-                repo,
-                token: Some((user, token)),
-            } => write!(f, "https://{}:{}@{}", user, token, repo),
-            GitHubRepo::Https { repo, .. } => write!(f, "https://{}", repo),
+impl GitRepo<'_, '_> {
+    /// Given a repository and access method, form the URL string to be passed to git.
+    ///
+    /// If this repository is private, then `secret` must be a Personal Access Token or password.
+    /// Otherwise, this method **panics**.
+    ///
+    /// If this repository is public or SSH is used, then `secret` is ignored.
+    pub fn git_repo_access_url(&self, secret: Option<&str>) -> String {
+        match (self, secret) {
+            (GitRepo::Ssh { repo }, _) => format!("{}", repo),
+            (GitRepo::HttpsPublic { repo }, _) => format!("https://{}", repo),
+            (GitRepo::HttpsPrivate { repo, username }, Some(secret)) => {
+                format!("https://{}:{}@{}", username, secret, repo)
+            }
+            (GitRepo::HttpsPrivate { .. }, None) => {
+                panic!("No PAT or password provided for private repository.")
+            }
         }
     }
 }
 
-/// The username to clone the research workspace with.
-pub const GITHUB_CLONE_USERNAME: &str = "robo-mark-i-m";
+///////////////////////////////////////////////////////////////////////////////
 
-/// The github repo URL for the research workspace.
-pub const RESEARCH_WORKSPACE_REPO: &str = "github.com/multifacet/0sim-workspace";
+/// Information needed to log into a remote machine.
+#[derive(Clone, Debug)]
+pub struct Login<'u, 'h, A: std::net::ToSocketAddrs + std::fmt::Display + Clone> {
+    /// A network address for the host.
+    pub host: A,
+    /// A human-readable address for the host. Often, this is the same as `host`.
+    pub hostname: &'h str,
+    /// The username to log in as.
+    pub username: &'u str,
+}
 
 /// Common paths.
 pub mod paths {
@@ -173,11 +194,10 @@ pub fn clone_research_workspace(
         }
     } else {
         // Clone the repo.
-        let repo = GitHubRepo::Https {
-            repo: RESEARCH_WORKSPACE_REPO.into(),
-            token: Some((GITHUB_CLONE_USERNAME.into(), token.into())),
-        };
-        ushell.run(cmd!("git clone {}", repo))?;
+        ushell.run(cmd!(
+            "git clone {}",
+            RESEARCH_WORKSPACE_REPO.git_repo_access_url(Some(token))
+        ))?;
     }
 
     // Checkout submodules.
