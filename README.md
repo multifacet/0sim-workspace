@@ -202,7 +202,8 @@ or more variations of parameters.
 
 1. Run the following command, which will do all setup necessary, including
    cloning the workspace, compiling 0sim, and installing it. This takes about 1
-   hour on an 4-core/8-thread machine.
+   hour on our machine, but it will vary depending on how many cores the remote
+   has.
 
    ```
    ./target/debug/runner setup00000 $ADDR $ME --host_dep --create_vm \
