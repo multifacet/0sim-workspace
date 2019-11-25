@@ -64,9 +64,15 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) specify which devices to use as swap devices. By default all \
           unpartitioned, unmounted devices are used (e.g. --swap sda sdb sdc).")
 
-        (@arg TOKEN: +takes_value --clone_wkspc
+        (@arg CLONE_WKSPC: --clone_wkspc
+         "(Optional) If passed, clone the workspace on the remote (or update if already cloned \
+         using the git access method in src/common.rs. If the method uses HTTPS to access a \
+         private repository, the --secret option must also be passed giving the GitHub personal \
+         access token or password.")
+
+        (@arg SECRET: +takes_value --secret
          "(Optional) If we should clone the workspace, this is the Github personal access \
-          token for cloning the repo.")
+          token or password for cloning the repo.")
 
         (@arg HOST_KERNEL: +takes_value --host_kernel
          "(Optional) The git branch to compile the kernel from (e.g. --host_kernel markm_ztier)")
@@ -117,16 +123,18 @@ where
     /// Set the devices to be used
     swap_devs: Option<Vec<&'a str>>,
 
-    /// The token to clone the workspace with.
-    clone_wkspc: Option<&'a str>,
+    /// Should we clone/update the workspace?
+    clone_wkspc: bool,
+    /// The PAT or password to clone/update the workspace with, if needed.
+    secret: Option<&'a str>,
 
     /// The branch to build the kernel from.
     git_branch: Option<&'a str>,
 
-    /// Should we build host benchmarks.
+    /// Should we build host benchmarks?
     host_bmks: bool,
 
-    /// Should we prepare the host for initing the VM? This needs to be done only once.
+    /// Should we prepare the host for initing the VM? This needs to be done only once?
     host_prep: bool,
 
     /// Disable EPT on the host.
@@ -162,7 +170,8 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let mapper_device = sub_m.value_of("MAPPER_DEVICE");
     let swap_devs = sub_m.values_of("SWAP_DEVS").map(|i| i.collect());
 
-    let clone_wkspc = sub_m.value_of("TOKEN");
+    let clone_wkspc = sub_m.is_present("CLONE_WKSPC");
+    let secret = sub_m.value_of("SECRET");
 
     let git_branch = sub_m.value_of("HOST_KERNEL");
 
@@ -190,6 +199,7 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         swap_devs,
         git_branch,
         clone_wkspc,
+        secret,
         host_bmks,
         host_prep,
         disable_ept,
@@ -516,7 +526,7 @@ fn clone_research_workspace<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    if let Some(token) = cfg.clone_wkspc {
+    if cfg.clone_wkspc {
         const SUBMODULES: &[&str] = &[
             ZEROSIM_KERNEL_SUBMODULE,
             ZEROSIM_EXPERIMENTS_SUBMODULE,
@@ -528,7 +538,7 @@ where
             ZEROSIM_NULLFS_SUBMODULE,
         ];
 
-        crate::common::clone_research_workspace(&ushell, token, SUBMODULES)?;
+        crate::common::clone_research_workspace(&ushell, cfg.secret, SUBMODULES)?;
     }
 
     Ok(())

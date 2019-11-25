@@ -175,8 +175,10 @@ pub fn timings_str(timings: &[(&str, std::time::Duration)]) -> String {
     s
 }
 
-/// Clone the 0sim-workspace and checkout the given submodules. The given token is used as the
-/// Github personal access token.
+/// Clone the 0sim-workspace and checkout the given submodules.
+///
+/// `secret` is a GitHub personal access token or password that is needed if a private repo is
+/// being accessed via HTTPS.
 ///
 /// If the repository is already cloned, it is updated (along with submodules).
 ///
@@ -185,7 +187,7 @@ pub fn timings_str(timings: &[(&str, std::time::Duration)]) -> String {
 /// *NOTE*: This function intentionally does not take the repo URL. It should always be the above.
 pub fn clone_research_workspace(
     ushell: &SshShell,
-    token: &str,
+    secret: Option<&str>,
     submodules: &[&str],
 ) -> Result<String, failure::Error> {
     // Check if the repo is already cloned.
@@ -199,7 +201,7 @@ pub fn clone_research_workspace(
         // Clone the repo.
         ushell.run(cmd!(
             "git clone {}",
-            RESEARCH_WORKSPACE_REPO.git_repo_access_url(Some(token))
+            RESEARCH_WORKSPACE_REPO.git_repo_access_url(secret)
         ))?;
     }
 

@@ -107,8 +107,9 @@ will work. You can get rust [here](https://rustup.rs).
 
 ## Other requirements
 
-- You will need a [GitHub Personal Access Token][pat] to run `setup00000`,
-  which is the main setup routine.
+- If you are using a private fork of this workspace, you will need a [GitHub
+  Personal Access Token][pat] to run `setup00000`, which is the main setup
+  routine.
 
 - You will need access to the `multifacet/0sim-workspace` repo and its
   submodules because they will be cloned to the remote machine.
@@ -205,7 +206,9 @@ or more variations of parameters.
 
    ```
    ./target/debug/runner setup00000 $ADDR $ME --host_dep --create_vm \
-   --host_bmks --prepare_host --host_kernel markm_ztier --clone_wkspc $TOKEN
+   --host_bmks --prepare_host --host_kernel markm_ztier --clone_wkspc \
+   --secret $TOKEN \
+   # optionally --home_device /dev/sdc --mapper_device /dev/sdb
    ```
 
    where `$ADDR` is the SSH address:port of the machine (e.g. `mark.cs.wisc.edu:22`),
