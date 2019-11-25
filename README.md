@@ -200,6 +200,11 @@ or more variations of parameters.
 
    You can skip this for now and set up a swap device later if you want.
 
+0. (Optional) If you would like to build and install a recent kernel (see the
+   `KERNEL_RECENT_TARBALL` constant in `src/common.rs`) in the target, use
+   the `--guest_kernel` option. Alternately, you can install whatever kernel
+   you want manually.
+
 1. Run the following command, which will do all setup necessary, including
    cloning the workspace, compiling 0sim, and installing it. This takes about 1
    hour on our machine, but it will vary depending on how many cores the remote
@@ -208,7 +213,7 @@ or more variations of parameters.
    ```
    ./target/debug/runner setup00000 $ADDR $ME --host_dep --create_vm \
    --host_bmks --prepare_host --host_kernel markm_ztier --clone_wkspc \
-   --secret $TOKEN \
+   --guest_bmks --secret $TOKEN \
    # optionally --home_device /dev/sdc --mapper_device /dev/sdb
    ```
 

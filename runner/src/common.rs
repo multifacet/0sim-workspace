@@ -153,6 +153,7 @@ pub mod paths {
         pub const VAGRANT_RESULTS_DIR: &str = "/vagrant/vm_shared/results/";
 
         /// The URL of the tarball used to build the guest kernel.
+        /// **NOTE** Also update the next constant.
         pub const KERNEL_RECENT_TARBALL: &str =
             "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.1.4.tar.xz";
 
