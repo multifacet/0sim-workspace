@@ -336,8 +336,6 @@ pub fn turn_off_watchdogs(shell: &SshShell) -> Result<(), failure::Error> {
     shell.run(cmd!(
         "echo 0 | sudo tee /proc/sys/kernel/hung_task_timeout_secs"
     ))?;
-    shell.run(cmd!("echo 0 | sudo tee /proc/sys/kernel/soft_watchdog"))?;
-
     shell.run(cmd!("echo 0 | sudo tee /proc/sys/kernel/watchdog").allow_error())?;
     Ok(())
 }
