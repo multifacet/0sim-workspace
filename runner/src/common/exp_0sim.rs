@@ -675,7 +675,7 @@ pub fn gen_vagrantfile(shell: &SshShell, memgb: usize, cores: usize) -> Result<(
             vm_shared_full_path
         ),
         cmd!(
-            r#"sed -i 's/research_workspace_dir = ''/research_workspace_dir = "{}"/' Vagrantfile"#,
+            r#"sed -i 's/zerosim_workspace_dir = ''/zerosim_workspace_dir = "{}"/' Vagrantfile"#,
             research_workspace_full_path
         ),
     }

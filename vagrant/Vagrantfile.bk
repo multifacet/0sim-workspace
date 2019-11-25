@@ -63,7 +63,7 @@ Vagrant.configure("2") do |config|
     # Shared folders via NFS
     vagrant_dir = ''
     vm_shared_dir = ''
-    research_workspace_dir = ''
+    zerosim_workspace_dir = ''
     config.vm.synced_folder vagrant_dir, '/vagrant',
         :disabled => true
 
@@ -71,7 +71,7 @@ Vagrant.configure("2") do |config|
         :disabled => false,
         :nfs => true
 
-    config.vm.synced_folder research_workspace_dir, '/home/vagrant/research-workspace',
+    config.vm.synced_folder zerosim_workspace_dir, '/home/vagrant/0sim-workspace',
         :disabled => false,
         :nfs => true
 
