@@ -68,6 +68,9 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "(Optional) Set /proc/zerosim_drift_threshold")
         (@arg DELTA: --delay +takes_value {is_usize}
          "(Optional) Set /proc/zerosim_delay")
+        (@arg DISABLE_ZSWAP: --disable_zswap
+         "(Optional; not recommended) Disable zswap, forcing the hypervisor to \
+         actually swap to disk")
     }
 }
 
@@ -118,6 +121,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         .value_of("DELAY")
         .map(|value| value.parse::<usize>().unwrap());
 
+    let disable_zswap = sub_m.is_present("DISABLE_ZSWAP");
+
     let ushell = SshShell::with_default_key(login.username, login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
@@ -136,6 +141,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         (size.is_some()) size: size,
         calibrated: false,
         warmup: warmup,
+
+        (disable_zswap) disable_zswap: disable_zswap,
 
         zswap_max_pool_percent: 50,
         (zerosim_drift_threshold.is_some()) zerosim_drift_threshold: zerosim_drift_threshold,
@@ -175,6 +182,7 @@ where
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
     let zerosim_drift_threshold = settings.get::<Option<usize>>("zerosim_drift_threshold");
     let zerosim_delay = settings.get::<Option<usize>>("zerosim_delay");
+    let disable_zswap = settings.get::<bool>("disable_zswap");
 
     // Reboot
     initial_reboot(&login)?;
@@ -183,7 +191,9 @@ where
     let mut ushell = connect_and_setup_host_only(&login)?;
 
     // Turn on SSDSWAP.
-    turn_on_ssdswap(&ushell)?;
+    if !disable_zswap {
+        turn_on_ssdswap(&ushell)?;
+    }
 
     // Collect timers on VM
     let mut timers = vec![];
@@ -204,9 +214,16 @@ where
     );
 
     // Environment
-    turn_on_zswap(&mut ushell)?;
-    set_zerosim_d(&ushell, zerosim_drift_threshold)?;
-    set_zerosim_delay(&ushell, zerosim_delay)?;
+    if !disable_zswap {
+        turn_on_zswap(&mut ushell)?;
+
+        if let Some(threshold) = zerosim_drift_threshold {
+            set_zerosim_threshold(&ushell, threshold)?;
+        }
+        if let Some(delay) = zerosim_delay {
+            set_zerosim_delay(&ushell, delay)?;
+        }
+    }
 
     ushell.run(
         cmd!(
