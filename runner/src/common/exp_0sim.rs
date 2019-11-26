@@ -178,7 +178,7 @@ where
 }
 
 /// Set D for 0sim.
-pub fn set_zerosim_d(shell: &SshShell, d: usize) -> Result<(), failure::Error> {
+pub fn set_zerosim_threshold(shell: &SshShell, d: usize) -> Result<(), failure::Error> {
     shell.run(cmd!("echo {} | sudo tee /proc/zerosim_drift_threshold", d))?;
     Ok(())
 }

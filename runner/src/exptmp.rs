@@ -152,8 +152,6 @@ pub fn run(print_results_path: bool, sub_m: &ArgMatches<'_>) -> Result<(), failu
         cores: cores,
 
         zswap_max_pool_percent: 50,
-        zerosim_drift_threshold: 10_000_000,
-        zerosim_delay: 0,
 
         username: login.username,
         host: login.hostname,
@@ -186,8 +184,6 @@ where
     let warmup = settings.get::<bool>("warmup");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
-    let zerosim_drift_threshold = settings.get::<usize>("zerosim_drift_threshold");
-    let zerosim_delay = settings.get::<usize>("zerosim_delay");
     let pf_time = settings.get::<Option<u64>>("pf_time");
 
     // Reboot
@@ -219,8 +215,6 @@ where
 
     // Environment
     turn_on_zswap(&mut ushell)?;
-    set_zerosim_d(&ushell, zerosim_drift_threshold)?;
-    set_zerosim_delay(&ushell, zerosim_delay)?;
 
     ushell.run(
         cmd!(

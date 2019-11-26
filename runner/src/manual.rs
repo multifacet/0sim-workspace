@@ -11,8 +11,8 @@ use spurs::{cmd, Execute, SshShell};
 
 use crate::common::{
     exp_0sim::{
-        initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, set_zerosim_d,
-        set_zerosim_delay, setup_swapping, start_vagrant, turn_on_ssdswap, turn_on_zswap,
+        initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, set_zerosim_delay,
+        set_zerosim_threshold, setup_swapping, start_vagrant, turn_on_ssdswap, turn_on_zswap,
         VAGRANT_CORES, VAGRANT_MEM, ZEROSIM_LAPIC_ADJUST, ZEROSIM_SKIP_HALT,
     },
     paths::*,
@@ -186,7 +186,7 @@ pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
 
     // Set D and delta
     if let Some(zerosim_drift_threshold) = zerosim_drift_threshold {
-        set_zerosim_d(&ushell, zerosim_drift_threshold)?;
+        set_zerosim_threshold(&ushell, zerosim_drift_threshold)?;
     }
     if let Some(zerosim_delay) = zerosim_delay {
         set_zerosim_delay(&ushell, zerosim_delay)?;

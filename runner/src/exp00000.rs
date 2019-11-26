@@ -113,12 +113,10 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
 
     let zerosim_drift_threshold = sub_m
         .value_of("DRIFT_THRESHOLD")
-        .map(|value| value.parse::<usize>().unwrap())
-        .unwrap_or(10_000_000);
+        .map(|value| value.parse::<usize>().unwrap());
     let zerosim_delay = sub_m
         .value_of("DELAY")
-        .map(|value| value.parse::<usize>().unwrap())
-        .unwrap_or(0);
+        .map(|value| value.parse::<usize>().unwrap());
 
     let ushell = SshShell::with_default_key(login.username, login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
@@ -140,8 +138,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         warmup: warmup,
 
         zswap_max_pool_percent: 50,
-        zerosim_drift_threshold: zerosim_drift_threshold,
-        zerosim_delay: zerosim_delay,
+        (zerosim_drift_threshold.is_some()) zerosim_drift_threshold: zerosim_drift_threshold,
+        (zerosim_delay.is_some()) zerosim_delay: zerosim_delay,
 
         username: login.username,
         host: login.hostname,
@@ -175,8 +173,8 @@ where
     let prefault = settings.get::<bool>("prefault");
     let calibrate = settings.get::<bool>("calibrated");
     let zswap_max_pool_percent = settings.get::<usize>("zswap_max_pool_percent");
-    let zerosim_drift_threshold = settings.get::<usize>("zerosim_drift_threshold");
-    let zerosim_delay = settings.get::<usize>("zerosim_delay");
+    let zerosim_drift_threshold = settings.get::<Option<usize>>("zerosim_drift_threshold");
+    let zerosim_delay = settings.get::<Option<usize>>("zerosim_delay");
 
     // Reboot
     initial_reboot(&login)?;
