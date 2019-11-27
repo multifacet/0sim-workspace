@@ -342,3 +342,16 @@ README](https://github.com/mark-i-m/jobserver).
 license of the Linux kernel.
 
 The tools in this repository are licensed under the Apache v2 open-source license.
+
+# Troubleshooting
+
+We will collect common issues here as they are reported...
+
+- Vagrant error: `Call to virDomainCreateWithFlags failed: internal error: qemu
+  unexpectedly closed the monitor: 2019-11-26T23:49:09.807847Z qemu-kvm:
+  unrecognized feature phys-bits`
+    - Cause: This happens because `libvirtd` is using an old version of QEMU
+      packaged with Centos which is masking the recent version compiled from
+      source by `runner`.
+    - Solution: Uninstall the old version: `sudo yum remove qemu-kvm`, and
+      restart libvirtd: `sudo systemctl restart libvirtd`
