@@ -65,7 +65,8 @@ repository: `runner` and `jobserver`.
 
 You will need two machines:
 - one to run 0sim (since 0sim is a modified Linux kernel + KVM). We call this
-  machine the `remote`.
+  machine the `remote`. You need to be able to SSH to this machine **without a
+  user password or RSA key passphrase**.
 - one to run the runner. This machine should have a persistent network
   connection, so we would recommend some lab machine or a desktop machine. We
   call this machine the `local`.
@@ -78,8 +79,9 @@ will work. You can get rust [here](https://rustup.rs).
 
 - You will need an internet connection for `cargo` to download dependencies.
 
-- You will need _passphrase-less_ SSH access to the remote machine from the
-  local machine.
+- You will need **passphrase-less** SSH access to the remote machine from the
+  local machine. That is, you will need to use SSH, and the SSH key that must
+  _not_ have a passphrase.
 
 - `runner` should compile and run on Linux, MacOS, or Windows, but we have only
   tried Linux.
@@ -91,7 +93,7 @@ will work. You can get rust [here](https://rustup.rs).
 
 - The remote machine should have your SSH key installed in `authorized_keys`.
 
-- You must have password-less `sudo` access on the remote machine.
+- You must have **password-less** `sudo` access on the remote machine.
 
 - The remote machine must be an Intel `x86_64` machine (AMD virtualization
   extensions are not supported yet).
@@ -107,9 +109,9 @@ will work. You can get rust [here](https://rustup.rs).
 
 ## Other requirements
 
-- If you are using a private fork of this workspace, you will need a [GitHub
-  Personal Access Token][pat] to run `setup00000`, which is the main setup
-  routine.
+- If you are using a private fork of this workspace, you will need a GitHub
+  Personal Access Token to run `setup00000`, which is the main setup routine.
+  [See these instructions for GitHub Tokens][pat].
 
 - You will need access to the `multifacet/0sim-workspace` repo and its
   submodules because they will be cloned to the remote machine.
