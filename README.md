@@ -144,7 +144,7 @@ or more variations of parameters.
    git clone https://github.com/multifacet/0sim-workspace.git
    ```
 
-   Note, you only need to clone this repository, not all of the submodules. In
+   Note, you only need to clone this repository, _not_ all of the submodules. In
    particular, you do _not_ need to clone 0sim, which would take a long time.
 
 1. Edit the constant `RESEARCH_WORKSPACE_REPO` at the top of
