@@ -147,19 +147,16 @@ or more variations of parameters.
    Note, you only need to clone this repository, _not_ all of the submodules. In
    particular, you do _not_ need to clone 0sim, which would take a long time.
 
-1. Edit the constant `RESEARCH_WORKSPACE_REPO` at the top of
+1. If needed, edit the constant `RESEARCH_WORKSPACE_REPO` at the top of
    [`./runner/src/common.rs`][user]. This specifies the location and access
    method of the workspace repo (this repo). **NOTE**: this is the access
    method that is used to clone the repo on the _remote_, so make sure that it
    works there. For example, make sure that necessary private keys are
    installed there if using SSH.
 
-    - **NOTE to Bijan, Deepak**: the repo is still private at the moment, so
-      please use the private repo instructions. But when we make it public, the
-      first instructions should apply. TODO(markm): remove this note...
-
     - If you are just using our public repository from github, you can leave it as is.
-    - If you are using a private fork of our repository, you should change the constant to `GitRepo::HttpsPrivate`.
+    - If you are using a private fork of our repository, you should change the
+      constant to `GitRepo::HttpsPrivate` with the appropriate values filled in.
     - If you are using SSH to access the repo, you should change the constant to `GitRepo::Ssh`.
     - See the documentation comments on the `GitRepo` type just below the constant.
 
