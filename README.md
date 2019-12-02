@@ -212,7 +212,8 @@ or more variations of parameters.
    ```
    ./target/debug/runner setup00000 $ADDR $ME --host_dep --create_vm \
    --host_bmks --prepare_host --host_kernel markm_ztier --clone_wkspc \
-   --guest_bmks --secret $TOKEN \
+   --guest_bmks
+   # optionally (if not using public repo) --secret $TOKEN
    # optionally --home_device /dev/sdc --mapper_device /dev/sdb
    ```
 
