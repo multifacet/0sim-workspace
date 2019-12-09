@@ -20,14 +20,14 @@ const VAGRANT_RPM_URL: &str =
     "https://releases.hashicorp.com/vagrant/2.1.5/vagrant_2.1.5_x86_64.rpm";
 
 const HADOOP_TARBALL: &str =
-    "http://apache.cs.utah.edu/hadoop/common/hadoop-3.1.2/hadoop-3.1.2.tar.gz";
-const HADOOP_TARBALL_NAME: &str = "hadoop-3.1.2.tar.gz";
-const HADOOP_HOME: &str = "hadoop-3.1.2";
+    "http://apache.cs.utah.edu/hadoop/common/hadoop-3.1.3/hadoop-3.1.3.tar.gz";
+const HADOOP_TARBALL_NAME: &str = "hadoop-3.1.3.tar.gz";
+const HADOOP_HOME: &str = "hadoop-3.1.3";
 
 const SPARK_TARBALL: &str =
-    "http://apache.cs.utah.edu/spark/spark-2.4.3/spark-2.4.3-bin-hadoop2.7.tgz";
-const SPARK_TARBALL_NAME: &str = "spark-2.4.3-bin-hadoop2.7.tgz";
-const SPARK_HOME: &str = "spark-2.4.3-bin-hadoop2.7";
+    "http://apache.cs.utah.edu/spark/spark-2.4.4/spark-2.4.4-bin-hadoop2.7.tgz";
+const SPARK_TARBALL_NAME: &str = "spark-2.4.4-bin-hadoop2.7.tgz";
+const SPARK_HOME: &str = "spark-2.4.4-bin-hadoop2.7";
 
 const QEMU_TARBALL: &str = "https://download.qemu.org/qemu-4.0.0.tar.xz";
 const QEMU_TARBALL_NAME: &str = "qemu-4.0.0.tar.xz";
@@ -293,7 +293,7 @@ where
 
     // Install benchmarks.
     if cfg.guest_bmks || cfg.setup_hadoop {
-        install_guest_benchmarks(&ushell, &vrshell, &cfg)?;
+        install_guest_benchmarks(&ushell, &vushell, &cfg)?;
     }
 
     // Make sure the TSC is marked as a reliable clock source in the guest.
