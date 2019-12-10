@@ -93,8 +93,8 @@ fn main() {
         let err = match err.downcast::<spurs::SshError>() {
             Ok(err) => {
                 println!(
-                    "`runner` encountered the following error while \
-                     attempting to run a command over SSH: {}",
+                    "`runner` encountered an error while \
+                     attempting to run a command over SSH:\n{}",
                     err
                 );
 
@@ -104,6 +104,9 @@ fn main() {
         };
 
         // Any other errors
-        println!("`runner` encountered the following error: {:?}", err);
+        println!(
+            "`runner` encountered the following error:\n{}",
+            err.as_fail(),
+        );
     }
 }

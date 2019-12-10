@@ -16,6 +16,8 @@ pub mod output;
 
 pub mod exp_0sim;
 
+use failure::ResultExt;
+
 use serde::{Deserialize, Serialize};
 
 use spurs::{cmd, Execute, SshShell};
@@ -202,7 +204,7 @@ pub fn clone_research_workspace(
     if let Ok(_hash) = research_workspace_git_hash(&ushell) {
         // If so, just update it.
         with_shell! { ushell in &dir!(RESEARCH_WORKSPACE_PATH) =>
-            cmd!("git pull"),
+            cmd!("giti pull"),
             cmd!("git submodule update"),
         }
     } else {
@@ -250,7 +252,8 @@ pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
     let output = std::process::Command::new("git")
         .args(&["rev-parse", "HEAD"])
         .output()?;
-    let output = std::str::from_utf8(&output.stdout)?;
+    let output =
+        std::str::from_utf8(&output.stdout).context("converting git hash string to UTF-8")?;
     let output = output.trim();
     Ok(output.into())
 }
@@ -315,7 +318,9 @@ where
     's: 'd,
 {
     if let Some(setting) = settings.get(setting) {
-        Ok(Some(serde_json::from_str(setting)?))
+        Ok(Some(
+            serde_json::from_str(setting).context("deserializing remote research settings")?,
+        ))
     } else {
         Ok(None)
     }
@@ -349,7 +354,9 @@ pub fn get_num_cores(shell: &SshShell) -> Result<usize, failure::Error> {
     let nprocess = shell.run(cmd!("getconf _NPROCESSORS_ONLN"))?.stdout;
     let nprocess = nprocess.trim();
 
-    let nprocess = nprocess.parse::<usize>()?;
+    let nprocess = nprocess
+        .parse::<usize>()
+        .context("parsing number of cores")?;
 
     Ok(nprocess)
 }
@@ -357,7 +364,7 @@ pub fn get_num_cores(shell: &SshShell) -> Result<usize, failure::Error> {
 /// Get the max CPU frequency of the remote in MHz.
 ///
 /// NOTE: this is not necessarily the current CPU freq. You need to set the scaling governor.
-pub fn get_cpu_freq(shell: &SshShell) -> Result<usize, failure::Error> {
+pub fn get_cpu_freq(shell: &SshShell) -> Result<usize, spurs::SshError> {
     let freq =
         shell.run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
     let alt =
