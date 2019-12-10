@@ -171,6 +171,8 @@ or more variations of parameters.
 3. The runner is now built. The compiled binary is `./target/debug/runner`. You
    can pass the `--help` flag to see usage. It has a bunch of possible
    subcommands. They do various setup operations or run experiments.
+   - **NOTE** The runner must be run from the `0sim-workspace/runner` directory;
+   i.e. always run it as `./target/debug/runner <args>`
 
 [user]: https://github.com/multifacet/0sim-workspace/blob/master/runner/src/common.rs#L29
 
@@ -229,6 +231,9 @@ or more variations of parameters.
    ./target/debug/runner setup00000 --help
    ```
 
+   **NOTE** The runner must be run from the `0sim-workspace/runner` directory;
+   i.e. always run it as `./target/debug/runner <args>`
+
 <a name="run-exp"></a>
 ## Using the Runner to run experiments on a remote machine.
 
@@ -265,6 +270,9 @@ versions of the experiments to improve reproducibility.
    ```
    ./target/debug/runner exp00000 marks-machine.cs.wisc.edu:22 markm 4096 1 -m
    ```
+
+   **NOTE** The runner must be run from the `0sim-workspace/runner` directory;
+   i.e. always run it as `./target/debug/runner <args>`
 
 3. Wait for the experiment to terminate.
 
