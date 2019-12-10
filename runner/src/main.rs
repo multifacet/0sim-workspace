@@ -87,8 +87,23 @@ fn run() -> Result<(), failure::Error> {
 fn main() {
     env_logger::init();
 
-    if let Err(e) = run() {
-        println!("RUNNER ERROR {:?}", e);
-        std::process::exit(1);
+    // If an error occurred, try to print something helpful.
+    if let Err(err) = run() {
+        // Errors from SSH commands
+        let err = match err.downcast::<spurs::SshError>() {
+            Ok(err) => {
+                println!(
+                    "`runner` encountered the following error while \
+                     attempting to run a command over SSH: {}",
+                    err
+                );
+
+                std::process::exit(101);
+            }
+            Err(err) => err,
+        };
+
+        // Any other errors
+        println!("`runner` encountered the following error: {:?}", err);
     }
 }

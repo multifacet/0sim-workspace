@@ -197,7 +197,7 @@ pub fn clone_research_workspace(
     ushell: &SshShell,
     secret: Option<&str>,
     submodules: &[&str],
-) -> Result<String, failure::Error> {
+) -> Result<String, spurs::SshError> {
     // Check if the repo is already cloned.
     if let Ok(_hash) = research_workspace_git_hash(&ushell) {
         // If so, just update it.
@@ -226,7 +226,7 @@ pub fn clone_research_workspace(
 }
 
 /// Get the git hash of the remote research workspace.
-pub fn research_workspace_git_hash(ushell: &SshShell) -> Result<String, failure::Error> {
+pub fn research_workspace_git_hash(ushell: &SshShell) -> Result<String, spurs::SshError> {
     let hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
     let hash = hash.stdout.trim();
 
@@ -256,7 +256,7 @@ pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
 }
 
 /// Get the path of the user's home directory.
-pub fn get_user_home_dir(ushell: &SshShell) -> Result<String, failure::Error> {
+pub fn get_user_home_dir(ushell: &SshShell) -> Result<String, spurs::SshError> {
     let user_home = ushell.run(cmd!("echo $HOME").use_bash())?;
     Ok(user_home.stdout.trim().to_owned())
 }
@@ -270,7 +270,7 @@ pub fn set_remote_research_setting<V: Serialize>(
     ushell: &SshShell,
     setting: &str,
     value: V,
-) -> Result<(), failure::Error> {
+) -> Result<(), spurs::SshError> {
     // Make sure the file exists
     ushell.run(cmd!("touch research-settings.json"))?;
 
@@ -292,7 +292,7 @@ pub fn set_remote_research_setting<V: Serialize>(
 /// a single value.
 pub fn get_remote_research_settings(
     ushell: &SshShell,
-) -> Result<std::collections::BTreeMap<String, String>, failure::Error> {
+) -> Result<std::collections::BTreeMap<String, String>, spurs::SshError> {
     // Make sure the file exists
     ushell.run(cmd!("touch research-settings.json"))?;
 
@@ -315,9 +315,7 @@ where
     's: 'd,
 {
     if let Some(setting) = settings.get(setting) {
-        Ok(Some(
-            serde_json::from_str(setting).expect("unable to deserialize"),
-        ))
+        Ok(Some(serde_json::from_str(setting)?))
     } else {
         Ok(None)
     }
@@ -338,7 +336,7 @@ pub fn gen_local_version(branch: &str, hash: &str) -> String {
 }
 
 /// Generate a new vagrant domain name and update the Vagrantfile.
-pub fn gen_new_vagrantdomain(shell: &SshShell) -> Result<(), failure::Error> {
+pub fn gen_new_vagrantdomain(shell: &SshShell) -> Result<(), spurs::SshError> {
     let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
     let uniq = shell.run(cmd!("date | sha256sum | head -c 10"))?;
     let uniq = uniq.stdout.trim();
@@ -379,7 +377,7 @@ pub fn turn_on_thp(
     transparent_hugepage_khugepaged_defrag: usize,
     transparent_hugepage_khugepaged_alloc_sleep_ms: usize,
     transparent_hugepage_khugepaged_scan_sleep_ms: usize,
-) -> Result<(), failure::Error> {
+) -> Result<(), spurs::SshError> {
     shell.run(
         cmd!(
             "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/enabled",
@@ -466,7 +464,7 @@ pub struct KernelConfig<'a> {
     pub extra_options: &'a [(&'a str, bool)],
 }
 
-pub fn get_absolute_path(shell: &SshShell, path: &str) -> Result<String, failure::Error> {
+pub fn get_absolute_path(shell: &SshShell, path: &str) -> Result<String, spurs::SshError> {
     Ok(shell.run(cmd!("pwd").cwd(path))?.stdout.trim().into())
 }
 
@@ -616,7 +614,7 @@ pub fn service(
     shell: &SshShell,
     service: &str,
     action: ServiceAction,
-) -> Result<(), failure::Error> {
+) -> Result<(), spurs::SshError> {
     match action {
         ServiceAction::Restart => {
             shell.run(cmd!("sudo service {} restart", service))?;
@@ -638,6 +636,6 @@ pub fn service(
     Ok(())
 }
 
-pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failure::Error> {
+pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, spurs::SshError> {
     Ok(shell.run(cmd!("systemctl status {}", service)).is_ok())
 }
