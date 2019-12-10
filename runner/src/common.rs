@@ -199,12 +199,12 @@ pub fn clone_research_workspace(
     ushell: &SshShell,
     secret: Option<&str>,
     submodules: &[&str],
-) -> Result<String, spurs::SshError> {
+) -> Result<String, failure::Error> {
     // Check if the repo is already cloned.
     if let Ok(_hash) = research_workspace_git_hash(&ushell) {
         // If so, just update it.
         with_shell! { ushell in &dir!(RESEARCH_WORKSPACE_PATH) =>
-            cmd!("giti pull"),
+            cmd!("git pull"),
             cmd!("git submodule update"),
         }
     } else {
@@ -228,7 +228,7 @@ pub fn clone_research_workspace(
 }
 
 /// Get the git hash of the remote research workspace.
-pub fn research_workspace_git_hash(ushell: &SshShell) -> Result<String, spurs::SshError> {
+pub fn research_workspace_git_hash(ushell: &SshShell) -> Result<String, failure::Error> {
     let hash = ushell.run(cmd!("git rev-parse HEAD").cwd(RESEARCH_WORKSPACE_PATH))?;
     let hash = hash.stdout.trim();
 
@@ -259,7 +259,7 @@ pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
 }
 
 /// Get the path of the user's home directory.
-pub fn get_user_home_dir(ushell: &SshShell) -> Result<String, spurs::SshError> {
+pub fn get_user_home_dir(ushell: &SshShell) -> Result<String, failure::Error> {
     let user_home = ushell.run(cmd!("echo $HOME").use_bash())?;
     Ok(user_home.stdout.trim().to_owned())
 }
@@ -273,7 +273,7 @@ pub fn set_remote_research_setting<V: Serialize>(
     ushell: &SshShell,
     setting: &str,
     value: V,
-) -> Result<(), spurs::SshError> {
+) -> Result<(), failure::Error> {
     // Make sure the file exists
     ushell.run(cmd!("touch research-settings.json"))?;
 
@@ -295,7 +295,7 @@ pub fn set_remote_research_setting<V: Serialize>(
 /// a single value.
 pub fn get_remote_research_settings(
     ushell: &SshShell,
-) -> Result<std::collections::BTreeMap<String, String>, spurs::SshError> {
+) -> Result<std::collections::BTreeMap<String, String>, failure::Error> {
     // Make sure the file exists
     ushell.run(cmd!("touch research-settings.json"))?;
 
@@ -341,7 +341,7 @@ pub fn gen_local_version(branch: &str, hash: &str) -> String {
 }
 
 /// Generate a new vagrant domain name and update the Vagrantfile.
-pub fn gen_new_vagrantdomain(shell: &SshShell) -> Result<(), spurs::SshError> {
+pub fn gen_new_vagrantdomain(shell: &SshShell) -> Result<(), failure::Error> {
     let vagrant_path = &format!("{}/{}", RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
     let uniq = shell.run(cmd!("date | sha256sum | head -c 10"))?;
     let uniq = uniq.stdout.trim();
@@ -364,7 +364,7 @@ pub fn get_num_cores(shell: &SshShell) -> Result<usize, failure::Error> {
 /// Get the max CPU frequency of the remote in MHz.
 ///
 /// NOTE: this is not necessarily the current CPU freq. You need to set the scaling governor.
-pub fn get_cpu_freq(shell: &SshShell) -> Result<usize, spurs::SshError> {
+pub fn get_cpu_freq(shell: &SshShell) -> Result<usize, failure::Error> {
     let freq =
         shell.run(cmd!("lscpu | grep 'CPU max MHz' | grep -oE '[0-9]+' | head -n1").use_bash())?;
     let alt =
@@ -384,7 +384,7 @@ pub fn turn_on_thp(
     transparent_hugepage_khugepaged_defrag: usize,
     transparent_hugepage_khugepaged_alloc_sleep_ms: usize,
     transparent_hugepage_khugepaged_scan_sleep_ms: usize,
-) -> Result<(), spurs::SshError> {
+) -> Result<(), failure::Error> {
     shell.run(
         cmd!(
             "echo {} | sudo tee /sys/kernel/mm/transparent_hugepage/enabled",
@@ -471,7 +471,7 @@ pub struct KernelConfig<'a> {
     pub extra_options: &'a [(&'a str, bool)],
 }
 
-pub fn get_absolute_path(shell: &SshShell, path: &str) -> Result<String, spurs::SshError> {
+pub fn get_absolute_path(shell: &SshShell, path: &str) -> Result<String, failure::Error> {
     Ok(shell.run(cmd!("pwd").cwd(path))?.stdout.trim().into())
 }
 
@@ -621,7 +621,7 @@ pub fn service(
     shell: &SshShell,
     service: &str,
     action: ServiceAction,
-) -> Result<(), spurs::SshError> {
+) -> Result<(), failure::Error> {
     match action {
         ServiceAction::Restart => {
             shell.run(cmd!("sudo service {} restart", service))?;
@@ -643,6 +643,6 @@ pub fn service(
     Ok(())
 }
 
-pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, spurs::SshError> {
+pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failure::Error> {
     Ok(shell.run(cmd!("systemctl status {}", service)).is_ok())
 }

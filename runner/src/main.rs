@@ -85,28 +85,38 @@ fn run() -> Result<(), failure::Error> {
 }
 
 fn main() {
+    use console::style;
+
     env_logger::init();
+
+    // Set the RUST_BACKTRACE environment variable so that we always get backtraces. Normally, one
+    // doesn't want this because of the performance penalty, but in this case, we don't care too
+    // much, whereas the debugging improve is massive.
+    std::env::set_var("RUST_BACKTRACE", "1");
 
     // If an error occurred, try to print something helpful.
     if let Err(err) = run() {
+        const MESSAGE: &str =
+r#"== ERROR ==================================================================================
+`runner` encountered an error. The command log above may offer clues. If the error pertains to SSH,
+you may be able to get useful information by setting the RUST_LOG=debug environment variable. It is
+recommended that you use `debug` builds of `runner`, rather than `release`, as the performance of
+`runner` is not that important and is almost always dominated by the experiment being run."#;
+
+        println!("{}", style(MESSAGE).red().bold());
+
         // Errors from SSH commands
-        let err = match err.downcast::<spurs::SshError>() {
-            Ok(err) => {
-                println!(
-                    "`runner` encountered an error while \
-                     attempting to run a command over SSH:\n{}",
-                    err
-                );
+        if err.downcast_ref::<spurs::SshError>().is_some() {
+            println!("An error occurred while attempting to run a command over SSH");
+        }
 
-                std::process::exit(101);
-            }
-            Err(err) => err,
-        };
-
-        // Any other errors
+        // Print error and backtrace
         println!(
-            "`runner` encountered the following error:\n{}",
+            "`runner` encountered the following error:\n{}\n{}",
             err.as_fail(),
+            err.backtrace(),
         );
+
+        std::process::exit(101);
     }
 }
