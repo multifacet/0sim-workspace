@@ -32,9 +32,6 @@ const SPARK_HOME: &str = "spark-2.4.4-bin-hadoop2.7";
 const QEMU_TARBALL: &str = "https://download.qemu.org/qemu-4.0.0.tar.xz";
 const QEMU_TARBALL_NAME: &str = "qemu-4.0.0.tar.xz";
 
-/// Location of `.ssh` directory on UW CS AFS so we can install it on experimental machines.
-const SSH_LOCATION: &str = "/u/m/a/markm/.ssh";
-
 pub fn cli_options() -> clap::App<'static, 'static> {
     clap_app! { setup00000 =>
         (about: "Sets up the given _centos_ test machine for use with vagrant. Requires `sudo`.")
@@ -858,7 +855,9 @@ where
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
     ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
 
-    let key = std::fs::read_to_string(dir!(SSH_LOCATION, "id_rsa.pub"))?;
+    let ssh_location = std::env::var("HOME").context("finding location of .ssh directory")?;
+
+    let key = std::fs::read_to_string(dir!(ssh_location, "id_rsa.pub"))?;
     let key = key.trim();
     ushell.run(
         cmd!(
@@ -874,7 +873,7 @@ where
     let _ = Command::new("ssh-keygen")
         .args(&[
             "-f",
-            &dir!(SSH_LOCATION, "known_hosts"),
+            &dir!(ssh_location, "known_hosts"),
             "-R",
             &format!("[{}]:{}", host, VAGRANT_PORT),
         ])
