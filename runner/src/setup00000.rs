@@ -7,6 +7,8 @@ use std::process::Command;
 
 use clap::clap_app;
 
+use failure::ResultExt;
+
 use spurs::{cmd, Execute, SshShell};
 
 use crate::common::{
@@ -855,9 +857,12 @@ where
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
     ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
 
-    let ssh_location = std::env::var("HOME").context("finding location of .ssh directory")?;
+    let ssh_location = format!(
+        "{}/.ssh",
+        std::env::var("HOME").context("finding location of .ssh directory")?
+    );
 
-    let key = std::fs::read_to_string(dir!(ssh_location, "id_rsa.pub"))?;
+    let key = std::fs::read_to_string(dir!(&ssh_location, "id_rsa.pub"))?;
     let key = key.trim();
     ushell.run(
         cmd!(
@@ -873,7 +878,7 @@ where
     let _ = Command::new("ssh-keygen")
         .args(&[
             "-f",
-            &dir!(ssh_location, "known_hosts"),
+            &dir!(&ssh_location, "known_hosts"),
             "-R",
             &format!("[{}]:{}", host, VAGRANT_PORT),
         ])
