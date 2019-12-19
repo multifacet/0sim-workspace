@@ -654,14 +654,19 @@ pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failu
 pub fn setup_passphraseless_local_ssh(ushell: &SshShell) -> Result<(), failure::Error> {
     // First check if it already works
     if ushell
-        .run(cmd!("ssh localhost -- whoami").allow_error())
+        .run(cmd!("ssh -o StrictHostKeyChecking=no localhost -- whoami"))
         .is_err()
     {
         with_shell! { ushell =>
             cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty(),
             cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"),
+            cmd!("ssh-keygen -R localhost -f ~/.ssh/known_hosts"),
+            cmd!("ssh-keyscan -H localhost >> ~/.ssh/known_hosts"),
         }
     }
+
+    // Test it.
+    ushell.run(cmd!("ssh localhost -- whoami"))?;
 
     Ok(())
 }

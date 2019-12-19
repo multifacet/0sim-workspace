@@ -230,11 +230,8 @@ where
         .use_bash(),
     )?;
 
-    let zerosim_exp_path = &dir!(
-        "/home/vagrant",
-        RESEARCH_WORKSPACE_PATH,
-        ZEROSIM_EXPERIMENTS_SUBMODULE
-    );
+    let zerosim_path = &dir!("/home/vagrant", RESEARCH_WORKSPACE_PATH,);
+    let zerosim_exp_path = &dir!(zerosim_path, ZEROSIM_EXPERIMENTS_SUBMODULE);
 
     // let zerosim_path_host = &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
 
@@ -459,11 +456,7 @@ where
         }
 
         Workload::HiBenchWordcount => {
-            let zerosim_hadoop = dir!(
-                RESEARCH_WORKSPACE_PATH,
-                ZEROSIM_BENCHMARKS_DIR,
-                ZEROSIM_HADOOP_PATH
-            );
+            let zerosim_hadoop = dir!(zerosim_path, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH);
             let hibench_home = dir!(&zerosim_hadoop, "HiBench");
 
             // Start hadoop
