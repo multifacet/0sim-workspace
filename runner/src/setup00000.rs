@@ -285,7 +285,7 @@ where
 
     // Install benchmarks.
     if cfg.guest_bmks || cfg.setup_hadoop {
-        install_guest_benchmarks(&ushell, &vushell, &cfg)?;
+        install_guest_benchmarks(&ushell, &vushell, &vrshell, &cfg)?;
     }
 
     // Make sure the TSC is marked as a reliable clock source in the guest.
@@ -1051,6 +1051,7 @@ fn install_guest_kernel(
 fn install_guest_benchmarks<A>(
     ushell: &SshShell,
     vushell: &SshShell,
+    vrshell: &SshShell,
     cfg: &SetupConfig<'_, A>,
 ) -> Result<(), failure::Error>
 where
@@ -1058,7 +1059,7 @@ where
 {
     // Hadoop/spark/hibench
     if cfg.setup_hadoop {
-        vm_setup_hadoop(ushell, vushell, HADOOP_VERSION, SPARK_VERSION)?;
+        vm_setup_hadoop(ushell, vushell, vrshell, HADOOP_VERSION, SPARK_VERSION)?;
     }
 
     // Create a mountpoint for nullfs
@@ -1072,6 +1073,7 @@ where
 fn vm_setup_hadoop(
     ushell: &SshShell,
     vushell: &SshShell,
+    vrshell: &SshShell,
     hadoop_version: &str,
     spark_version: &str,
 ) -> Result<(), failure::Error> {
@@ -1084,6 +1086,12 @@ fn vm_setup_hadoop(
     crate::common::setup_passphraseless_local_ssh(vushell)?;
 
     // Add hadoop env vars to shell profile.
+    let user_home = vushell.run(cmd!("echo $HOME"))?.stdout;
+    vrshell.run(cmd!(
+        "echo 'source {}/{}/hadoop_env.sh' >> ~/.bashrc",
+        user_home.as_str(),
+        hadoop_path
+    ))?;
     vushell.run(cmd!(
         "echo 'source {}/hadoop_env.sh' >> ~/.bashrc",
         hadoop_path
