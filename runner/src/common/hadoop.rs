@@ -4,7 +4,8 @@ use std::path::Path;
 
 use spurs::{cmd, Execute, SshShell};
 
-const HADOOP_TARBALL_URL_TEMPLATE: &str = "http://apache.cs.utah.edu/hadoop/common/hadoop-VERSION/";
+const HADOOP_TARBALL_URL_TEMPLATE: &str =
+    "http://apache.cs.utah.edu/hadoop/common/hadoop-VERSION/hadoop-VERSION.tar.gz";
 
 const SPARK_TARBALL_URL_TEMPLATE: &str =
     "http://apache.cs.utah.edu/spark/spark-VERSION/spark-VERSION-bin-without-hadoop.tgz";
