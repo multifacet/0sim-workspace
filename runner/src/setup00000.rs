@@ -21,18 +21,10 @@ use crate::common::{
 const VAGRANT_RPM_URL: &str =
     "https://releases.hashicorp.com/vagrant/2.1.5/vagrant_2.1.5_x86_64.rpm";
 
-const HADOOP_TARBALL: &str =
-    "http://apache.cs.utah.edu/hadoop/common/hadoop-3.1.3/hadoop-3.1.3.tar.gz";
-const HADOOP_TARBALL_NAME: &str = "hadoop-3.1.3.tar.gz";
-const HADOOP_HOME: &str = "hadoop-3.1.3";
-
-const SPARK_TARBALL: &str =
-    "http://apache.cs.utah.edu/spark/spark-2.4.4/spark-2.4.4-bin-hadoop2.7.tgz";
-const SPARK_TARBALL_NAME: &str = "spark-2.4.4-bin-hadoop2.7.tgz";
-const SPARK_HOME: &str = "spark-2.4.4-bin-hadoop2.7";
-
 const QEMU_TARBALL: &str = "https://download.qemu.org/qemu-4.0.0.tar.xz";
 const QEMU_TARBALL_NAME: &str = "qemu-4.0.0.tar.xz";
+
+const HADOOP_VERSION: &str = "3.1.3";
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     clap_app! { setup00000 =>
@@ -1065,46 +1057,55 @@ where
 {
     // Hadoop/spark/hibench
     if cfg.setup_hadoop {
-        with_shell! { vushell =>
-            cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty(),
-            cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"),
-
-            cmd!(
-                "echo 'source {}/hadoop_env.sh' >> ~/.bashrc",
-                dir!(
-                    RESEARCH_WORKSPACE_PATH,
-                    ZEROSIM_BENCHMARKS_DIR,
-                    ZEROSIM_HADOOP_PATH
-                )
-            )
-        }
-
-        with_shell! { ushell
-            in &dir!(RESEARCH_WORKSPACE_PATH, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH) =>
-
-            cmd!("wget {} {}", HADOOP_TARBALL, SPARK_TARBALL),
-            cmd!("tar xvzf {}", HADOOP_TARBALL_NAME),
-            cmd!("tar xvzf {}", SPARK_TARBALL_NAME),
-            cmd!("cp hadoop-conf/* {}/etc/hadoop/", HADOOP_HOME),
-            cmd!("cp spark-conf/* {}/conf/", SPARK_HOME),
-            cmd!("cp hibench-conf/* HiBench/conf/"),
-        }
-
-        vushell.run(
-            cmd!("sh -x setup.sh")
-                .use_bash()
-                .cwd(&dir!(
-                    RESEARCH_WORKSPACE_PATH,
-                    ZEROSIM_BENCHMARKS_DIR,
-                    ZEROSIM_HADOOP_PATH
-                ))
-                .use_bash(),
-        )?;
+        vm_setup_hadoop(ushell, vushell, HADOOP_VERSION)?;
     }
 
     // Create a mountpoint for nullfs
     vushell.run(cmd!("sudo mkdir -p /mnt/nullfs"))?;
     vushell.run(cmd!("sudo chmod 777 /mnt/nullfs"))?;
+
+    Ok(())
+}
+
+/// Set up hadoop and hibench in the guest.
+fn vm_setup_hadoop(
+    ushell: &SshShell,
+    vushell: &SshShell,
+    version: &str,
+) -> Result<(), failure::Error> {
+    let hadoop_path = dir!(
+        RESEARCH_WORKSPACE_PATH,
+        ZEROSIM_BENCHMARKS_DIR,
+        ZEROSIM_HADOOP_PATH
+    );
+
+    crate::common::setup_passphraseless_local_ssh(vushell)?;
+
+    // Add hadoop env vars to shell profile.
+    vushell.run(cmd!(
+        "echo 'source {}/hadoop_env.sh' >> ~/.bashrc",
+        hadoop_path
+    ))?;
+
+    // Download and untar hadoop and spark.
+    crate::common::hadoop::download_hadoop_tarball(&ushell, version, &hadoop_path)?;
+    crate::common::hadoop::download_spark_tarball(&ushell, version, &hadoop_path)?;
+
+    // Copy config options into place. These already have settings set, so we don't need to do a
+    // lot of adjusting on the fly.
+    with_shell! { ushell in &hadoop_path =>
+        cmd!("cp hadoop-conf/* {}/hadoop/etc/hadoop/", hadoop_path),
+        cmd!("cp spark-conf/* {}/spark/conf/", hadoop_path),
+        cmd!("cp hibench-conf/* {}/HiBench/conf/", hadoop_path),
+    }
+
+    // Do some setup for hadoop and then hibench
+    vushell.run(
+        cmd!("sh -x setup.sh")
+            .use_bash()
+            .cwd(&hadoop_path)
+            .use_bash(),
+    )?;
 
     Ok(())
 }

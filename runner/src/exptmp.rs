@@ -31,6 +31,7 @@ enum Workload {
     Zeros,
     Counter,
     Locality,
+    HiBenchWordcount,
 }
 
 impl Workload {
@@ -39,6 +40,7 @@ impl Workload {
             Workload::Memcached => "memcached_gen_data",
             Workload::Zeros | Workload::Counter => "time_mmap_touch",
             Workload::Locality => "locality_mem_access",
+            Workload::HiBenchWordcount => "", //TODO
         }
     }
 
@@ -48,6 +50,7 @@ impl Workload {
             ("time_mmap_touch", Some(TimeMmapTouchPattern::Zeros)) => Workload::Zeros,
             ("time_mmap_touch", Some(TimeMmapTouchPattern::Counter)) => Workload::Counter,
             ("locality_mem_access", None) => Workload::Locality,
+            ("hibench_wordcount", None) => Workload::HiBenchWordcount,
             _ => panic!("unknown workload: {:?} {:?}", s, pat),
         }
     }
@@ -75,6 +78,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
             (@arg counter: -c "Fill pages with counter values")
             (@arg memcached: -m "Run a memcached workload")
             (@arg locality: -l "Run the locality test workload")
+            (@arg hibench_wordcount: -w "Run HiBench Wordcount")
         )
         (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
          "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
@@ -102,6 +106,8 @@ pub fn run(print_results_path: bool, sub_m: &ArgMatches<'_>) -> Result<(), failu
         Workload::Counter
     } else if sub_m.is_present("locality") {
         Workload::Locality
+    } else if sub_m.is_present("hibench_wordcount") {
+        Workload::HiBenchWordcount
     } else {
         panic!("unknown workload")
     };
@@ -140,7 +146,7 @@ pub fn run(print_results_path: bool, sub_m: &ArgMatches<'_>) -> Result<(), failu
 
         * size: size,
         pattern: match workload {
-            Workload::Memcached | Workload::Locality => None,
+            Workload::Memcached | Workload::Locality | Workload::HiBenchWordcount => None,
             Workload::Zeros => Some(TimeMmapTouchPattern::Zeros),
             Workload::Counter => Some(TimeMmapTouchPattern::Counter),
         },
@@ -450,6 +456,29 @@ where
             );
 
             let _ = spawn_handle0.join()?;
+        }
+
+        Workload::HiBenchWordcount => {
+            let zerosim_hadoop = dir!(
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_BENCHMARKS_DIR,
+                ZEROSIM_HADOOP_PATH
+            );
+            let hibench_home = dir!(&zerosim_hadoop, "HiBench");
+
+            // Start hadoop
+            vshell.run(cmd!("./start-all-standalone.sh").cwd(&zerosim_hadoop))?;
+
+            // Prepare hadoop input
+            vshell.run(
+                cmd!("./bin/workloads/micro/wordcount/prepare/prepare.sh").cwd(&hibench_home),
+            )?;
+
+            // Run workload
+            vshell.run(cmd!("./bin/workloads/micro/wordcount/hadoop/run.sh").cwd(&hibench_home))?;
+
+            // Stop hadoop
+            vshell.run(cmd!("./start-all-standalone.sh").cwd(&zerosim_hadoop))?;
         }
     }
 

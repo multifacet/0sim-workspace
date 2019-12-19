@@ -16,6 +16,8 @@ pub mod output;
 
 pub mod exp_0sim;
 
+pub mod hadoop;
+
 use failure::ResultExt;
 
 use serde::{Deserialize, Serialize};
@@ -643,6 +645,17 @@ pub fn service(
     Ok(())
 }
 
+/// Returns true if the given service is running.
 pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failure::Error> {
     Ok(shell.run(cmd!("systemctl status {}", service)).is_ok())
+}
+
+/// Set up passphraseless SSH to localhost.
+pub fn setup_passphraseless_local_ssh(ushell: &SshShell) -> Result<(), failure::Error> {
+    with_shell! { ushell =>
+        cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty(),
+        cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"),
+    }
+
+    Ok(())
 }
