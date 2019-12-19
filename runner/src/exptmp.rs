@@ -460,7 +460,7 @@ where
             let hibench_home = dir!(&zerosim_hadoop, "HiBench");
 
             // Start hadoop
-            vshell.run(cmd!("./start-all-standalone.sh").cwd(&zerosim_hadoop))?;
+            vshell.run(cmd!("bash -x ./start-all-standalone.sh").cwd(&zerosim_hadoop))?;
 
             // Prepare hadoop input
             vshell.run(
@@ -471,7 +471,7 @@ where
             vshell.run(cmd!("./bin/workloads/micro/wordcount/hadoop/run.sh").cwd(&hibench_home))?;
 
             // Stop hadoop
-            vshell.run(cmd!("./start-all-standalone.sh").cwd(&zerosim_hadoop))?;
+            vshell.run(cmd!("bash -x ./stop-all-standalone.sh").cwd(&zerosim_hadoop))?;
         }
     }
 
