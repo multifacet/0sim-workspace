@@ -25,6 +25,7 @@ const QEMU_TARBALL: &str = "https://download.qemu.org/qemu-4.0.0.tar.xz";
 const QEMU_TARBALL_NAME: &str = "qemu-4.0.0.tar.xz";
 
 const HADOOP_VERSION: &str = "3.1.3";
+const SPARK_VERSION: &str = "2.4.4";
 
 pub fn cli_options() -> clap::App<'static, 'static> {
     clap_app! { setup00000 =>
@@ -1057,7 +1058,7 @@ where
 {
     // Hadoop/spark/hibench
     if cfg.setup_hadoop {
-        vm_setup_hadoop(ushell, vushell, HADOOP_VERSION)?;
+        vm_setup_hadoop(ushell, vushell, HADOOP_VERSION, SPARK_VERSION)?;
     }
 
     // Create a mountpoint for nullfs
@@ -1071,7 +1072,8 @@ where
 fn vm_setup_hadoop(
     ushell: &SshShell,
     vushell: &SshShell,
-    version: &str,
+    hadoop_version: &str,
+    spark_version: &str,
 ) -> Result<(), failure::Error> {
     let hadoop_path = dir!(
         RESEARCH_WORKSPACE_PATH,
@@ -1088,15 +1090,15 @@ fn vm_setup_hadoop(
     ))?;
 
     // Download and untar hadoop and spark.
-    crate::common::hadoop::download_hadoop_tarball(&ushell, version, &hadoop_path)?;
-    crate::common::hadoop::download_spark_tarball(&ushell, version, &hadoop_path)?;
+    crate::common::hadoop::download_hadoop_tarball(&ushell, hadoop_version, &hadoop_path)?;
+    crate::common::hadoop::download_spark_tarball(&ushell, spark_version, &hadoop_path)?;
 
     // Copy config options into place. These already have settings set, so we don't need to do a
     // lot of adjusting on the fly.
     with_shell! { ushell in &hadoop_path =>
-        cmd!("cp hadoop-conf/* {}/hadoop/etc/hadoop/", hadoop_path),
-        cmd!("cp spark-conf/* {}/spark/conf/", hadoop_path),
-        cmd!("cp hibench-conf/* {}/HiBench/conf/", hadoop_path),
+        cmd!("cp hadoop-conf/* hadoop/etc/hadoop/"),
+        cmd!("cp spark-conf/* spark/conf/"),
+        cmd!("cp hibench-conf/* HiBench/conf/"),
     }
 
     // Do some setup for hadoop and then hibench
