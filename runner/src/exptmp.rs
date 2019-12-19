@@ -40,7 +40,7 @@ impl Workload {
             Workload::Memcached => "memcached_gen_data",
             Workload::Zeros | Workload::Counter => "time_mmap_touch",
             Workload::Locality => "locality_mem_access",
-            Workload::HiBenchWordcount => "", //TODO
+            Workload::HiBenchWordcount => "hibench_wordcount",
         }
     }
 
