@@ -101,7 +101,8 @@ r#"== ERROR ====================================================================
 `runner` encountered an error. The command log above may offer clues. If the error pertains to SSH,
 you may be able to get useful information by setting the RUST_LOG=debug environment variable. It is
 recommended that you use `debug` builds of `runner`, rather than `release`, as the performance of
-`runner` is not that important and is almost always dominated by the experiment being run."#;
+`runner` is not that important and is almost always dominated by the experiment being run.
+"#;
 
         println!("{}", style(MESSAGE).red().bold());
 
