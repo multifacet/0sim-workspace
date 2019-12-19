@@ -78,7 +78,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
             (@arg counter: -c "Fill pages with counter values")
             (@arg memcached: -m "Run a memcached workload")
             (@arg locality: -l "Run the locality test workload")
-            (@arg hibench_wordcount: -w "Run HiBench Wordcount")
+            (@arg hibench_wordcount: -b "Run HiBench Wordcount")
         )
         (@arg VMSIZE: +takes_value {is_usize} -v --vm_size
          "The number of GBs of the VM (defaults to 1024) (e.g. 500)")
