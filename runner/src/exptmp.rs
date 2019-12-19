@@ -456,6 +456,9 @@ where
         }
 
         Workload::HiBenchWordcount => {
+            // Hadoop should be run as non-root user.
+            let vshell = crate::common::exp_0sim::connect_to_vagrant_as_user(&login.host)?;
+
             let zerosim_hadoop = dir!(zerosim_path, ZEROSIM_BENCHMARKS_DIR, ZEROSIM_HADOOP_PATH);
             let hibench_home = dir!(&zerosim_hadoop, "HiBench");
 
