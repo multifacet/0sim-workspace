@@ -652,9 +652,15 @@ pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failu
 
 /// Set up passphraseless SSH to localhost.
 pub fn setup_passphraseless_local_ssh(ushell: &SshShell) -> Result<(), failure::Error> {
-    with_shell! { ushell =>
-        cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty(),
-        cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"),
+    // First check if it already works
+    if ushell
+        .run(cmd!("ssh localhost -- whoami").allow_error())
+        .is_err()
+    {
+        with_shell! { ushell =>
+            cmd!("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa").no_pty(),
+            cmd!("cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"),
+        }
     }
 
     Ok(())
