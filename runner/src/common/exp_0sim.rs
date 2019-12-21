@@ -785,6 +785,7 @@ pub fn gen_standard_sim_output(
         "sudo bash -c 'tail /sys/kernel/debug/zswap/*' >> {}",
         host_sim_file
     ))?;
+    ushell.run(cmd!("cat /proc/zerosim_guest_offset; echo"))?;
 
     ushell.run(cmd!("sync"))?;
     vshell.run(cmd!(
