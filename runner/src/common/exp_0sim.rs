@@ -786,7 +786,7 @@ pub fn gen_standard_sim_output(
         host_sim_file
     ))?;
     ushell.run(cmd!(
-        "(echo /proc/zerosim_guest_offset; cat /proc/zerosim_guest_offset; echo) >> {}",
+        "(tail /proc/zerosim_guest_offset; echo) >> {}",
         host_sim_file
     ))?;
 
