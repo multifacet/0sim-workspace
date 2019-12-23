@@ -1087,13 +1087,15 @@ fn vm_setup_hadoop(
 
     // Add hadoop env vars to shell profile.
     let user_home = vushell.run(cmd!("echo $HOME"))?.stdout;
+    let user_home = user_home.trim();
     vrshell.run(cmd!(
         "echo 'source {}/{}/hadoop_env.sh' >> ~/.bashrc",
-        user_home.as_str(),
+        user_home,
         hadoop_path
     ))?;
     vushell.run(cmd!(
-        "echo 'source {}/hadoop_env.sh' >> ~/.bashrc",
+        "echo 'source {}/{}/hadoop_env.sh' >> ~/.bashrc",
+        user_home,
         hadoop_path
     ))?;
 
