@@ -280,12 +280,11 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     // Make sure to turn off skip_halt, which breaks multi-core boot.
     shell.run(cmd!("echo 0 | sudo tee /proc/zerosim_skip_halt"))?;
 
-    // Make sure to leave LAPIC adjust off.
-    if lapic_adjust {
-        shell.run(cmd!("echo 1 | sudo tee /proc/zerosim_lapic_adjust"))?;
-    } else {
-        shell.run(cmd!("echo 0 | sudo tee /proc/zerosim_lapic_adjust"))?;
-    }
+    // Set LAPIC adjust if needed
+    shell.run(cmd!(
+        "echo {} | sudo tee /proc/zerosim_lapic_adjust",
+        if lapic_adjust { 1 } else { 0 }
+    ))?;
 
     if fast {
         shell.run(
