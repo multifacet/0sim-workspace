@@ -890,6 +890,10 @@ where
     )?;
     let mut vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
 
+    // Make sure we have an alternate way to get into the VM
+    vrshell.run(cmd!("echo 0sim | passwd --stdin vagrant"))?;
+    vrshell.run(cmd!("echo 0sim | passwd --stdin root"))?;
+
     // Sometimes on adsl, networking is kind of messed up until a host restart. Check for
     // connectivity, and try restarting.
     let pub_net = vushell.run(cmd!("ping -c 1 -W 10 1.1.1.1")).is_ok();
