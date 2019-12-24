@@ -315,6 +315,13 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
 
     dump_sys_info(&vshell)?;
 
+    // Don't let the OOM killer kill ssh
+    vshell.run(cmd!(
+        r"pgrep -f /usr/sbin/sshd | while read PID; do \
+            echo -1000 | sudo tee /proc/$PID/oom_score_adj;
+        done"
+    ))?;
+
     if fast {
         shell.run(
             cmd!("echo 1 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
