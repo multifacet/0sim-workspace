@@ -109,8 +109,8 @@ where
                 /* RAM */ 10,
                 /* cores */ 1,
                 /* fast */ true,
-                /* skip_halt */ false,
-                /* lapic_adjust */ false,
+                ZEROSIM_SKIP_HALT,
+                ZEROSIM_LAPIC_ADJUST,
             )?
         );
 
@@ -139,8 +139,8 @@ where
             vm_size,
             cores,
             /* fast */ false,
-            /* skip_halt */ ZEROSIM_SKIP_HALT,
-            /* lapic_adjust */ ZEROSIM_LAPIC_ADJUST,
+            ZEROSIM_SKIP_HALT,
+            ZEROSIM_LAPIC_ADJUST,
         )?
     );
 

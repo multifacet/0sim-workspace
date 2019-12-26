@@ -266,8 +266,8 @@ where
             20,
             1,
             /* fast */ true,
-            /* skip_halt */ false,
-            /* lapic_adjust */ false,
+            ZEROSIM_SKIP_HALT,
+            ZEROSIM_LAPIC_ADJUST,
         )?;
         let vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
 
@@ -276,6 +276,9 @@ where
         // Nothing left to do
         return Ok(());
     };
+
+    // Disable TSC offsetting for performance
+    set_tsc_offsetting(&ushell, false)?;
 
     install_guest_dependencies(&vrshell, &vushell)?;
 
@@ -792,9 +795,7 @@ where
     spurs_util::reboot(ushell, /* dry_run */ false)?;
 
     // Disable TSC offsetting so that setup runs faster
-    ushell.run(
-        cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
-    )?;
+    set_tsc_offsetting(&ushell, false)?;
 
     // Disable firewalld if it is running because it causes VM issues. When we do that, we need to
     // reastart libvirtd.
@@ -885,8 +886,8 @@ where
         20,
         1,
         /* fast */ true,
-        /* skip_halt */ false,
-        /* lapic_adjust */ false,
+        ZEROSIM_SKIP_HALT,
+        ZEROSIM_LAPIC_ADJUST,
     )?;
     let mut vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
 
@@ -907,16 +908,14 @@ where
             20,
             1,
             /* fast */ true,
-            /* skip_halt */ false,
-            /* lapic_adjust */ false,
+            ZEROSIM_SKIP_HALT,
+            ZEROSIM_LAPIC_ADJUST,
         )?;
         vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
     }
 
     // Keep tsc offsetting off (it may be turned on by start_vagrant).
-    ushell.run(
-        cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting").use_bash(),
-    )?;
+    set_tsc_offsetting(&ushell, false)?;
 
     // If needed, setup the proxy.
     if let Some(proxy) = cfg.setup_proxy {

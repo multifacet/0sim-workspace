@@ -286,12 +286,8 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         if lapic_adjust { 1 } else { 0 }
     ))?;
 
-    if fast {
-        shell.run(
-            cmd!("echo 0 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
-                .use_bash(),
-        )?;
-    }
+    // Disable TSC offsetting if `fast` is true.
+    set_tsc_offsetting(shell, !fast)?;
 
     vagrant_halt(&shell)?;
 
@@ -322,12 +318,8 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
         done"
     ))?;
 
-    if fast {
-        shell.run(
-            cmd!("echo 1 | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting")
-                .use_bash(),
-        )?;
-    }
+    // Enable TSC offsetting (regardless of whether it was already off).
+    set_tsc_offsetting(shell, true)?;
 
     // Can turn skip_halt back on now.
     if skip_halt {
@@ -335,6 +327,19 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     }
 
     Ok(vshell)
+}
+
+/// Turn on or off 0sim TSC offsetting. Turning it off makes things run much faster, but gives up
+/// accuracy. If you are doing some sort of setup routine, it is worth it to turn off.
+pub fn set_tsc_offsetting(shell: &SshShell, enabled: bool) -> Result<(), failure::Error> {
+    shell.run(
+        cmd!(
+            "echo {} | sudo tee /sys/module/kvm_intel/parameters/enable_tsc_offsetting",
+            if enabled { 1 } else { 0 }
+        )
+        .use_bash(),
+    )?;
+    Ok(())
 }
 
 /// Turn off soft lockup and NMI watchdogs if possible in the shell.
