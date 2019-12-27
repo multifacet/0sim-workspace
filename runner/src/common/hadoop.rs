@@ -7,7 +7,7 @@ use spurs::{cmd, Execute, SshShell};
 const APACHE_HADOOP_MIRROR: &str = "http://apache-mirror.8birdsvideo.com/";
 
 const HADOOP_TARBALL_URL_TEMPLATE: &str = "hadoop/common/hadoop-VERSION/hadoop-VERSION.tar.gz";
-const SPARK_TARBALL_URL_TEMPLATE: &str = "spark/spark-VERSION/spark-VERSION-bin-without-hadoop.tgz";
+const SPARK_TARBALL_URL_TEMPLATE: &str = "spark/spark-VERSION/spark-VERSION-bin-hadoop2.7.tgz";
 
 /// Download and untar the hadoop tarball for the given version as `path/hadoop/`, deleting
 /// anything that was previously there.
@@ -48,8 +48,33 @@ where
         cmd!("wget -O /tmp/spark.tgz {}", url),
         cmd!("tar xvzf /tmp/spark.tgz"),
         cmd!("rm -rf {}/spark", path.as_ref().display()),
-        cmd!("mv spark-{}-bin-without-hadoop {}/spark", version, path.as_ref().display()),
+        cmd!("mv spark-{}-bin-hadoop2.7.tgz {}/spark", version, path.as_ref().display()),
     }
+
+    Ok(())
+}
+
+/// Start Spark master and worker on the given machine. The shell should not be a root shell.
+pub fn start_spark<P: AsRef<Path>>(shell: &SshShell, spark_home: &P) -> Result<(), failure::Error> {
+    shell.run(cmd!(
+        "bash -x {}/sbin/start-master.sh -h localhost -p 7077",
+        spark_home.as_ref().display()
+    ))?;
+
+    shell.run(cmd!(
+        "bash -x {}/sbin/start-slave.sh localhost:7077",
+        spark_home.as_ref().display()
+    ))?;
+
+    Ok(())
+}
+
+/// Stop spark running on this machine.
+pub fn stop_spark<P: AsRef<Path>>(shell: &SshShell, spark_home: &P) -> Result<(), failure::Error> {
+    shell.run(cmd!(
+        "bash -x {}/sbin/stop-all.sh",
+        spark_home.as_ref().display()
+    ))?;
 
     Ok(())
 }

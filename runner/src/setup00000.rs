@@ -919,12 +919,28 @@ where
 
     // If needed, setup the proxy.
     if let Some(proxy) = cfg.setup_proxy {
+        let mut parts = proxy.split(":");
+        let address = parts.next().unwrap();
+        let port = parts.next().unwrap();
+
         // user
         with_shell! { vushell =>
             cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
             cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
             cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
             cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+
+            // Setup proxying for maven
+            cmd!("mkdir -p .m2"),
+            cmd!("cp {}/mvn-settings.xml .m2/settings.xml",
+                dir!(
+                    RESEARCH_WORKSPACE_PATH,
+                    ZEROSIM_BENCHMARKS_DIR,
+                    ZEROSIM_HADOOP_PATH
+                )
+            ),
+            cmd!("sed -i 's/PROXY_ADDRESS/{}' .m2/settings.xml", address),
+            cmd!("sed -i 's/PROXY_PORT/{}' .m2/settings.xml", port),
         }
 
         // root
