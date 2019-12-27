@@ -48,7 +48,7 @@ where
         cmd!("wget -O /tmp/spark.tgz {}", url),
         cmd!("tar xvzf /tmp/spark.tgz"),
         cmd!("rm -rf {}/spark", path.as_ref().display()),
-        cmd!("mv spark-{}-bin-hadoop2.7.tgz {}/spark", version, path.as_ref().display()),
+        cmd!("mv spark-{}-bin-hadoop2.7 {}/spark", version, path.as_ref().display()),
     }
 
     Ok(())

@@ -277,6 +277,13 @@ where
         return Ok(());
     };
 
+    // Setup of proxying if needed.
+    let (vrshell, vushell) = if let Some(proxy) = cfg.setup_proxy {
+        setup_proxy(vrshell, vushell, proxy, &cfg)?
+    } else {
+        (vrshell, vushell)
+    };
+
     // Disable TSC offsetting for performance
     set_tsc_offsetting(&ushell, false)?;
 
@@ -917,50 +924,60 @@ where
     // Keep tsc offsetting off (it may be turned on by start_vagrant).
     set_tsc_offsetting(&ushell, false)?;
 
-    // If needed, setup the proxy.
-    if let Some(proxy) = cfg.setup_proxy {
-        let mut parts = proxy.split(":");
-        let address = parts.next().unwrap();
-        let port = parts.next().unwrap();
+    Ok((vrshell, vushell))
+}
 
-        // user
-        with_shell! { vushell =>
-            cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
-            cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
-            cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
-            cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+/// Setup up proxying for the given root/user shells and proxy address:port. Consume the old shells
+/// and return new shells with the proxy settings active.
+fn setup_proxy<A>(
+    rshell: SshShell,
+    ushell: SshShell,
+    proxy: &str,
+    cfg: &SetupConfig<'_, A>,
+) -> Result<(SshShell, SshShell), failure::Error>
+where
+    A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
+{
+    let mut parts = proxy.split(":");
+    let address = parts.next().unwrap();
+    let port = parts.next().unwrap();
 
-            // Setup proxying for maven
-            cmd!("mkdir -p .m2"),
-            cmd!("cp {}/mvn-settings.xml .m2/settings.xml",
-                dir!(
-                    RESEARCH_WORKSPACE_PATH,
-                    ZEROSIM_BENCHMARKS_DIR,
-                    ZEROSIM_HADOOP_PATH
-                )
-            ),
-            cmd!("sed -i 's/PROXY_ADDRESS/{}' .m2/settings.xml", address),
-            cmd!("sed -i 's/PROXY_PORT/{}' .m2/settings.xml", port),
-        }
+    // user
+    with_shell! { ushell =>
+        cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+        cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+        cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+        cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
 
-        // root
-        with_shell! { vrshell =>
-            cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
-            cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
-            cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
-            cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
-        }
-
-        // proxy
-        vrshell
-            .run(cmd!("echo proxy=https://{} | tee --append /etc/yum.conf", proxy).use_bash())?;
-
-        // need to restart shell to get new env
-        vrshell = connect_to_vagrant_as_root(&cfg.login.host)?;
-        vushell = connect_to_vagrant_as_user(&cfg.login.host)?;
+        // Setup proxying for maven
+        cmd!("mkdir -p .m2"),
+        cmd!("cp {}/mvn-settings.xml .m2/settings.xml",
+            dir!(
+                RESEARCH_WORKSPACE_PATH,
+                ZEROSIM_BENCHMARKS_DIR,
+                ZEROSIM_HADOOP_PATH
+            )
+        ),
+        cmd!("sed -i 's/PROXY_ADDRESS/{}/' .m2/settings.xml", address),
+        cmd!("sed -i 's/PROXY_PORT/{}/' .m2/settings.xml", port),
     }
 
-    Ok((vrshell, vushell))
+    // root
+    with_shell! { rshell =>
+        cmd!("echo export http_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+        cmd!("echo export https_proxy='{}' | tee --append .bashrc", proxy).use_bash(),
+        cmd!("echo export HTTP_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+        cmd!("echo export HTTPS_PROXY='{}' | tee --append .bashrc", proxy).use_bash(),
+    }
+
+    // proxy
+    rshell.run(cmd!("echo proxy=https://{} | tee --append /etc/yum.conf", proxy).use_bash())?;
+
+    // need to restart shell to get new env
+    let rshell = connect_to_vagrant_as_root(&cfg.login.host)?;
+    let ushell = connect_to_vagrant_as_user(&cfg.login.host)?;
+
+    Ok((rshell, ushell))
 }
 
 fn install_guest_dependencies(
