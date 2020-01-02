@@ -609,12 +609,16 @@ pub fn build_kernel(
 
 /// Something that may be done to a service.
 pub enum ServiceAction {
+    /// Start the service if it is not active. Otherwise, do nothing.
     Start,
-    #[allow(dead_code)]
+    /// Stop the service if it is active. Otherwise, do nothing.
     Stop,
+    /// Restart the service, or start it if it is not active. Requires that the service exist.
     Restart,
+    /// Disable and stop the service if it is active. Otherwise, do nothing.
     Disable,
     #[allow(dead_code)]
+    /// Enable the service, but do not start it. Requires that the service exist.
     Enable,
 }
 
@@ -624,21 +628,33 @@ pub fn service(
     service: &str,
     action: ServiceAction,
 ) -> Result<(), failure::Error> {
+    let is_active = service_is_active(shell, service)?;
+
     match action {
         ServiceAction::Restart => {
-            shell.run(cmd!("sudo service {} restart", service))?;
+            if is_active {
+                shell.run(cmd!("sudo systemctl restart {}", service))?;
+            } else {
+                shell.run(cmd!("sudo systemctl start {}", service))?;
+            }
         }
         ServiceAction::Start => {
-            shell.run(cmd!("sudo service {} start", service))?;
+            if !is_active {
+                shell.run(cmd!("sudo systemctl start {}", service))?;
+            }
         }
         ServiceAction::Stop => {
-            shell.run(cmd!("sudo service {} stop", service))?;
+            if is_active {
+                shell.run(cmd!("sudo systemctl stop {}", service))?;
+            }
         }
         ServiceAction::Enable => {
             shell.run(cmd!("sudo systemctl enable {}", service))?;
         }
         ServiceAction::Disable => {
-            shell.run(cmd!("sudo systemctl disable {}", service))?;
+            if is_active {
+                shell.run(cmd!("sudo systemctl disable --now {}", service))?;
+            }
         }
     }
 
@@ -646,8 +662,8 @@ pub fn service(
 }
 
 /// Returns true if the given service is running.
-pub fn service_is_running(shell: &SshShell, service: &str) -> Result<bool, failure::Error> {
-    Ok(shell.run(cmd!("systemctl status {}", service)).is_ok())
+pub fn service_is_active(shell: &SshShell, service: &str) -> Result<bool, failure::Error> {
+    Ok(shell.run(cmd!("systemctl is-active {}", service)).is_ok())
 }
 
 /// Set up passphraseless SSH to localhost.

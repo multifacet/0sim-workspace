@@ -6,7 +6,7 @@ use spurs::{cmd, Execute, SshError, SshShell};
 
 use super::paths::*;
 
-pub use super::Login;
+pub use super::{Login, ServiceAction};
 
 /// The port that vagrant VMs forward from.
 pub const VAGRANT_PORT: u16 = 5555;
@@ -199,12 +199,8 @@ pub fn turn_on_zswap(shell: &mut SshShell) -> Result<(), failure::Error> {
     )?;
 
     // KSM is also not working right
-    if crate::common::service_is_running(shell, "ksm")? {
-        shell.run(cmd!("sudo systemctl disable ksm"))?;
-    }
-    if crate::common::service_is_running(shell, "ksmtuned")? {
-        shell.run(cmd!("sudo systemctl disable ksmtuned"))?;
-    }
+    crate::common::service(shell, "ksm", ServiceAction::Disable)?;
+    crate::common::service(shell, "ksmtuned", ServiceAction::Disable)?;
 
     shell.run(cmd!("echo ztier | sudo tee /sys/module/zswap/parameters/zpool").use_bash())?;
     shell.run(cmd!("echo y | sudo tee /sys/module/zswap/parameters/enabled").use_bash())?;
@@ -260,18 +256,13 @@ pub fn start_vagrant<A: std::net::ToSocketAddrs + std::fmt::Display>(
     skip_halt: bool,
     lapic_adjust: bool,
 ) -> Result<SshShell, failure::Error> {
-    shell.run(cmd!("sudo systemctl stop firewalld"))?;
-    shell.run(cmd!("sudo systemctl stop nfs-idmap.service"))?;
-    shell.run(cmd!("sudo systemctl start nfs-idmap.service"))?;
-    shell.run(cmd!("sudo service libvirtd restart"))?;
+    crate::common::service(shell, "firewalld", ServiceAction::Stop)?;
+    crate::common::service(shell, "nfs-idmap", ServiceAction::Restart)?;
+    crate::common::service(shell, "libvirtd", ServiceAction::Restart)?;
 
     // Disable KSM because it creates a lot of overhead when the host is oversubscribed
-    if crate::common::service_is_running(shell, "ksm")? {
-        shell.run(cmd!("sudo systemctl disable ksm"))?;
-    }
-    if crate::common::service_is_running(shell, "ksmtuned")? {
-        shell.run(cmd!("sudo systemctl disable ksmtuned"))?;
-    }
+    crate::common::service(shell, "ksm", ServiceAction::Disable)?;
+    crate::common::service(shell, "ksmtuned", ServiceAction::Disable)?;
 
     gen_vagrantfile(shell, memgb, cores)?;
 
