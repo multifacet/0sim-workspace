@@ -391,6 +391,24 @@ We will collect common issues here as they are reported...
     - Solution: You need a large physical storage device to back the
       thin-provisioned device mapper device.
 
+- `swapon: /dev/sdk: read swap header failed: Invalid argument` or similar
+  on a machine with many storage devices.
+    - Causes: often the devices will move around and get different names after
+      a reboot. This means that if you configured (via `setup00000`) 0sim to
+      use a particular device (say `/dev/sdk`) for swap space, it might fail
+      after a reboot.
+    - Solution: the UUID of a device will not change after a reboot. Linux
+      provides a way to refer to devices by their UUID instead of their name:
+      `/dev/disk/by-uuid/{UUID}`. You can find the UUID of a device with the
+      `blkid` command. Then, you can use the `--swap` argument to `setup00000`
+      to set up that device by UUID:
+
+      ```console
+      --swap disk/by-uuid/{UUID}
+      ```
+
+      where `{UUID}` is replaced by the UUID of your device from the `blkid` command.
+
 # Known Issues
 
 There are some issues of which we are aware but do not have a good solution.
