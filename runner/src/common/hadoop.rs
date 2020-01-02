@@ -54,6 +54,7 @@ where
     Ok(())
 }
 
+#[allow(dead_code)]
 /// Start Spark master and worker on the given machine. The shell should not be a root shell.
 pub fn start_spark<P: AsRef<Path>>(shell: &SshShell, spark_home: &P) -> Result<(), failure::Error> {
     shell.run(cmd!(
@@ -69,6 +70,7 @@ pub fn start_spark<P: AsRef<Path>>(shell: &SshShell, spark_home: &P) -> Result<(
     Ok(())
 }
 
+#[allow(dead_code)]
 /// Stop spark running on this machine.
 pub fn stop_spark<P: AsRef<Path>>(shell: &SshShell, spark_home: &P) -> Result<(), failure::Error> {
     shell.run(cmd!(
