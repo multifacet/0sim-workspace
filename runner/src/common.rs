@@ -262,8 +262,16 @@ pub fn local_research_workspace_git_hash() -> Result<String, failure::Error> {
 
 /// Get the path of the user's home directory.
 pub fn get_user_home_dir(ushell: &SshShell) -> Result<String, failure::Error> {
-    let user_home = ushell.run(cmd!("echo $HOME").use_bash())?;
-    Ok(user_home.stdout.trim().to_owned())
+    let user_home = ushell
+        .run(cmd!("echo $HOME").use_bash())?
+        .stdout
+        .trim()
+        .to_owned();
+    if user_home.is_empty() {
+        Err(failure::format_err!("$HOME is empty"))
+    } else {
+        Ok(user_home)
+    }
 }
 
 /// There are some settings that are per-machine, rather than per-experiment (e.g. which devices to
