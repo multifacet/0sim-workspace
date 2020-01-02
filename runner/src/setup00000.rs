@@ -396,6 +396,7 @@ where
             "wget",
             "libevent",
             "libevent-devel",
+            "firewalld",
         ]),
 
         // Add user to libvirt group after installing
