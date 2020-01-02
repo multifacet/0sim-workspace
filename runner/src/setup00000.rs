@@ -824,11 +824,11 @@ where
 
 /// Destroys any existing VM forcibly.
 fn destroy_vm(ushell: &SshShell) -> Result<(), failure::Error> {
-    // Create the VM and add our ssh key to it.
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
     with_shell! { ushell in vagrant_path =>
         cmd!("vagrant halt --force || [ ! -e Vagrantfile ]").use_bash(),
+        cmd!("sudo virsh net-undefine vagrant-libvirt || [ ! -e Vagrantfile ]").use_bash(),
         cmd!("vagrant destroy --force || [ ! -e Vagrantfile ]").use_bash(),
     }
 
