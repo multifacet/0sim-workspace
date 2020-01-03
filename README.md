@@ -397,17 +397,14 @@ We will collect common issues here as they are reported...
       a reboot. This means that if you configured (via `setup00000`) 0sim to
       use a particular device (say `/dev/sdk`) for swap space, it might fail
       after a reboot.
-    - Solution: the UUID of a device will not change after a reboot. Linux
-      provides a way to refer to devices by their UUID instead of their name:
-      `/dev/disk/by-uuid/{UUID}`. You can find the UUID of a device with the
-      `blkid` command. Then, you can use the `--swap` argument to `setup00000`
-      to set up that device by UUID:
+    - Solution: pass the `--unstable_device_names` flag to `setup00000` along
+      with your other arguments. For example:
 
       ```console
-      --swap disk/by-uuid/{UUID}
+      --swap sda sdh sdi --unstable_device_names
       ```
 
-      where `{UUID}` is replaced by the UUID of your device from the `blkid` command.
+      This will cause setup to use device-id based paths, which are stable.
 
 # Known Issues
 
