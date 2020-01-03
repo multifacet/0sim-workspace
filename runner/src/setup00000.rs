@@ -47,14 +47,14 @@ pub fn cli_options() -> clap::App<'static, 'static> {
 
         (@arg HOME_DEVICE: +takes_value --home_device
          "(Optional) the device to format and use as a home directory \
-         (e.g. --home_device /dev/sda)")
+         (e.g. --home_device /dev/sda). The device should _not_ already be mounted.")
 
         (@arg MAPPER_DEVICE: +takes_value --mapper_device conflicts_with[SWAP_DEVS]
          "(Optional) the device to use with device mapper as a thinly-provisioned \
-         swap space (e.g. --mapper_device /dev/sda)")
+         swap space (e.g. --mapper_device /dev/sda). The device should _not_ already be mounted.")
         (@arg SWAP_DEVS: +takes_value --swap ... conflicts_with[MAPPER_DEVICE]
          "(Optional) specify which devices to use as swap devices. The devices must \
-          all be unmounted. By default all unpartitioned, unmounted devices are used \
+          all be _unmounted_. By default all unpartitioned, unmounted devices are used \
           (e.g. --swap sda sdb sdc).")
 
         (@arg UNSTABLE_DEVICE_NAMES: --unstable_device_names
