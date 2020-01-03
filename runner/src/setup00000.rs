@@ -57,6 +57,12 @@ pub fn cli_options() -> clap::App<'static, 'static> {
           all be unmounted. By default all unpartitioned, unmounted devices are used \
           (e.g. --swap sda sdb sdc).")
 
+        (@arg UNSTABLE_DEVICE_NAMES: --unstable_device_names
+         "(Optional) specifies that device names may change across a reboot \
+          (e.g. /dev/sda might be /dev/sdb after a reboot). In this case, the device \
+          names used in other arguments will be converted to stable names based on device ids."
+        )
+
         (@arg CLONE_WKSPC: --clone_wkspc
          "(Optional) If passed, clone the workspace on the remote (or update if already cloned \
          using the git access method in src/common.rs. If the method uses HTTPS to access a \
@@ -114,7 +120,9 @@ where
     /// Set the device to be used with device mapper.
     mapper_device: Option<&'a str>,
     /// Set the devices to be used
-    swap_devs: Option<Vec<&'a str>>,
+    swap_devices: Option<Vec<&'a str>>,
+    /// Device names are unstable and should be converted to UUIDs.
+    unstable_names: bool,
 
     /// Should we clone/update the workspace?
     clone_wkspc: bool,
@@ -161,7 +169,8 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
 
     let home_device = sub_m.value_of("HOME_DEVICE");
     let mapper_device = sub_m.value_of("MAPPER_DEVICE");
-    let swap_devs = sub_m.values_of("SWAP_DEVS").map(|i| i.collect());
+    let swap_devices = sub_m.values_of("SWAP_DEVS").map(|i| i.collect());
+    let unstable_names = sub_m.is_present("UNSTABLE_DEVICE_NAMES");
 
     let clone_wkspc = sub_m.is_present("CLONE_WKSPC");
     let secret = sub_m.value_of("SECRET");
@@ -189,7 +198,8 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         host_dep,
         home_device,
         mapper_device,
-        swap_devs,
+        swap_devices,
+        unstable_names,
         git_branch,
         clone_wkspc,
         secret,
@@ -213,7 +223,7 @@ fn validate_options<A>(cfg: &SetupConfig<'_, A>) -> Result<(), failure::Error>
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    assert!(cfg.mapper_device.is_none() || cfg.swap_devs.is_none());
+    assert!(cfg.mapper_device.is_none() || cfg.swap_devices.is_none());
 
     Ok(())
 }
@@ -231,7 +241,7 @@ where
         rename_poweroff(&ushell)?;
         install_host_dependencies(&mut ushell, &cfg)?;
     }
-    set_up_host_devices(&ushell, &cfg)?;
+    set_up_host_devices(&ushell, &cfg)?; // TODO
     clone_research_workspace(&ushell, &cfg)?;
     install_host_kernel(&ushell, &cfg)?;
 
@@ -471,6 +481,8 @@ fn set_up_host_devices<A>(ushell: &SshShell, cfg: &SetupConfig<'_, A>) -> Result
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
+    use crate::common::get_device_id;
+
     let user_home = &get_user_home_dir(&ushell)?;
 
     if let Some(device) = cfg.home_device {
@@ -478,6 +490,8 @@ where
         // - format the device and create a partition
         // - mkfs on the partition
         // - copy data to new partition and mount as home dir
+        //
+        // This already handles unstable names properly, so no need to bother here.
         ushell.run(spurs_util::write_gpt(device))?;
         ushell.run(spurs_util::create_partition(device))?;
         spurs_util::format_partition_as_ext4(
@@ -496,15 +510,24 @@ where
 
         const DM_META_FILE: &str = "dm.meta";
 
+        // Convert name if needed
+        let mapper_device = if cfg.unstable_names {
+            let mapper_device_name_only = mapper_device.replace("/dev/", "");
+            let dev_id = get_device_id(ushell, &mapper_device_name_only)?;
+            dir!("/dev/disk/by-id/", dev_id)
+        } else {
+            mapper_device.into()
+        };
+
         // create a 1GB zeroed file to be mounted as a loopback device for use as metadata dev for thin pool
         ushell.run(cmd!("sudo fallocate -z -l 1073741824 {}", DM_META_FILE))?;
 
-        create_thin_swap(&ushell, DM_META_FILE, mapper_device)?;
+        create_thin_swap(&ushell, DM_META_FILE, &mapper_device)?;
 
         // Save so that we can mount on reboot.
         crate::common::set_remote_research_setting(&ushell, "dm-meta", DM_META_FILE)?;
         crate::common::set_remote_research_setting(&ushell, "dm-data", mapper_device)?;
-    } else if let Some(swap_devs) = &cfg.swap_devs {
+    } else if let Some(swap_devs) = &cfg.swap_devices {
         if swap_devs.is_empty() {
             let unpartitioned =
                 spurs_util::get_unpartitioned_devs(ushell, /* dry_run */ false)?;
@@ -512,11 +535,21 @@ where
                 ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
             }
         } else {
+            let mut swap_devices = Vec::new();
             for dev in swap_devs.iter() {
+                let dev = if cfg.unstable_names {
+                    let dev_id = get_device_id(ushell, dev)?;
+                    dir!("disk/by-id/", dev_id)
+                } else {
+                    (*dev).to_owned()
+                };
+
                 ushell.run(cmd!("sudo mkswap /dev/{}", dev))?;
+
+                swap_devices.push(dev);
             }
 
-            crate::common::set_remote_research_setting(&ushell, "swap-devices", &cfg.swap_devs)?;
+            crate::common::set_remote_research_setting(&ushell, "swap-devices", &swap_devices)?;
         }
     }
 
@@ -776,7 +809,7 @@ where
 {
     let user_home = &get_user_home_dir(&ushell)?;
 
-    // Configure libvirt to store images on the home device.
+    // Configure libvirt to store images in the home directory.
     ushell.run(cmd!("mkdir -p images/"))?;
     ushell.run(cmd!("chmod +x ."))?;
     ushell.run(cmd!("chmod +x images/"))?;

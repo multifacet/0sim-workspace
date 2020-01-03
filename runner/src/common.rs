@@ -694,3 +694,30 @@ pub fn setup_passphraseless_local_ssh(ushell: &SshShell) -> Result<(), failure::
 
     Ok(())
 }
+
+/// Returns the device id from `/dev/disk/by-id/` of the given device. `dev_name` should _exclude_
+/// the `/dev/` (e.g. `sda`).
+pub fn get_device_id(shell: &SshShell, dev_name: &str) -> Result<String, failure::Error> {
+    let out = shell.run(
+        cmd!(
+            r#"ls -lah /dev/disk/by-id/ | \
+            sort -k 11 | \
+            awk '{{print $11 "\t" $9}}' | \
+            grep {} | \
+            head -n 1 | \
+            awk '{{print $2}}'"#,
+            dev_name
+        )
+        .use_bash(),
+    )?;
+    let name = out.stdout.trim().to_owned();
+
+    if name.is_empty() {
+        Err(failure::format_err!(
+            "Unable to find device by ID: {}",
+            dev_name
+        ))
+    } else {
+        Ok(name)
+    }
+}
