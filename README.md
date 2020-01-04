@@ -422,3 +422,69 @@ There are some issues of which we are aware but do not have a good solution.
     - Cause: We believe this is a KVM bug but are not 100% sure. The fact that
       1024-1027GB machines boot and run indicates that this is not a hardware
       limitation.
+
+# List of `runner` Experiments
+
+The `runner` has a bunch of subcommands (see `./runner help`) to do different
+setup routines and run different experiments from our paper. Each one has a
+submodule in the `runner` source code and command line option. This section
+contains a list of the current set of sucommands and what each one does. Please
+see the source code and the `./runner help` messages for more info.
+
+Setup routines:
+
+- `setup00000`: The main setup routine that installs 0sim.
+- `setup00001`: Auxilliary setup routine that builds and installs a kernel in a
+  virtual machine.
+
+Experiments:
+
+- `exp00000`: Runs one of the following workloads in simulation:
+    - A single-threaded memcached client that does insertions on a memcached
+      server on the same host.
+    - A microbenchmark that mmaps and touches pages linearly in memory.
+    - A microbenchmark that mmaps pages and writes a incrementing counter to
+      each page.
+    - A single-threaded redis client that does insertions on a redis server on
+      the same host.
+    - The Metis in-memory MR workload doing a matrix multiplication (this one
+      tends to crash for large workloads).
+
+- `exp00002`: Runs one of the following microbenchmarks (in simulation) that
+  evaluates 0sim's TSC offsetting mechansim:
+    - A workload that executes `rdtsc` repeatedly.
+    - A workload that produces either very local memory accesses or one with
+      very poor temporal and spatial locality.
+
+- `exp00003`: Runs a memcached workload in simulation the presence of intense
+  kernel compaction activity. This requires `setup00001` with the
+  `markm_instrumented` branch.
+
+- `exp00004`: Similar to `exp00003` but runs on bare-metal and intended as a
+  comparison baseline. This requires `setup00000` run with the
+  `markm_instrumented` branch.
+
+- `exp00005`: Runs NAS CG class E in simulation and collects compressibility
+  statistics.
+
+- `exp00006`: Boot the kernel in simulation and collect metrics from struct
+  page initiailization. This requires `setup00001` be run with branch
+  `markm_instrument_ktask` or `markm_instrumented`.
+
+- `exp00007`: Runs one of a few workloads in simulation and collects
+  `/proc/buddyinfo` periodically.
+
+- `exp00008`: Runs one of a few workloads in simulation and collects infomation
+  about direct and indirect reclamation. This requires `setup00001` be run with
+  branch `markm_instrumented`.
+
+- `exp00009`: Runs either a microbenchmark or memcached in simulation while
+  running a kernel build on the host. This is intended as a test for 0sim's TSC
+  offsetting mechansim.
+
+- `exp00010`: Runs one of a few workloads on bare-metal; intended as a
+  comparison baseline.
+
+- `exptmp`: A perpetually unstable experiment where I play around with trying
+  to get things to work. Having a separate name makes it easier to not
+  accidentally use the results for anything.
