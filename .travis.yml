@@ -13,7 +13,7 @@ install:
 - source ~/.cargo/env || true
 - bash -x ./doc/ci-install.sh
 script:
-- cd docs; mdbook build
+- cd doc; mdbook build
 notifications:
   email:
     on_success: never
