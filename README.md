@@ -8,7 +8,7 @@ use the tooling we have built around it, which is contained in this repository.
 This README documents some basic workflow and features for the use of this
 tooling and of 0sim.
 
-[Jump to Getting Started](#getting-started)
+[Read the Getting Started Guide](https://multifacet.github.io/0sim-workspace)
 
 ## What is 0sim?
 
@@ -55,14 +55,7 @@ Mark Mansi and Michael M. Swift. _0sim: Preparing System Software for a World wi
 - `0sim-trace` is a git submodule that contains the tracer.
     - [Here is a link to the repo](https://github.com/multifacet/0sim-trace)
 
-## Licensing
-
-0sim itself is implemented as a modified Linux kernel, so it maintains the GPL
-license of the Linux kernel.
-
-The tools in this repository are licensed under the Apache v2 open-source license.
-
-# List of `runner` Experiments
+## List of `runner` Experiments
 
 The `runner` has a bunch of subcommands (see `./runner help`) to do different
 setup routines and run different experiments from our paper. Each one has a
@@ -128,3 +121,10 @@ Experiments:
 - `exptmp`: A perpetually unstable experiment where I play around with trying
   to get things to work. Having a separate name makes it easier to not
   accidentally use the results for anything.
+
+## Licensing
+
+0sim itself is implemented as a modified Linux kernel, so it maintains the GPL
+license of the Linux kernel.
+
+The tools in this repository are licensed under the Apache v2 open-source license.
