@@ -66,4 +66,5 @@ There are some issues of which we are aware but do not have a good solution.
       sort of hardware timeout when KVM emulates devices during boot, but we
       are not really sure.
     - Disabling TSC offsetting during target boot can solve this in some cases.
-
+    - In some cases, running with 1023GB instead of >=1024GB resolves the
+      issue. This seems like a KVM bug.
