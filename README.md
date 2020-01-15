@@ -426,6 +426,12 @@ There are some issues of which we are aware but do not have a good solution.
       1024-1027GB machines boot and run indicates that this is not a hardware
       limitation.
 
+- Unable to boot large multicore target.
+    - Cause: This also happens with stock KVM. We suspect this is due to some
+      sort of hardware timeout when KVM emulates devices during boot, but we
+      are not really sure.
+    - Disabling TSC offsetting during target boot can solve this in some cases.
+
 # List of `runner` Experiments
 
 The `runner` has a bunch of subcommands (see `./runner help`) to do different
