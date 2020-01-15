@@ -1,0 +1,23 @@
+language: rust
+rust:
+- stable
+cache:
+- cargo
+- directories:
+  - book/linkcheck/
+before_install:
+- shopt -s globstar
+install:
+- source ~/.cargo/env || true
+- bash -x ./doc/ci-install.sh
+script:
+- mdbook build
+notifications:
+  email:
+    on_success: never
+deploy:
+  provider: pages
+  skip-cleanup: true
+  github-token: $GITHUB_TOKEN
+  local-dir: doc/book/html
+  target_branch: gh-pages
