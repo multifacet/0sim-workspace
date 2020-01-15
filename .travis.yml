@@ -2,7 +2,7 @@ language: rust
 rust:
 - stable
 git:
-- submodules: false
+  submodules: false
 cache:
 - cargo
 - directories:
