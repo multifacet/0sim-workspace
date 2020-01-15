@@ -8,7 +8,8 @@ use the tooling we have built around it, which is contained in this repository.
 This README documents some basic workflow and features for the use of this
 tooling and of 0sim.
 
-[Read the Getting Started Guide](https://multifacet.github.io/0sim-workspace)
+[Read the 0sim User Guide](https://multifacet.github.io/0sim-workspace)
+    - [Getting Started](https://multifacet.github.io/0sim-workspace/getting-started.html)
 
 ## What is 0sim?
 
