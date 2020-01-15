@@ -68,3 +68,12 @@ There are some issues of which we are aware but do not have a good solution.
     - Disabling TSC offsetting during target boot can solve this in some cases.
     - In some cases, running with 1023GB instead of >=1024GB resolves the
       issue. This seems like a KVM bug.
+
+- Hanging/Unresponsive Remote. Occasionally, the simulation platform becomes
+  unresponsive. It is ok to forcibly reset the remote, even if the machine is
+  booted.
+    - This may cause the target's VM image to become corrupted. The image can
+      be recreated by rerunning the appropriate `setup*` `runner` subcommands.
+      Note that a subset of flags can be passed to `setup00000` (e.g. one does
+      not need to keep passing `--host_kernel`). The `--DESTROY_EXISTING` flag
+      will destroy any existing target VM.
