@@ -52,7 +52,10 @@ interact directly with 0sim. Instead, we drive it using the tools in this
 repository: `runner` and `jobserver`.
 
 - `runner`: executes commands on the remote machine in 0sim. `runner` takes
-  care of reproducible setup and execution. It also saves a ton of time.
+  care of reproducible setup and execution. It also saves a ton of time. In
+  general, `runner` has two types of subcommands:
+    - `setup*` commands do setup/configuration work.
+    - `exp*` command runs experiments.
 
 - `jobserver`: makes it easy to run a large number of experiments on one or
   more machines with possibly different parameters, collecting the results and
@@ -431,7 +434,8 @@ submodule in the `runner` source code and command line option. This section
 contains a list of the current set of sucommands and what each one does. Please
 see the source code and the `./runner help` messages for more info.
 
-Setup routines:
+Setup routines do setup/configuration tasks. They do not run any experiments,
+but are required to run before experiments can run.
 
 - `setup00000`: The main setup routine that installs 0sim.
 - `setup00001`: Auxilliary setup routine that builds and installs a kernel in a
