@@ -445,6 +445,7 @@ pub enum KernelSrc {
     Git {
         repo_path: String,
         git_branch: String,
+        is_tag: bool,
     },
 
     /// The given tarball, which will be untarred and built as is. We assume that the name of the
@@ -500,9 +501,13 @@ pub fn build_kernel(
         KernelSrc::Git {
             repo_path,
             git_branch,
+            is_tag,
         } => {
             ushell.run(cmd!("git checkout {}", git_branch).cwd(&repo_path))?;
-            ushell.run(cmd!("git pull").cwd(&repo_path))?;
+
+            if !is_tag {
+                ushell.run(cmd!("git pull").cwd(&repo_path))?;
+            }
 
             get_absolute_path(ushell, &repo_path)?
         }

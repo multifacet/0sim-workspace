@@ -83,6 +83,7 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         KernelSrc::Git {
             repo_path: kernel_path.clone(),
             git_branch: git_branch.into(),
+            is_tag: false,
         },
         KernelConfig {
             base_config: KernelBaseConfigSource::Path(dir!(
