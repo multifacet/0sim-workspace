@@ -53,7 +53,7 @@ fn run() -> Result<(), failure::Error> {
         .subcommand(exp00008::cli_options())
         .subcommand(exp00009::cli_options())
         .subcommand(exp00010::cli_options())
-        .setting(clap::AppSettings::SubcommandRequired)
+        .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .setting(clap::AppSettings::DisableVersion)
         .get_matches();
 
@@ -96,8 +96,7 @@ fn main() {
 
     // If an error occurred, try to print something helpful.
     if let Err(err) = run() {
-        const MESSAGE: &str =
-r#"== ERROR ==================================================================================
+        const MESSAGE: &str = r#"== ERROR ==================================================================================
 `runner` encountered an error. The command log above may offer clues. If the error pertains to SSH,
 you may be able to get useful information by setting the RUST_LOG=debug environment variable. It is
 recommended that you use `debug` builds of `runner`, rather than `release`, as the performance of

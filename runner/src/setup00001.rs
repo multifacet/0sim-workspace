@@ -50,11 +50,6 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let user_home = &get_user_home_dir(&ushell)?;
     let kernel_path = &dir!(user_home, RESEARCH_WORKSPACE_PATH, ZEROSIM_KERNEL_SUBMODULE);
 
-    ushell.run(cmd!("git checkout {}", git_branch).cwd(kernel_path))?;
-
-    // Make sure we are running the latest version... sigh... made this mistake enough...
-    ushell.run(cmd!("git pull").cwd(kernel_path))?;
-
     const CONFIG_SET: &[(&str, bool)] = &[
         // Enable my changes, though we don't expect to use them in the guest much.
         ("CONFIG_ZSWAP", true),
