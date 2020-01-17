@@ -588,7 +588,8 @@ pub fn build_kernel(
         KernelPkgType::Rpm => "binrpm-pkg",
     };
 
-    ushell.run(
+    // Sometimes there is an error the first time. If so, retrying usually works.
+    let res = ushell.run(
         cmd!(
             "yes '' | make -j {} {} {}",
             nprocess,
@@ -599,22 +600,23 @@ pub fn build_kernel(
                 "".into()
             }
         )
-        .cwd(kbuild_path)
-        .allow_error(),
-    )?;
-    ushell.run(
-        cmd!(
-            "make -j {} {} {}",
-            nprocess,
-            make_target,
-            if let Some(kernel_local_version) = kernel_local_version {
-                format!("LOCALVERSION=-{}", kernel_local_version)
-            } else {
-                "".into()
-            }
-        )
         .cwd(kbuild_path),
-    )?;
+    );
+    if let Err(..) = res {
+        ushell.run(
+            cmd!(
+                "make -j {} {} {}",
+                nprocess,
+                make_target,
+                if let Some(kernel_local_version) = kernel_local_version {
+                    format!("LOCALVERSION=-{}", kernel_local_version)
+                } else {
+                    "".into()
+                }
+            )
+            .cwd(kbuild_path),
+        )?;
+    }
 
     Ok(())
 }
