@@ -64,9 +64,11 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          (ignored for memcached).")
         (@arg SIZE: -s --size +takes_value {is_usize}
          "The number of GBs of the workload (e.g. 500)")
-        (@arg DRIFT_THRESHOLD: --drift_thresh +takes_value {is_usize}
+        (@arg MULTICORE_OFFSETTING: --multicore_offsetting
+         "(Optional) Enable multicore offsetting for greater accuracy at a performance cost")
+        (@arg DRIFT_THRESHOLD: --drift_thresh +takes_value {is_usize} requires[MULTICORE_OFFSETTING]
          "(Optional) Set multicore offsetting drift threshold.")
-        (@arg DELAY: --delay +takes_value {is_usize}
+        (@arg DELAY: --delay +takes_value {is_usize} requires[MULTICORE_OFFSETTING]
          "(Optional) Set multicore offsetting delay.")
         (@arg DISABLE_ZSWAP: --disable_zswap
          "(Optional; not recommended) Disable zswap, forcing the hypervisor to \
@@ -123,6 +125,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
 
     let disable_zswap = sub_m.is_present("DISABLE_ZSWAP");
 
+    let multicore_offsetting = sub_m.is_present("MULTICORE_OFFSETTING");
+
     let ushell = SshShell::with_default_key(login.username, login.host)?;
     let local_git_hash = crate::common::local_research_workspace_git_hash()?;
     let remote_git_hash = crate::common::research_workspace_git_hash(&ushell)?;
@@ -143,6 +147,8 @@ pub fn run(print_results_path: bool, sub_m: &clap::ArgMatches<'_>) -> Result<(),
         warmup: warmup,
 
         (disable_zswap) disable_zswap: disable_zswap,
+
+        (multicore_offsetting) multicore_offsetting: multicore_offsetting,
 
         zswap_max_pool_percent: 50,
         (zerosim_drift_threshold.is_some()) zerosim_drift_threshold: zerosim_drift_threshold,
@@ -183,6 +189,7 @@ where
     let zerosim_drift_threshold = settings.get::<Option<usize>>("zerosim_drift_threshold");
     let zerosim_delay = settings.get::<Option<usize>>("zerosim_delay");
     let disable_zswap = settings.get::<bool>("disable_zswap");
+    let multicore_offsetting = settings.get::<bool>("multicore_offsetting");
 
     // Reboot
     initial_reboot(&login)?;
@@ -216,13 +223,17 @@ where
     // Environment
     if !disable_zswap {
         ZeroSim::turn_on_zswap(&mut ushell)?;
+    }
 
-        if let Some(threshold) = zerosim_drift_threshold {
-            ZeroSim::threshold(&ushell, threshold)?;
-        }
-        if let Some(delay) = zerosim_delay {
-            ZeroSim::delay(&ushell, delay)?;
-        }
+    if let Some(threshold) = zerosim_drift_threshold {
+        ZeroSim::threshold(&ushell, threshold)?;
+    }
+    if let Some(delay) = zerosim_delay {
+        ZeroSim::delay(&ushell, delay)?;
+    }
+    ZeroSim::multicore_offsetting(&ushell, multicore_offsetting)?;
+    if multicore_offsetting {
+        ZeroSim::sync_guest_tsc(&ushell)?;
     }
 
     ZeroSim::zswap_max_pool_percent(&ushell, zswap_max_pool_percent)?;
