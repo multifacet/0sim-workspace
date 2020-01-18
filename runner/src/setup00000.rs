@@ -296,7 +296,7 @@ where
     };
 
     // Disable TSC offsetting for performance
-    set_tsc_offsetting(&ushell, false)?;
+    ZeroSim::tsc_offsetting(&ushell, false)?;
 
     install_guest_dependencies(&vrshell, &vushell)?;
 
@@ -838,7 +838,7 @@ where
     spurs_util::reboot(ushell, /* dry_run */ false)?;
 
     // Disable TSC offsetting so that setup runs faster
-    set_tsc_offsetting(&ushell, false)?;
+    ZeroSim::tsc_offsetting(&ushell, false)?;
 
     // Disable firewalld if it is running because it causes VM issues. When we do that, we need to
     // reastart libvirtd.
@@ -888,8 +888,8 @@ where
     gen_vagrantfile(&ushell, 20, 1)?;
 
     // Make sure to turn off skip_halt and lapic_adjust
-    ushell.run(cmd!("echo 0 | sudo tee /proc/zerosim_skip_halt"))?;
-    ushell.run(cmd!("echo 0 | sudo tee /proc/zerosim_lapic_adjust"))?;
+    ZeroSim::skip_halt(&ushell, false)?;
+    ZeroSim::lapic_adjust(&ushell, false)?;
 
     ushell.run(cmd!("vagrant halt").cwd(vagrant_path))?;
     ushell.run(cmd!("vagrant up").cwd(vagrant_path))?; // This creates the VM
@@ -958,7 +958,7 @@ where
     }
 
     // Keep tsc offsetting off (it may be turned on by start_vagrant).
-    set_tsc_offsetting(&ushell, false)?;
+    ZeroSim::tsc_offsetting(&ushell, false)?;
 
     Ok((vrshell, vushell))
 }

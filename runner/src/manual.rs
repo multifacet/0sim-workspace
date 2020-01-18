@@ -11,9 +11,9 @@ use spurs::{cmd, Execute, SshShell};
 
 use crate::common::{
     exp_0sim::{
-        initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, set_zerosim_delay,
-        set_zerosim_threshold, setup_swapping, start_vagrant, turn_on_ssdswap, turn_on_zswap,
-        VAGRANT_CORES, VAGRANT_MEM, ZEROSIM_LAPIC_ADJUST, ZEROSIM_SKIP_HALT,
+        initial_reboot, set_kernel_printk_level, set_perf_scaling_gov, setup_swapping,
+        start_vagrant, turn_on_ssdswap, ZeroSim, VAGRANT_CORES, VAGRANT_MEM, ZEROSIM_LAPIC_ADJUST,
+        ZEROSIM_SKIP_HALT,
     },
     paths::*,
     Login,
@@ -55,9 +55,9 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         (@arg ZSWAP: --zswap +takes_value {is_usize}
          "(Optional) Turn on zswap with the given `max_pool_percent`")
         (@arg DRIFT_THRESHOLD: --drift_thresh +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_drift_threshold")
+         "(Optional) Set multicore offsetting drift threshold.")
         (@arg DELAY: --delay +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_delay")
+         "(Optional) Set multicore offsetting delay.")
         (@arg DISABLE_EPT: --disable_ept
          "(Optional) may need to disable Intel EPT on machines that don't have enough physical bits.")
         (@arg UPDATE_EXP: --update_exp
@@ -173,23 +173,16 @@ pub fn run(sub_m: &ArgMatches<'_>) -> Result<(), failure::Error> {
 
     // Turn on zswap
     if let Some(max_pool_percent) = zswap {
-        turn_on_zswap(&mut ushell)?;
-
-        ushell.run(
-            cmd!(
-                "echo {} | sudo tee /sys/module/zswap/parameters/max_pool_percent",
-                max_pool_percent
-            )
-            .use_bash(),
-        )?;
+        ZeroSim::turn_on_zswap(&mut ushell)?;
+        ZeroSim::zswap_max_pool_percent(&ushell, max_pool_percent)?;
     }
 
     // Set D and delta
     if let Some(zerosim_drift_threshold) = zerosim_drift_threshold {
-        set_zerosim_threshold(&ushell, zerosim_drift_threshold)?;
+        ZeroSim::threshold(&ushell, zerosim_drift_threshold)?;
     }
     if let Some(zerosim_delay) = zerosim_delay {
-        set_zerosim_delay(&ushell, zerosim_delay)?;
+        ZeroSim::delay(&ushell, zerosim_delay)?;
     }
 
     // Update 0sim-experiments

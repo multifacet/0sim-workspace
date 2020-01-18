@@ -167,15 +167,8 @@ where
     );
 
     // Environment
-    turn_on_zswap(&mut ushell)?;
-
-    ushell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/module/zswap/parameters/max_pool_percent",
-            zswap_max_pool_percent
-        )
-        .use_bash(),
-    )?;
+    ZeroSim::turn_on_zswap(&mut ushell)?;
+    ZeroSim::zswap_max_pool_percent(&ushell, zswap_max_pool_percent)?;
 
     // Mount guest swap space
     let research_settings = crate::common::get_remote_research_settings(&ushell)?;

@@ -41,7 +41,7 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         connect_and_setup_host_and_vagrant(&login, 20, 1, ZEROSIM_SKIP_HALT, ZEROSIM_LAPIC_ADJUST)?;
 
     // Disable TSC offsetting so that setup runs faster
-    set_tsc_offsetting(&ushell, false)?;
+    ZeroSim::tsc_offsetting(&ushell, false)?;
 
     // Install the instrumented kernel on the guest.
     //

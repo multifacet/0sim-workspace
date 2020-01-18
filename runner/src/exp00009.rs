@@ -167,15 +167,8 @@ where
     );
 
     // Environment
-    turn_on_zswap(&mut ushell)?;
-
-    ushell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/module/zswap/parameters/max_pool_percent",
-            zswap_max_pool_percent
-        )
-        .use_bash(),
-    )?;
+    ZeroSim::turn_on_zswap(&mut ushell)?;
+    ZeroSim::zswap_max_pool_percent(&ushell, zswap_max_pool_percent)?;
 
     let zerosim_exp_path = &dir!(
         "/home/vagrant",

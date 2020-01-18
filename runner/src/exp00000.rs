@@ -65,9 +65,9 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         (@arg SIZE: -s --size +takes_value {is_usize}
          "The number of GBs of the workload (e.g. 500)")
         (@arg DRIFT_THRESHOLD: --drift_thresh +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_drift_threshold")
-        (@arg DELTA: --delay +takes_value {is_usize}
-         "(Optional) Set /proc/zerosim_delay")
+         "(Optional) Set multicore offsetting drift threshold.")
+        (@arg DELAY: --delay +takes_value {is_usize}
+         "(Optional) Set multicore offsetting delay.")
         (@arg DISABLE_ZSWAP: --disable_zswap
          "(Optional; not recommended) Disable zswap, forcing the hypervisor to \
          actually swap to disk")
@@ -215,23 +215,17 @@ where
 
     // Environment
     if !disable_zswap {
-        turn_on_zswap(&mut ushell)?;
+        ZeroSim::turn_on_zswap(&mut ushell)?;
 
         if let Some(threshold) = zerosim_drift_threshold {
-            set_zerosim_threshold(&ushell, threshold)?;
+            ZeroSim::threshold(&ushell, threshold)?;
         }
         if let Some(delay) = zerosim_delay {
-            set_zerosim_delay(&ushell, delay)?;
+            ZeroSim::delay(&ushell, delay)?;
         }
     }
 
-    ushell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/module/zswap/parameters/max_pool_percent",
-            zswap_max_pool_percent
-        )
-        .use_bash(),
-    )?;
+    ZeroSim::zswap_max_pool_percent(&ushell, zswap_max_pool_percent)?;
 
     let zerosim_exp_path = &dir!(
         "/home/vagrant",

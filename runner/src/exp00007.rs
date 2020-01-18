@@ -195,7 +195,7 @@ where
     let mut timers = vec![];
 
     // Environment
-    turn_on_zswap(&mut ushell)?;
+    ZeroSim::turn_on_zswap(&mut ushell)?;
 
     // Start and connect to VM
     let vshell = time!(
@@ -218,13 +218,7 @@ where
         .stdout;
     let size = size.trim().parse::<usize>().unwrap();
 
-    ushell.run(
-        cmd!(
-            "echo {} | sudo tee /sys/module/zswap/parameters/max_pool_percent",
-            zswap_max_pool_percent
-        )
-        .use_bash(),
-    )?;
+    ZeroSim::zswap_max_pool_percent(&ushell, zswap_max_pool_percent)?;
 
     let zerosim_exp_path = &dir!(
         "/home/vagrant",
