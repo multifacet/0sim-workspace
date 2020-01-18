@@ -211,7 +211,7 @@ pub fn clone_research_workspace(
     } else {
         // Clone the repo.
         ushell.run(cmd!(
-            "git clone {}",
+            "git clone {} 0sim-workspace",
             RESEARCH_WORKSPACE_REPO.git_repo_access_url(secret)
         ))?;
     }
