@@ -89,7 +89,7 @@ impl ZeroSim {
 
     /// Set the Zswap max_pool_percent.
     pub fn zswap_max_pool_percent(shell: &SshShell, pct: usize) -> Result<(), failure::Error> {
-        assert!(pct <= 100 && pct >= 0);
+        assert!(pct <= 100);
 
         shell.run(
             cmd!(

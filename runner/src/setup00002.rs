@@ -91,7 +91,6 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let kernel_config: Vec<_> = sub_m
         .values_of("CONFIGS")
         .unwrap()
-        .into_iter()
         .map(|arg| parse_config_option(arg).unwrap())
         .collect();
 
@@ -131,7 +130,7 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     crate::common::build_kernel(
         &ushell,
         KernelSrc::Git {
-            repo_path: kernel_path.clone(),
+            repo_path: kernel_path,
             git_branch: git_branch.into(),
             is_tag,
         },

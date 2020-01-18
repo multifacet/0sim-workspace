@@ -80,7 +80,7 @@ impl GitRepo<'_, '_> {
     /// If this repository is public or SSH is used, then `secret` is ignored.
     pub fn git_repo_access_url(&self, secret: Option<&str>) -> String {
         match (self, secret) {
-            (GitRepo::Ssh { repo }, _) => format!("{}", repo),
+            (GitRepo::Ssh { repo }, _) => repo.to_owned(),
             (GitRepo::HttpsPublic { repo }, _) => format!("https://{}", repo),
             (GitRepo::HttpsPrivate { repo, username }, Some(secret)) => {
                 format!("https://{}:{}@{}", username, secret, repo)

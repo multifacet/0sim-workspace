@@ -974,7 +974,7 @@ fn setup_proxy<A>(
 where
     A: std::net::ToSocketAddrs + std::fmt::Display + std::fmt::Debug + Clone,
 {
-    let mut parts = proxy.split(":");
+    let mut parts = proxy.split(':');
     let address = parts.next().unwrap();
     let port = parts.next().unwrap();
 
