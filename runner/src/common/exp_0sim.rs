@@ -19,8 +19,8 @@ pub const VAGRANT_CORES: usize = 1;
 
 /// The default value for /proc/zerosim_skip_halt.
 ///
-/// Turning this on breaks the x86 ISA contract. Don't do that.
-pub const ZEROSIM_SKIP_HALT: bool = false;
+/// Turning this on breaks the x86 ISA contract. Don't do that unless you know what you're about.
+pub const ZEROSIM_SKIP_HALT: bool = true;
 
 /// The default value for /proc/zerosim_lapic_adjust.
 pub const ZEROSIM_LAPIC_ADJUST: bool = true;
