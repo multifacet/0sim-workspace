@@ -296,6 +296,9 @@ pub fn connect_to_vagrant_as_user<A: std::net::ToSocketAddrs + std::fmt::Display
 pub fn vagrant_halt(shell: &SshShell) -> Result<(), failure::Error> {
     let vagrant_path = &dir!(RESEARCH_WORKSPACE_PATH, VAGRANT_SUBDIRECTORY);
 
+    // Speed things up...
+    ZeroSim::tsc_offsetting(shell, false)?;
+
     let res = shell.run(cmd!("vagrant halt").cwd(vagrant_path));
 
     if res.is_err() {
