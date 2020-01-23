@@ -20,7 +20,7 @@ pub const VAGRANT_CORES: usize = 1;
 /// The default value for /proc/zerosim_skip_halt.
 ///
 /// Turning this on breaks the x86 ISA contract. Don't do that unless you know what you're about.
-pub const ZEROSIM_SKIP_HALT: bool = false;
+pub const ZEROSIM_SKIP_HALT: bool = true;
 
 /// The default value for /proc/zerosim_lapic_adjust.
 pub const ZEROSIM_LAPIC_ADJUST: bool = true;
@@ -54,7 +54,7 @@ impl ZeroSim {
     pub fn skip_halt(shell: &SshShell, on: bool) -> Result<(), failure::Error> {
         shell.run(cmd!(
             "echo {} | sudo tee /proc/zerosim_skip_halt",
-            if on { "1" } else { "0" }
+            if on { "3" } else { "0" }
         ))?;
         Ok(())
     }
