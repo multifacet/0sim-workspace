@@ -39,7 +39,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          (NOTE: this needs to be passed before )")
         (@arg SECRET: --secret +takes_value requires[HTTPS] requires[USERNAME]
          "A secret token for accessing a private repository")
-        (@arg USERNAME: --username +takes_value requires[HTTPS] requires[SECRET]
+        (@arg GIT_USERNAME: --username +takes_value requires[HTTPS] requires[SECRET]
          "A username for accessing a private repository")
         (@arg CONFIGS: ... +allow_hyphen_values {validate_config_option}
          "Space separated list of Linux kernel configuration options, prefixed by \
@@ -102,7 +102,7 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     let git_repo = {
         let https = sub_m.value_of("HTTPS");
         let ssh = sub_m.value_of("SSH");
-        let username = sub_m.value_of("USERNAME");
+        let username = sub_m.value_of("GIT_USERNAME");
 
         match (https, ssh, secret) {
             (Some(https), None, None) => GitRepo::HttpsPublic { repo: https },
