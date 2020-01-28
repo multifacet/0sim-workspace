@@ -67,7 +67,7 @@ pub enum GitRepo<'a, 's> {
     /// Use SSH. Not PAT is needed, and this works for public and private repos.
     Ssh {
         /// Repo git URL (e.g. `git@github.com:multifacet/0sim-workspace`)
-        repo: String,
+        repo: &'s str,
     },
 }
 
@@ -80,7 +80,7 @@ impl GitRepo<'_, '_> {
     /// If this repository is public or SSH is used, then `secret` is ignored.
     pub fn git_repo_access_url(&self, secret: Option<&str>) -> String {
         match (self, secret) {
-            (GitRepo::Ssh { repo }, _) => repo.to_owned(),
+            (GitRepo::Ssh { repo }, _) => repo.to_string(),
             (GitRepo::HttpsPublic { repo }, _) => format!("https://{}", repo),
             (GitRepo::HttpsPrivate { repo, username }, Some(secret)) => {
                 format!("https://{}:{}@{}", username, secret, repo)
