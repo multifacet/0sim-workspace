@@ -10,7 +10,7 @@ use crate::common::{
     exp_0sim::*,
     get_user_home_dir,
     paths::{setup00000::*, setup00001::*, *},
-    KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login,
+    GitRepo, KernelBaseConfigSource, KernelConfig, KernelPkgType, KernelSrc, Login,
 };
 
 pub const GUEST_SWAP_GBS: usize = 10;
@@ -23,11 +23,24 @@ pub fn cli_options() -> clap::App<'static, 'static> {
          "The domain name of the remote (e.g. c240g2-031321.wisc.cloudlab.us:22)")
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
+        (@group GIT_REPO =>
+            (@attributes +required)
+            (@arg HTTPS: --https +takes_value
+             "The git repository to compile the kernel from as an HTTPS URL.")
+            (@arg SSH: --ssh +takes_value
+             "The git repository to compile the kernel from as an SSH address.")
+        )
         (@arg GIT_REPO: +required +takes_value
          "The git repository to compile the kernel from (either SSH or HTTPS)")
         (@arg GIT_BRANCH: +required +takes_value
          "The git branch to compile the kernel from (e.g. markm_ztier)")
-        (@arg IS_TAG: --tag "Pass if GIT_BRANCH is not a branch but a tag (NOTE: this needs to be passed before )")
+        (@arg IS_TAG: --tag
+         "Pass if GIT_BRANCH is not a branch but a tag \
+         (NOTE: this needs to be passed before )")
+        (@arg SECRET: --secret +takes_value requires[HTTPS] requires[USERNAME]
+         "A secret token for accessing a private repository")
+        (@arg USERNAME: --username +takes_value requires[HTTPS] requires[SECRET]
+         "A username for accessing a private repository")
         (@arg CONFIGS: ... +allow_hyphen_values {validate_config_option}
          "Space separated list of Linux kernel configuration options, prefixed by \
          + to enable and - to disable. For example, +CONFIG_ZSWAP or \
@@ -85,7 +98,23 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
         hostname: sub_m.value_of("HOSTNAME").unwrap(),
         host: sub_m.value_of("HOSTNAME").unwrap(),
     };
-    let git_repo = sub_m.value_of("GIT_REPO").unwrap();
+    let secret = sub_m.value_of("SECRET");
+    let git_repo = {
+        let https = sub_m.value_of("HTTPS");
+        let ssh = sub_m.value_of("SSH");
+        let username = sub_m.value_of("USERNAME");
+
+        match (https, ssh, secret) {
+            (Some(https), None, None) => GitRepo::HttpsPublic { repo: https },
+            (Some(https), None, Some(_)) => GitRepo::HttpsPrivate {
+                repo: https,
+                username: username.unwrap(),
+            },
+            (None, Some(ssh), None) => GitRepo::Ssh { repo: ssh },
+            _ => unreachable!(),
+        }
+    }
+    .git_repo_access_url(secret);
     let git_branch = sub_m.value_of("GIT_BRANCH").unwrap();
     let is_tag = sub_m.is_present("IS_TAG");
     let kernel_config: Vec<_> = sub_m
@@ -102,11 +131,11 @@ pub fn run(sub_m: &clap::ArgMatches<'_>) -> Result<(), failure::Error> {
     ZeroSim::tsc_offsetting(&ushell, false)?;
 
     // Clone the given kernel, if needed.
-    let kernel_path = pathify(git_repo, git_branch);
+    let kernel_path = pathify(&git_repo, git_branch);
     ushell.run(cmd!(
         "[ -e {} ] || git clone {} {}",
         kernel_path,
-        git_repo,
+        &git_repo,
         kernel_path
     ))?;
 
