@@ -74,7 +74,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
           token or password for cloning the repo.")
 
         (@arg HOST_KERNEL: +takes_value --host_kernel
-         "(Optional) The git branch to compile the kernel from (e.g. --host_kernel markm_ztier)")
+         "(Optional) The git branch to compile the kernel from (e.g. --host_kernel master)")
 
         (@arg HOST_BMKS: --host_bmks
          "(Optional) If passed, build host benchmarks. This also makes them available to the guest.")

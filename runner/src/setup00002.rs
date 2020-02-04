@@ -33,7 +33,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         (@arg GIT_REPO: +required +takes_value
          "The git repository to compile the kernel from (either SSH or HTTPS)")
         (@arg GIT_BRANCH: +required +takes_value
-         "The git branch to compile the kernel from (e.g. markm_ztier)")
+         "The git branch to compile the kernel from (e.g. master)")
         (@arg IS_TAG: --tag
          "Pass if GIT_BRANCH is not a branch but a tag \
          (NOTE: this needs to be passed before )")

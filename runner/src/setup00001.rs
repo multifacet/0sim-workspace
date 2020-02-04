@@ -24,7 +24,7 @@ pub fn cli_options() -> clap::App<'static, 'static> {
         (@arg USERNAME: +required +takes_value
          "The username on the remote (e.g. markm)")
         (@arg GIT_BRANCH: +required +takes_value
-         "The git branch to compile the kernel from (e.g. markm_ztier)")
+         "The git branch to compile the kernel from (e.g. master)")
     }
 }
 
