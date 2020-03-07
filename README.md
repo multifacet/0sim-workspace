@@ -32,8 +32,9 @@ systems (e.g. terabytes of RAM):
 > oblivious. 0sim takes advantage of data-obliviousness to make
 > huge simulations feasible and fast via memory compression.
 
-Mark Mansi and Michael M. Swift. _0sim: Preparing System Software for a World with Terabyte-scale Memories_. ASPLOS 2020.
-(TODO: link)
+Mark Mansi and Michael M. Swift. [_0sim: Preparing System Software for a World with Terabyte-scale Memories_][paper]. ASPLOS 2020.
+
+[paper]: https://pages.cs.wisc.edu/~markm/papers/zerosim.pdf
 
 ## Repository Contents
 
