@@ -1,0 +1,646 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>0sim User Guide</title>
+        
+        <meta name="robots" content="noindex" />
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div id="sidebar-scrollbox" class="sidebar-scrollbox">
+                <ol class="chapter"><li class="expanded "><a href="overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="expanded "><a href="requirements.html"><strong aria-hidden="true">2.</strong> Requirements</a></li><li class="expanded "><a href="getting-started.html"><strong aria-hidden="true">3.</strong> Getting Started</a></li><li><ol class="section"><li class="expanded "><a href="cloudlab.html"><strong aria-hidden="true">3.1.</strong> Cloudlab</a></li></ol></li><li class="expanded "><a href="troubleshooting.html"><strong aria-hidden="true">4.</strong> Troubleshooting</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar" class="menu-bar">
+                    <div id="menu-bar-sticky-container">
+                        <div class="left-buttons">
+                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                                <i class="fa fa-bars"></i>
+                            </button>
+                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                                <i class="fa fa-paint-brush"></i>
+                            </button>
+                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                                <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                            </ul>
+                            
+                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                                <i class="fa fa-search"></i>
+                            </button>
+                            
+                        </div>
+
+                        <h1 class="menu-title">0sim User Guide</h1>
+
+                        <div class="right-buttons">
+                            <a href="print.html" title="Print this book" aria-label="Print this book">
+                                <i id="print-button" class="fa fa-print"></i>
+                            </a>
+                            
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#overview" id="overview">Overview</a></h1>
+<blockquote>
+<p>This section is intended to give a quick overview of how 0sim and the
+associated tools are intended to be used. Feel free to skip to <a href="./getting-started.html"><code>Getting Started</code></a> if you already know.</p>
+</blockquote>
+<p><img src="./design.jpg" alt="Design Diagram" /></p>
+<p>The suggested workflow (the one we use) is to dedicate one machine to 0sim to
+run experiments. One would then drive this machine remotely from some local
+machine, such as a desktop workstation, via SSH.</p>
+<p>This repository contains a few tools we have developed and found useful in
+addition to 0sim. The paper (linked above mostly covers 0sim), but we rarely
+interact directly with 0sim. Instead, we drive it using the tools in this
+repository: <code>runner</code> and <code>jobserver</code>.</p>
+<ul>
+<li>
+<p><code>runner</code>: executes commands on the remote machine in 0sim. <code>runner</code> takes
+care of reproducible setup and execution. It also saves a ton of time. In
+general, <code>runner</code> has two types of subcommands:</p>
+<ul>
+<li><code>setup*</code> commands do setup/configuration work.</li>
+<li><code>exp*</code> command runs experiments.</li>
+</ul>
+</li>
+<li>
+<p><code>jobserver</code>: makes it easy to run a large number of experiments on one or
+more machines with possibly different parameters, collecting the results and
+logs in one place on the local machine for processing. The <code>jobserver</code> is
+more like a bookkeeping program that just forks off instances of <code>runner</code> to
+do the real work.</p>
+</li>
+</ul>
+<h1><a class="header" href="#requirements" id="requirements">Requirements</a></h1>
+<p>You will need two machines:</p>
+<ul>
+<li>one to run 0sim (since 0sim is a modified Linux kernel + KVM). We call this
+machine the <code>remote</code>. You need to be able to SSH to this machine <strong>without a
+user password or RSA key passphrase</strong>.</li>
+<li>one to run the runner. This machine should have a persistent network
+connection, so we would recommend some lab machine or a desktop machine. We
+call this machine the <code>local</code>.</li>
+</ul>
+<h2><a class="header" href="#local-machine-requirements" id="local-machine-requirements">Local machine requirements</a></h2>
+<ul>
+<li>
+<p>You will need stable rust on your local machine to build and run <code>runner</code>. We
+use 1.35, but slightly older versions should also work, and any newer version
+will work. You can get rust <a href="https://rustup.rs">here</a>.</p>
+</li>
+<li>
+<p>You will need an internet connection for <code>cargo</code> to download dependencies.</p>
+</li>
+<li>
+<p>You will need <strong>passphrase-less</strong> SSH access to the remote machine from the
+local machine. That is, you will need to use SSH, and the SSH key that must
+<em>not</em> have a passphrase.</p>
+</li>
+<li>
+<p><code>runner</code> should compile and run on Linux, MacOS, or Windows, but we have only
+tried Linux.</p>
+</li>
+</ul>
+<h2><a class="header" href="#remote-machine-requirements" id="remote-machine-requirements">Remote machine requirements</a></h2>
+<ul>
+<li>
+<p>The remote machine should be running CentOS 7. Newer versions may work, but we
+have not tested them.</p>
+</li>
+<li>
+<p>The remote machine should have your SSH key installed in <code>authorized_keys</code>.</p>
+</li>
+<li>
+<p>You must have <strong>password-less</strong> <code>sudo</code> access on the remote machine.</p>
+</li>
+<li>
+<p>The remote machine must be an Intel <code>x86_64</code> machine (AMD virtualization
+extensions are not supported yet).</p>
+</li>
+<li>
+<p>The remote machine must have an unused drive or partition that can be used
+for the swap space to back the simulator.</p>
+</li>
+</ul>
+<p><strong>Recommendations</strong></p>
+<ul>
+<li>32GB RAM or more</li>
+<li>1-2TB of swap space, preferably SSD</li>
+<li>See <a href="./cloudlab.html">this section</a> for recommendations of CloudLab instances.</li>
+</ul>
+<h2><a class="header" href="#other-requirements" id="other-requirements">Other requirements</a></h2>
+<ul>
+<li>
+<p>If you are using a private fork of this workspace, you will need a GitHub
+Personal Access Token to run <code>setup00000</code>, which is the main setup routine.
+<a href="https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line">See these instructions for GitHub Tokens</a>.</p>
+</li>
+<li>
+<p>You will need access to the <code>multifacet/0sim-workspace</code> repo and its
+submodules because they will be cloned to the remote machine.</p>
+</li>
+</ul>
+<h1><a class="header" href="#getting-started" id="getting-started">Getting Started</a></h1>
+<p>The workspace contains a bunch of tools, described in the contents section. The
+most important are the <code>runner</code> and <code>0sim</code> itself. The runner drives
+experiments and contains a library for writing and driving other experiments.
+There is an emphasis on reproducibility and ergonomic usage. <code>jobserver</code> is
+useful for running large numbers of experiments on one or more remotes with one
+or more variations of parameters.</p>
+<ol start="0">
+<li><a href="./requirements.html">Ensuring requirements (see above). Don't skip this or things will break.</a></li>
+<li><a href="getting-started.html#runner">Cloning and building the runner</a></li>
+<li><a href="getting-started.html#install-sim">Using the runner to set up another machine with 0sim</a></li>
+<li><a href="getting-started.html#run-exp">Using the runner to run a simulation with 0sim</a></li>
+<li><a href="getting-started.html#jobserver">(Optional) Using the jobserver to run a large number of experiments with the runner</a></li>
+</ol>
+<p><a name="runner"></a></p>
+<h2><a class="header" href="#cloning-and-building-the-runner" id="cloning-and-building-the-runner">Cloning and Building the runner</a></h2>
+<ol start="0">
+<li>
+<p>Clone this repository <em>to the local machine</em> (not the remote, runner will do
+that automatically).</p>
+<pre><code>git clone https://github.com/multifacet/0sim-workspace.git
+</code></pre>
+<p>Note, you only need to clone this repository, <em>not</em> all of the submodules. In
+particular, you do <em>not</em> need to clone 0sim, which would take a long time.</p>
+</li>
+<li>
+<p>If needed, edit the constant <code>RESEARCH_WORKSPACE_REPO</code> at the top of
+<a href="https://github.com/multifacet/0sim-workspace/blob/master/runner/src/common.rs#L29"><code>./runner/src/common.rs</code></a>. This specifies the location and access
+method of the workspace repo (this repo). <strong>NOTE</strong>: this is the access
+method that is used to clone the repo on the <em>remote</em>, so make sure that it
+works there. For example, make sure that necessary private keys are
+installed there if using SSH.</p>
+<ul>
+<li>If you are just using our public repository from github, you can leave it as is.</li>
+<li>If you are using a private fork of our repository, you should change the
+constant to <code>GitRepo::HttpsPrivate</code> with the appropriate values filled in.</li>
+<li>If you are using SSH to access the repo, you should change the constant to <code>GitRepo::Ssh</code>.</li>
+<li>See the documentation comments on the <code>GitRepo</code> type just below the constant.</li>
+</ul>
+</li>
+<li>
+<p>Build the runner. This may take a few minutes. This requires rust + cargo,
+as the runner is written in rust. You can install rust from <a href="https://rustup.rs">here</a>.</p>
+<pre><code>cd runner
+cargo build
+</code></pre>
+</li>
+<li>
+<p>The runner is now built. The compiled binary is <code>./target/debug/runner</code>. You
+can pass the <code>--help</code> flag to see usage. It has a bunch of possible
+subcommands. They do various setup operations or run experiments.</p>
+<ul>
+<li><strong>NOTE</strong> The runner must be run from the <code>0sim-workspace/runner</code> directory;
+i.e. always run it as <code>./target/debug/runner &lt;args&gt;</code></li>
+</ul>
+</li>
+</ol>
+<p><a name="install-sim"></a></p>
+<h2><a class="header" href="#using-the-runner-to-install-0sim-on-a-remote-machine" id="using-the-runner-to-install-0sim-on-a-remote-machine">Using the Runner to install 0sim on a remote machine.</a></h2>
+<ol start="0">
+<li>
+<p>Make sure the remote machine (the one that will run 0sim) is set up as
+described in the requirements. Specifically, you need passwordless access to
+the remote and you must have root access (since you will be installing a new
+kernel on it).</p>
+</li>
+<li>
+<p>(Optional) If you are running on Cloudlab, the default root volume is only
+16GB, which is not enough. You can pass another volume to be formatted and
+mounted as the root volume by passing the <code>--home_device</code> flag in the
+command in the step below.</p>
+</li>
+<li>
+<p>(Optional) 0sim requires a swap device to back its simulated memory, even
+though we likely won't write to most of it many workloads. The runner has
+two flags that allow different swap devices to be set up automatically:</p>
+<p><code>--mapper_device</code> sets up a 10TB thin-provisioned device-mapper device.</p>
+<p><code>--swap</code> uses the given devices for swap space.</p>
+<p>See the <code>--help</code> usage message for more info.</p>
+<p>You can skip this for now and set up a swap device later if you want.</p>
+</li>
+<li>
+<p>(Optional) If you would like to build and install a recent kernel (see the
+<code>KERNEL_RECENT_TARBALL</code> constant in <code>src/common.rs</code>) in the target, use
+the <code>--guest_kernel</code> option. Alternately, you can install whatever kernel
+you want manually.</p>
+</li>
+<li>
+<p>Run the following command, which will do all setup necessary, including
+cloning the workspace, compiling 0sim, and installing it. This takes about 1
+hour on our machine, but it will vary depending on how many cores the remote
+has.</p>
+<pre><code>./target/debug/runner setup00000 $ADDR $ME --host_dep --create_vm \
+--host_bmks --prepare_host --host_kernel master --clone_wkspc \
+--guest_bmks
+# optionally (if not using public repo) --secret $TOKEN
+# optionally --home_device /dev/sdc --mapper_device /dev/sdb
+</code></pre>
+<p>where <code>$ADDR</code> is the SSH address:port of the machine (e.g. <code>mark.cs.wisc.edu:22</code>),
+<code>$ME</code> is the username that will run the experiments, and <code>$TOKEN</code> is the
+GitHub Personal Access Token.</p>
+<p>There are also some additional flags you can pass (e.g. to disable EPT or
+build extra benchmarks), including the flags from the previous steps. Run
+the following command to see what they are:</p>
+<pre><code>./target/debug/runner setup00000 --help
+</code></pre>
+<p><strong>NOTE</strong> The runner must be run from the <code>0sim-workspace/runner</code> directory;
+i.e. always run it as <code>./target/debug/runner &lt;args&gt;</code></p>
+</li>
+</ol>
+<p><a name="run-exp"></a></p>
+<h2><a class="header" href="#using-the-runner-to-run-experiments-on-a-remote-machine" id="using-the-runner-to-run-experiments-on-a-remote-machine">Using the Runner to run experiments on a remote machine.</a></h2>
+<p>Experiment scripts are implemented as modules of the <code>runner</code> program. Each one
+exports a subcommand. You can see all of the available experiments by passing
+the <code>--help</code> flag to the runner:</p>
+<pre><code>./target/debug/runner --help
+</code></pre>
+<p><code>runner</code> is extensible and contains a library of useful function for adding new
+experiments in the form of new modules/subcommands.</p>
+<p><code>runner</code> also contains infrastructure for recording parameters and code
+versions of the experiments to improve reproducibility.</p>
+<ol start="0">
+<li>
+<p>Implement your experiment as a subcommand of the <code>runner</code> or choose one of
+the existing experiments.</p>
+</li>
+<li>
+<p>Choose the parameters you want to use for experiment. Pass <code>--help</code> to the
+experiment subcommand to see available parameters.</p>
+</li>
+<li>
+<p>Run the following command on the <em>local</em> machine:</p>
+<pre><code>./target/debug/runner expXXXXX $ADDR $ME ARG1 ARG2...
+</code></pre>
+<p>where $ADDR is the IP:PORT of the remote SSH server, $ME is the remote user
+that will be used to run the experiments, and ARG1, ARG2, etc are the
+arguments to the experiment. For example, one might run the following:</p>
+<pre><code>./target/debug/runner exp00000 marks-machine.cs.wisc.edu:22 markm 4096 1 -m
+</code></pre>
+<p><strong>NOTE</strong> The runner must be run from the <code>0sim-workspace/runner</code> directory;
+i.e. always run it as <code>./target/debug/runner &lt;args&gt;</code></p>
+</li>
+<li>
+<p>Wait for the experiment to terminate.</p>
+</li>
+<li>
+<p>Most experiments output results to a directory on the remote:
+<code>$HOME/vm_shared/results/</code>. These results can then be moved to wherever they
+will be consumed. There are a few different output files for each experiment:</p>
+<ul>
+<li>The data generated by the experiment (usually <code>.out</code>, but some experiments
+use other extensions, especially if there are multiple generated data
+files).</li>
+<li>The parameters/settings of the experiment (<code>.params</code>), including the git
+hash of the workspace.</li>
+<li>The time to run the experiment (<code>.time</code>).</li>
+<li>Infomation about the platform and target, useful for debugging (<code>.sim</code>),
+including the output of <code>lscpu</code>, <code>lsblk</code>, and <code>dmesg</code>, memory usage, and
+zswap status.</li>
+</ul>
+</li>
+</ol>
+<p><a name="jobserver"></a></p>
+<h2><a class="header" href="#using-the-jobserver-to-run-many-experiments" id="using-the-jobserver-to-run-many-experiments">Using the jobserver to run many experiments.</a></h2>
+<p>The jobserver exists to solve a problem that we often ran into while developing 0sim:</p>
+<ul>
+<li>One has multiple machines to run experiments on (e.g. multiple cloudlab instances).</li>
+<li>One has many experiments to run.</li>
+<li>The experiments need to be rerun with a bunch of different combinations of the parameters.</li>
+</ul>
+<p>Trying to manage this all by hand is extremely tedious, time consuming, and
+inefficient. The jobserver does this for you.</p>
+<p>For more info on how to use the jobserver, please see the <a href="https://github.com/mark-i-m/jobserver">jobserver
+README</a>.</p>
+<h1><a class="header" href="#cloudlab" id="cloudlab">Cloudlab</a></h1>
+<h2><a class="header" href="#recommended-hardwareprofile" id="recommended-hardwareprofile">Recommended Hardware/Profile</a></h2>
+<ol start="0">
+<li>
+<p>The following profile allows for easy creation of one or more Centos 7 instances:
+https://www.cloudlab.us/p/SuperPages/centos-n-bare-metal</p>
+</li>
+<li>
+<p>The <code>c220g2</code> instance type is well-suited for 0sim.</p>
+<ul>
+<li>There are two spare drives: a smaller SSD (usually <code>/dev/sdc</code>) and a
+large HDD (usually <code>/dev/sdb</code>). Depending on how data-oblivious your
+workload is, you may want to make the HDD your swap space because it is
+larger, even though it is slower.</li>
+<li>You can use the <code>--mapper_device</code>, <code>--swap</code>, and <code>--home_device</code> options
+of the <code>runner</code> with setup00000 to setup a cloudlab machine. See the
+usage message.</li>
+</ul>
+</li>
+</ol>
+<h2><a class="header" href="#cloudlab-troubleshooting" id="cloudlab-troubleshooting">Cloudlab Troubleshooting</a></h2>
+<ol start="0">
+<li>
+<p>On occasion, there is a Mellanox RDMA driver that conflicts with KVM/QEMU's
+install dependencies. You will get an error while running <code>setup00000</code>.
+Uninstall the Mellanox driver; we don't need it. The restart the script.</p>
+</li>
+<li>
+<p>There is a bug in the <code>spurs</code> library that we have yet to debug. Often the
+script will crash with the unhelpful error <code>no other error listed</code>. Usually
+this happens just after we finish setting up the host and rebooting it in
+<code>setup00000</code>. In this case, just restart the script. You can use the <code>-v</code>
+flag to set up only the VM, which is what we want.</p>
+</li>
+</ol>
+<h1><a class="header" href="#troubleshooting" id="troubleshooting">Troubleshooting</a></h1>
+<p>We will collect common issues here as they are reported...</p>
+<ul>
+<li>
+<p>Vagrant error: <code>Call to virDomainCreateWithFlags failed: internal error: qemu unexpectedly closed the monitor: 2019-11-26T23:49:09.807847Z qemu-kvm: unrecognized feature phys-bits</code></p>
+<ul>
+<li>Cause: This happens because <code>libvirtd</code> is using an old version of QEMU
+packaged with Centos which is masking the recent version compiled from
+source by <code>runner</code>.</li>
+<li>Solution: Uninstall the old version: <code>sudo yum remove qemu-kvm</code>, and
+restart libvirtd: <code>sudo systemctl restart libvirtd</code></li>
+</ul>
+</li>
+<li>
+<p>Out of memory (OOM) killing: The target workload is OOM killed near the end
+by the target kernel.</p>
+<ul>
+<li>Cause: unfortunately, the exact amount of memory used by a workload
+running on Linux and the exact amount of memory available before
+triggering the OOM killer are both difficult quantities to estimate.
+They vary from system to system.</li>
+<li>Solution: sometimes rerunning the workload may be sufficient. Sometimes
+it is necessary to modify the <code>runner</code> script for the experiment to
+create a larger target or a smaller workload. Some scripts also have
+flags to modify the workload size.</li>
+</ul>
+</li>
+<li>
+<p>Kernel <code>ENOSPC</code> when swapping + no apparent progress.</p>
+<ul>
+<li>Causes: if a thinly-provisioned swap space fills up, the device mapper
+system will return a <code>ENOSPC</code> error to the swapping subsystem. One can
+see this error in the kernel log on the platform (via <code>dmesg</code>).</li>
+<li>Solution: You need a large physical storage device to back the
+thin-provisioned device mapper device.</li>
+</ul>
+</li>
+<li>
+<p><code>swapon: /dev/sdk: read swap header failed: Invalid argument</code> or similar
+on a machine with many storage devices.</p>
+<ul>
+<li>
+<p>Causes: often the devices will move around and get different names after
+a reboot. This means that if you configured (via <code>setup00000</code>) 0sim to
+use a particular device (say <code>/dev/sdk</code>) for swap space, it might fail
+after a reboot.</p>
+</li>
+<li>
+<p>Solution: pass the <code>--unstable_device_names</code> flag to <code>setup00000</code> along
+with your other arguments. For example:</p>
+<pre><code class="language-console">--swap sda sdh sdi --unstable_device_names
+</code></pre>
+<p>This will cause setup to use device-id based paths, which are stable.</p>
+</li>
+</ul>
+</li>
+</ul>
+<h1><a class="header" href="#known-issues" id="known-issues">Known Issues</a></h1>
+<p>There are some issues of which we are aware but do not have a good solution.</p>
+<ul>
+<li>
+<p>SSH Errors: &quot;Broken pipe&quot; or &quot;Unable to create channel&quot; or variants</p>
+<ul>
+<li>Cause: This happens because the target gets so far behind the platform
+that the SSH connection times out. Unfortunately, this often happens for
+large simulations.</li>
+<li>We also suspect that this issue is worsened when Intel EPT (nested paging)
+extensions are enabled. One can use <code>runner setup00000</code> to disable EPT
+(see usage message).</li>
+</ul>
+</li>
+<li>
+<p>Unable to boot target larger than 511GB. <code>vagrant up</code> hangs at &quot;Waiting for
+guest to obtain IP&quot; or &quot;Waiting for guest to respond SSH&quot;.</p>
+<ul>
+<li>
+<p>Cause: Often this happens on standard personal computers (as opposed to
+server-class machines) when Intel EPT is enabled. These are part of
+Intel's extended/nested paging extensions. Most non-server processors we
+have tested have 39 physical-address bits, which is enough to address
+512GB of memory. By enabling EPT, the processor is forced to translate
+addresses that are too wide. QEMU manifests this by conveniently and
+inexplicably hanging at guest boot time without any error messages.</p>
+</li>
+<li>
+<p>Solution: Disable EPT on the platform machine. This can be done through
+the runner (<code>setup00000</code>):</p>
+<pre><code>./runner setup00000 {MACHINE} {USER} --disable_ept
+</code></pre>
+</li>
+</ul>
+</li>
+<li>
+<p>Unable to boot target larger than 1028GB on machine without EPT on some machines.</p>
+<ul>
+<li>Cause: We believe this is a KVM bug but are not 100% sure. The fact that
+1024-1027GB machines boot and run indicates that this is not a hardware
+limitation.</li>
+</ul>
+</li>
+<li>
+<p>Unable to boot large multicore target.</p>
+<ul>
+<li>Cause: This also happens with stock KVM. We suspect this is due to some
+sort of hardware timeout when KVM emulates devices during boot, but we
+are not really sure.</li>
+<li>Disabling TSC offsetting during target boot can solve this in some cases.</li>
+<li>In some cases, running with 1023GB instead of &gt;=1024GB resolves the
+issue. This seems like a KVM bug.</li>
+</ul>
+</li>
+<li>
+<p>Hanging/Unresponsive Remote. Occasionally, the simulation platform becomes
+unresponsive. It is ok to forcibly reset the remote, even if the machine is
+booted.</p>
+<ul>
+<li>This may cause the target's VM image to become corrupted. The image can
+be recreated by rerunning the appropriate <code>setup*</code> <code>runner</code> subcommands.
+Note that a subset of flags can be passed to <code>setup00000</code> (e.g. one does
+not need to keep passing <code>--host_kernel</code>). The <code>--DESTROY_EXISTING</code> flag
+will destroy any existing target VM.</li>
+</ul>
+</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+        
+        
+        <script type="text/javascript">
+            window.playpen_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+        
+        <script type="text/javascript">
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+        
+        
+
+    </body>
+</html>
