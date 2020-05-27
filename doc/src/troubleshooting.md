@@ -56,6 +56,22 @@ There are some issues of which we are aware but do not have a good solution.
       extensions are enabled. One can use `runner setup00000` to disable EPT
       (see usage message).
 
+- Unable to boot target larger than 511GB. `vagrant up` hangs at "Waiting for
+  guest to obtain IP" or "Waiting for guest to respond SSH".
+    - Cause: Often this happens on standard personal computers (as opposed to
+      server-class machines) when Intel EPT is enabled. These are part of
+      Intel's extended/nested paging extensions. Most non-server processors we
+      have tested have 39 physical-address bits, which is enough to address
+      512GB of memory. By enabling EPT, the processor is forced to translate
+      addresses that are too wide. QEMU manifests this by conveniently and
+      inexplicably hanging at guest boot time without any error messages.
+    - Solution: Disable EPT on the platform machine. This can be done through
+      the runner (`setup00000`):
+
+      ```
+      ./runner setup00000 {MACHINE} {USER} --disable_ept
+      ```
+
 - Unable to boot target larger than 1028GB on machine without EPT on some machines.
     - Cause: We believe this is a KVM bug but are not 100% sure. The fact that
       1024-1027GB machines boot and run indicates that this is not a hardware
